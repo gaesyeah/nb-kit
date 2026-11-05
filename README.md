@@ -77,7 +77,17 @@ O `userdir` é opcional. O padrão é o NetBeans mais novo em `~/.netbeans/`. O 
 - **Módulo de coloração não carregou:** confira se o NetBeans roda com Java 17 ou mais novo. O `check` mostra qual Java ele está usando.
 - **Algo diferente do esperado:** rode o `check` com o NetBeans aberto e veja quais itens aparecem como `PROBLEMA`.
 
-## Créditos
+## Licença
 
-- Cores: [One Dark Pro](https://github.com/Binaryify/OneDark-Pro), variante Mix, por Binaryify.
-- Fonte: [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), licença SIL Open Font License 1.1.
+[MIT](LICENSE).
+
+### Terceiros
+
+- **Cores:** [One Dark Pro](https://github.com/Binaryify/OneDark-Pro), variante Mix.
+  Copyright (c) 2013-2022 Binaryify, licença MIT.
+- **Fonte:** [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), baixada do repositório
+  oficial durante a instalação. Copyright 2020 The JetBrains Mono Project Authors, licença SIL Open Font License 1.1.
+- **Apache NetBeans** e **FlatLaf** são licenciados sob Apache 2.0. O módulo usa as APIs públicas do NetBeans.
+
+Projeto independente, sem vínculo com a Apache Software Foundation, com a JetBrains nem com os autores do One Dark Pro.
+"Apache NetBeans" é marca registrada da Apache Software Foundation.
