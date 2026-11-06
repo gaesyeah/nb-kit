@@ -6,7 +6,7 @@
 set -euo pipefail
 # Ctrl+C sai com codigo 130 (o trap de saida usa isso para desfazer uma instalacao pela metade)
 trap 'exit 130' INT TERM HUP
-VERSION=25
+VERSION=26
 
 usage() {
   local me; me="$(basename "$0")"
@@ -76,7 +76,8 @@ ask_yn() {
 
 # menu com setas; resultado em MENU_IDX (-1 = saiu com Esc ou q)
 menu() {
-  local -a o=("$@"); local n=$# i=0 j k rest
+  local -a o=("$@"); local n=$# i=${MENU_START:-0} j k rest
+  [ "$i" -lt "$n" ] || i=0
   printf '\e[?25l'; trap 'printf "\e[?25h\n"; exit 130' INT
   while :; do
     for ((j = 0; j < n; j++)); do
@@ -229,52 +230,162 @@ fi
 [ -n "$UD" ] || die "userdir não encontrado. Veja em Help > About (User directory) e passe como argumento."
 [ -d "$UD/config" ] || die "'$UD' não parece um userdir do NetBeans (sem pasta config/). Abra o NetBeans uma vez antes."
 
+# ---------- backups ----------
+# backups do estado de antes do tema (feitos na instalacao), do mais antigo para o mais novo
+bk_list() { ls -1 "$UD"/onedark-backup-*.tar.gz 2>/dev/null | sort; return 0; }
+bk_date() {
+  local b; b="$(basename "$1" .tar.gz)"; b="${b#onedark-backup-}"
+  if [[ "$b" =~ ^([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})$ ]]; then
+    echo "${BASH_REMATCH[3]}/${BASH_REMATCH[2]}/${BASH_REMATCH[1]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}"
+  else echo "$b"; fi
+}
+declare -A BKDESC=()
+# o que tem dentro: interface (FlatDarkLaf.properties) e/ou cores do FlatLaf Dark
+bk_desc() {
+  local l n p=()
+  if [ -z "${BKDESC[$1]:-}" ]; then
+    l="$(tar -tzf "$1" 2>/dev/null || true)"
+    if grep -qx 'config/LookAndFeel/FlatDarkLaf.properties' <<<"$l"; then p+=("interface (FlatDarkLaf.properties)"); fi
+    n="$(grep -oE '^config/Editors/[^/]+/[^/]+/FontsColors/FlatLafDark/' <<<"$l" | sort -u | wc -l || true)"
+    if [ "${n:-0}" -gt 0 ]; then p+=("cores do FlatLaf Dark ($n linguagens)")
+    elif grep -q '^config/Editors/FontsColors/FlatLafDark/' <<<"$l"; then p+=("cores do FlatLaf Dark"); fi
+    [ ${#p[@]} -gt 0 ] || p=("vazio")
+    BKDESC[$1]="$(IFS=+; echo "${p[*]}" | sed 's/+/ + /g')"
+  fi
+  echo "${BKDESC[$1]}"
+}
+bk_size() { local b; b=$(stat -c %s "$1" 2>/dev/null || echo 0); echo "$(( (b + 1023) / 1024 )) KB"; }
+
+# navega pelos backups: Enter restaura, Del apaga, Esc volta. Restaurar confirmado fica em RESTORE_BK
+browse_backups() {
+  local -a bks; local i=0 n j k rest line first
+  RESTORE_BK=""
+  printf '\e[?1049h'; trap 'printf "\e[?25h\e[?1049l"; exit 130' INT
+  while :; do
+    mapfile -t bks < <(bk_list)
+    n=${#bks[@]}
+    [ "$n" -gt 0 ] || break
+    [ "$i" -lt "$n" ] || i=$((n - 1))
+    first="${bks[0]}"
+    printf '\e[H\e[2J\e[?25l'
+    echo "${B}One Dark Pro Mix para NetBeans${N} ${D}v$VERSION${N}"
+    echo "  ${B}Backups${N}  ${D}${UD/#$HOME/\~}${N}"
+    echo
+    for ((j = 0; j < n; j++)); do
+      line="$(bk_date "${bks[j]}")   $(printf '%6s' "$(bk_size "${bks[j]}")")   $(bk_desc "${bks[j]}")"
+      [ "${bks[j]}" = "$first" ] && line="$line   ${D}(original, usado ao desinstalar)${N}"
+      if [ $j -eq $i ]; then printf '  %s> %s%s\n' "$BL$B" "$line" "$N"; else printf '    %s\n' "$line"; fi
+    done
+    echo
+    printf '  %s↑↓ navegar   Enter restaurar   Del apagar   Esc voltar%s' "$D" "$N"
+    IFS= read -rsn1 k </dev/tty || k=q
+    if [ "$k" = $'\e' ]; then
+      rest=""; IFS= read -rsn2 -t 0.05 rest </dev/tty || true
+      case "$rest" in
+        '[A'|OA) k=up ;;
+        '[B'|OB) k=down ;;
+        '[3') IFS= read -rsn1 -t 0.05 j </dev/tty || true; k=del ;;
+        '') k=q ;;
+        *) k=x ;;
+      esac
+    fi
+    case "$k" in
+      up|k) i=$(( (i + n - 1) % n )) ;;
+      down|j) i=$(( (i + 1) % n )) ;;
+      q) break ;;
+      del)
+        printf '\e[?25h\n\n'
+        if [ "$n" = 1 ] && [ -e "$UD/modules/com-onedarkmix-netbeans.jar" ]; then
+          echo "  ${Y}É o único backup.${N} Sem ele, desinstalar o tema não tem como voltar o FlatDarkLaf.properties de antes."
+          echo
+        fi
+        if ask_yn "Apagar o backup de $(bk_date "${bks[i]}")?" N; then
+          rm -f "${bks[i]}"; unset 'BKDESC[${bks[i]}]'
+          ok "backup apagado"; sleep 0.8
+        fi ;;
+      '')
+        printf '\e[?25h\n\n'
+        echo "  Volta como estava em $(bk_date "${bks[i]}"): $(bk_desc "${bks[i]}")."
+        if [ -e "$UD/modules/com-onedarkmix-netbeans.jar" ] || [ -d "$UD/config/Editors/FontsColors/One Dark Pro Mix" ]; then
+          echo "  Antes disso o tema é desinstalado."
+        else
+          echo "  O que você tem hoje nessas configurações vira um backup novo, então dá pra desfazer."
+        fi
+        echo
+        if ask_yn "Restaurar este backup?" N; then RESTORE_BK="${bks[i]}"; break; fi ;;
+    esac
+  done
+  printf '\e[?25h\e[?1049l'; trap 'exit 130' INT
+}
+
 # ---------- status e menu ----------
 if [ $MENU = 1 ]; then
   JAR="$UD/modules/com-onedarkmix-netbeans.jar"
   INSTVER="$(cat "$UD/onedark-version" 2>/dev/null || true)"
+  INSTALLED=0
+  if [ -e "$JAR" ] || [ -d "$UD/config/Editors/FontsColors/One Dark Pro Mix" ]; then INSTALLED=1; fi
   header
   echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"
-  if [ -e "$JAR" ] || [ -d "$UD/config/Editors/FontsColors/One Dark Pro Mix" ]; then
+  if [ $INSTALLED = 1 ]; then
     if [ "$INSTVER" = "$VERSION" ] || { [ -z "$INSTVER" ] && [ -e "$JAR" ] && [ "$(sha256sum "$JAR" | cut -d' ' -f1)" = "$JARSHA" ]; }; then
-      echo "  ${D}status${N}   ${G}● instalado${N} ${D}(v$VERSION)${N}"; opts=("Reinstalar")
+      echo "  ${D}status${N}   ${G}● instalado${N} ${D}(v$VERSION)${N}"; FIRSTOPT="Reinstalar"
     elif [[ "$INSTVER" =~ ^[0-9]+$ ]] && [ "$INSTVER" -gt "$VERSION" ]; then
-      echo "  ${D}status${N}   ${Y}● instalado (v$INSTVER, mais nova que este script)${N}"; opts=("Reinstalar com a v$VERSION")
+      echo "  ${D}status${N}   ${Y}● instalado (v$INSTVER, mais nova que este script)${N}"; FIRSTOPT="Reinstalar com a v$VERSION"
     else
       if [ -n "$INSTVER" ]; then old="v$INSTVER"; else old="versão anterior"; fi
-      echo "  ${D}status${N}   ${Y}● instalado ($old)${N}"; opts=("Atualizar para a v$VERSION")
+      echo "  ${D}status${N}   ${Y}● instalado ($old)${N}"; FIRSTOPT="Atualizar para a v$VERSION"
     fi
-    acts=(install)
-    if [ -e "$JAR" ] && [ -e "$UD/var/log/messages.log" ] && [ "$UD/var/log/messages.log" -nt "$JAR" ]; then
+  else
+    echo "  ${D}status${N}   ○ não instalado"; FIRSTOPT="Instalar"
+  fi
+  echo
+  MENU_START=0
+  while :; do
+    mapfile -t BKS < <(bk_list)
+    # sem backups e sem tema: nao tem menu, so a pergunta
+    if [ $INSTALLED = 0 ] && [ ${#BKS[@]} = 0 ]; then
+      ask_yn "Instalar agora?" S || { echo "Nada foi alterado."; exit 0; }
+      ACTION=install; break
+    fi
+    opts=("$FIRSTOPT"); acts=(install)
+    if [ $INSTALLED = 1 ] && [ -e "$JAR" ] && [ -e "$UD/var/log/messages.log" ] && [ "$UD/var/log/messages.log" -nt "$JAR" ]; then
       opts+=("Conferir se carregou no NetBeans"); acts+=(check)
     fi
-    opts+=("Desinstalar" "Sair"); acts+=(uninstall quit)
-    echo
+    if [ ${#BKS[@]} -gt 0 ]; then opts+=("Backups (${#BKS[@]})"); acts+=(backups); fi
+    if [ $INSTALLED = 1 ]; then opts+=("Desinstalar"); acts+=(uninstall); fi
+    opts+=("Sair"); acts+=(quit)
     menu "${opts[@]}"
     [ "$MENU_IDX" -lt 0 ] && { echo; exit 0; }
     ACTION="${acts[$MENU_IDX]}"
     [ "$ACTION" = quit ] && { echo; exit 0; }
-    echo
-    if [ "$ACTION" = uninstall ]; then
-      echo
-      echo "  ${B}Sai:${N}   perfil \"One Dark Pro Mix\", módulo de coloração, interface do tema, cor de seleção do terminal"
-      echo "  ${B}Volta:${N} o visual e o perfil de cores que você usava antes"
-      if [ -e "${XDG_DATA_HOME:-$HOME/.local/share}/fonts/JetBrainsMono/.onedark-installed" ]; then
-        echo "  ${B}Fica:${N}  o perfil FlatLaf Dark, como sempre esteve ${D}(a JetBrains Mono sai: foi o script que instalou)${N}"
-      else
-        echo "  ${B}Fica:${N}  o perfil FlatLaf Dark, como sempre esteve, e a fonte JetBrains Mono"
+    if [ "$ACTION" = backups ]; then
+      browse_backups
+      if [ -n "$RESTORE_BK" ]; then
+        # com o tema instalado, restaurar passa pela desinstalacao (usando este backup)
+        if [ $INSTALLED = 1 ]; then ACTION=uninstall; else ACTION=restore; fi
+        break
       fi
-      echo
-      ask_yn "Desinstalar o tema?" N || { echo "Nada foi alterado."; exit 0; }
+      # volta para o menu, redesenhado no mesmo lugar e no mesmo item
+      MENU_START=$MENU_IDX
+      printf '\e[%dA\r\e[J' "${#opts[@]}"
+      continue
+    fi
+    break
+  done
+  echo
+  if [ "$ACTION" = uninstall ] && [ -z "${RESTORE_BK:-}" ]; then
+    echo
+    echo "  ${B}Sai:${N}   perfil \"One Dark Pro Mix\", módulo de coloração, interface do tema, cor de seleção do terminal"
+    echo "  ${B}Volta:${N} o visual e o perfil de cores que você usava antes"
+    if [ -e "${XDG_DATA_HOME:-$HOME/.local/share}/fonts/JetBrainsMono/.onedark-installed" ]; then
+      echo "  ${B}Fica:${N}  o perfil FlatLaf Dark, como sempre esteve ${D}(a JetBrains Mono sai: foi o script que instalou)${N}"
+    else
+      echo "  ${B}Fica:${N}  o perfil FlatLaf Dark, como sempre esteve, e a fonte JetBrains Mono"
     fi
     echo
-  else
-    echo "  ${D}status${N}   ○ não instalado"
-    echo
-    ask_yn "Instalar agora?" S || { echo "Nada foi alterado."; exit 0; }
-    echo
-    ACTION=install
+    ask_yn "Desinstalar o tema?" N || { echo "Nada foi alterado."; exit 0; }
   fi
+  echo
 fi
 
 if [ "$ACTION" = "check" ]; then
@@ -840,14 +951,43 @@ for e in M.parse(sys.argv[1]).getElementsByTagName('fontcolor'):
 PY
 }
 
+# volta as configuracoes cobertas pelo backup exatamente como estavam nele
+restore_backup() {
+  local d; d="$(bk_date "$1")"
+  remove_targets
+  tar -xzf "$1" -C "$UD"
+  touch "$UD/.lastModified"
+  ok "$(bk_desc "$1") como em $d"
+}
+
+if [ "$ACTION" = "restore" ]; then
+  [ -n "${RESTORE_BK:-}" ] && [ -f "$RESTORE_BK" ] || die "backup não encontrado."
+  TOTAL=2
+  if [ $HEADER = 0 ]; then header; echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"; echo; fi
+  step "Backup do que você tem hoje"
+  backup
+  step "Restaurando o backup de $(bk_date "$RESTORE_BK")"
+  restore_backup "$RESTORE_BK"
+  echo
+  echo "${G}${B}Restaurado.${N}"
+  if [ $INTERACTIVE = 1 ] && nb_closed && find_launcher; then
+    echo
+    if ask_yn "Abrir o NetBeans agora?" S; then
+      (cd "$HOME" && setsid "${LAUNCH[@]}" >/dev/null 2>&1 </dev/null &)
+      ok "abrindo o NetBeans"
+    fi
+  fi
+  exit 0
+fi
+
 if [ "$ACTION" = "uninstall" ]; then
-  TOTAL=3
+  TOTAL=3; [ -n "${RESTORE_BK:-}" ] && TOTAL=4
   if [ $HEADER = 0 ]; then header; echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"; echo; fi
   step "Removendo perfil, interface e módulo"
   FONT="$(current_font "$UD/config/Editors/FontsColors/$PROFILE/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml")"
   rm -f "$UD/config/LookAndFeel/FlatDarkLaf.properties"
   find "$C/Editors" -depth -type d -path "*/FontsColors/$PROFILE" -exec rm -rf {} + 2>/dev/null || true
-  FIRST=$(ls -1 "$UD"/onedark-backup-*.tar.gz 2>/dev/null | sort | head -1 || true)
+  FIRST="${RESTORE_BK:-$(ls -1 "$UD"/onedark-backup-*.tar.gz 2>/dev/null | sort | head -1 || true)}"
   # tema de versao antiga (ate a v17) ainda dentro do FlatLaf Dark: devolve o original
   if [ -e "$C/Editors/FontsColors/FlatLafDark/Defaults/onedark-mix-tokenColorings.xml" ]; then
     for t in "${TARGETS[@]}"; do case "$t" in config/Editors/*) rm -rf "${UD:?}/$t" ;; esac; done
@@ -868,15 +1008,21 @@ if [ "$ACTION" = "uninstall" ]; then
   rm -f "$UD/onedark-manifest.json" "$UD/onedark-version" "$MODJAR" "$MODXML"
   [ -f "$TERMPREF" ] && sed -i "/^term\.selectionBackground=$TERMSEL\$/d" "$TERMPREF"
   touch "$UD/.lastModified"
-  if [ -n "$FIRST" ] && tar -tzf "$FIRST" config/LookAndFeel/FlatDarkLaf.properties >/dev/null 2>&1; then
+  # restaurando um backup escolhido: o passo seguinte ja volta tudo dele
+  if [ -z "${RESTORE_BK:-}" ] && [ -n "$FIRST" ] && tar -tzf "$FIRST" config/LookAndFeel/FlatDarkLaf.properties >/dev/null 2>&1; then
     tar -xzf "$FIRST" -C "$UD" config/LookAndFeel/FlatDarkLaf.properties; info "FlatDarkLaf.properties original restaurado"
   fi
   ok "pronto"
+  if [ -n "${RESTORE_BK:-}" ]; then
+    step "Restaurando o backup de $(bk_date "$RESTORE_BK")"
+    restore_backup "$RESTORE_BK"
+  fi
   echo
-  if [ $INTERACTIVE = 1 ]; then echo "${G}${B}Removido.${N}"; else echo "${G}${B}Removido.${N} Abra o NetBeans."; fi
+  if [ -n "${RESTORE_BK:-}" ]; then echo "${G}${B}Removido e restaurado.${N}"
+  elif [ $INTERACTIVE = 1 ]; then echo "${G}${B}Removido.${N}"; else echo "${G}${B}Removido.${N} Abra o NetBeans."; fi
   [ -n "$FONT" ] && echo "A fonte do perfil removido era: $FONT."
   mapfile -t BKS < <(ls -1 "$UD"/onedark-backup-*.tar.gz 2>/dev/null || true)
-  if [ $INTERACTIVE = 1 ] && [ ${#BKS[@]} -gt 0 ]; then
+  if [ $INTERACTIVE = 1 ] && [ ${#BKS[@]} -gt 0 ] && [ -z "${RESTORE_BK:-}" ]; then
     echo
     if [ ${#BKS[@]} = 1 ]; then q="1 arquivo"; else q="${#BKS[@]} arquivos"; fi
     if ask_yn "Apagar também os backups que o tema guardou ($q no userdir)?" N; then
@@ -2834,4 +2980,3 @@ if [ $INTERACTIVE = 1 ]; then
 else
   echo "Depois de abrir, confira com: bash $(basename "$0") check"
 fi
-
