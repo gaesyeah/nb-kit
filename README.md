@@ -37,7 +37,8 @@ bash netbeans-onedark.sh
 O script mostra o status e só as opções que fazem sentido:
 
 - **Não instalado:** pergunta `Instalar agora? [S/n]`.
-- **Instalado:** abre um menu com Reinstalar (ou Atualizar, se houver versão nova), Conferir, Desinstalar e Sair. Use ↑↓ para navegar, Enter para escolher e Esc para sair.
+- **Instalado:** abre um menu com Reinstalar (ou Atualizar, se houver versão nova), Conferir, Backups, Desinstalar e Sair. Use ↑↓ para navegar, Enter para escolher e Esc para sair.
+- **Backups:** só aparece quando existe algum backup. Lista cada um com data, tamanho e o que tem dentro. Use ↑↓ para navegar, Enter para restaurar, Del para apagar e Esc para voltar. Restaurar e apagar pedem confirmação.
 - **Mais de um NetBeans no computador:** pergunta em qual deles instalar.
 
 Se o NetBeans estiver aberto, o script oferece fechar. Ele fecha pelo mesmo caminho do File > Exit, então o NetBeans pergunta sobre arquivos não salvos e processos rodando como sempre. No fim, oferece abrir o NetBeans e confere sozinho se tudo carregou.
@@ -61,7 +62,8 @@ O `userdir` é opcional. O padrão é o NetBeans mais novo em `~/.netbeans/`. O 
 ## Suas configurações
 
 - **Personalizações:** se você mudou valores que o tema também define, como chaves da interface ou a fonte, o script pergunta se quer manter os seus.
-- **Backup:** antes da primeira instalação, ele guarda um backup do estado original no userdir (`onedark-backup-*.tar.gz`).
+- **Backup:** antes da primeira instalação, ele guarda um backup do estado original no userdir (`onedark-backup-*.tar.gz`). O mais antigo é o usado ao desinstalar.
+- **Restaurar um backup:** com o tema instalado, ele é desinstalado antes. Sem o tema, o que você tem hoje vira um backup novo antes, então dá pra desfazer.
 - **Falha ou Ctrl+C no meio:** se a instalação falhar ou for interrompida, tudo volta como estava.
 - **Desinstalar:**
   - Volta o visual e o perfil de cores anteriores.
