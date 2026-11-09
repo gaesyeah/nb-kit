@@ -48,7 +48,12 @@ t() {
 
 die() { echo "${R}$(t cli.error)${N} $*" >&2; exit 1; }
 STEP=0; TOTAL=0
-step() { STEP=$((STEP + 1)); printf '%s[%d/%d]%s %s\n' "$BL" "$STEP" "$TOTAL" "$N" "$*"; }
+step() {
+  STEP=$((STEP + 1))
+  # tests only: simulates a failure at this step, to check that everything goes back (tests/engine.sh)
+  if [ "${NBKIT_TEST_FAIL_STEP:-}" = "$STEP" ]; then die "NBKIT_TEST_FAIL_STEP=$STEP"; fi
+  printf '%s[%d/%d]%s %s\n' "$BL" "$STEP" "$TOTAL" "$N" "$*"
+}
 ok()   { printf '      %s✓%s %s\n' "$G" "$N" "$*"; }
 info() { printf '      %s%s%s\n' "$D" "$*" "$N"; }
 warn() { printf '      %s!%s %s\n' "$Y" "$N" "$*"; }

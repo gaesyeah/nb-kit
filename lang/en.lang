@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Error:
-cli.usage=nbkit v%s: modules for NetBeans\n\nUsage:\n  bash %s                                menu: shows the status and what can be done\n  bash %s install [module...] [userdir]  installs or updates (no module: all)\n  bash %s uninstall [module...] [userdir] removes (no module: all installed)\n  bash %s check [userdir]                after opening NetBeans: checks that everything loaded\n  bash %s --help                         this help\n\nModules: %s\nLanguage: --lang pt-BR or --lang en (without it, the system one)\nIf the NetBeans installation is not found: NB_HOME=/path/to/netbeans bash %s\n
+cli.usage=nbkit v%s: modules for NetBeans\n\nUsage:\n  bash %s                                menu: shows the status and what can be done\n  bash %s install [module...] [userdir]  installs or updates (no module: all)\n  bash %s uninstall [module...] [userdir] removes (no module: all installed)\n  bash %s check [userdir]                after opening NetBeans: checks that everything loaded\n  bash %s test                           runs the tests (only in the repository)\n  bash %s --help                         this help\n\nModules: %s\nLanguage: --lang pt-BR or --lang en (without it, the system one)\nIf the NetBeans installation is not found: NB_HOME=/path/to/netbeans bash %s\n
 cli.theme_label=Theme %s
 cli.no_modules_dir=modules/ folder not found next to %s. Download the whole nbkit folder.
 cli.no_modules=no module in %s.
@@ -90,6 +90,7 @@ cli.menu_uninstall=Uninstall
 cli.menu_quit=Quit
 cli.ask_uninstall=Uninstall?
 cli.nothing_installed=Nothing installed.
+cli.no_tests=the tests are in the repository, not in the release zip: git clone https://github.com/gaesyeah/nb-kit
 cli.ask_install=Install %s now? It will run: %s
 cli.python_old=nbkit needs Python 3.11 or newer (found: %s).
 cli.python_manual=install Python 3.11 or newer with your system package manager and run again.
@@ -136,6 +137,7 @@ theme.font_downloading=downloading to %s ...
 theme.font_installed=%s files installed, font cache updated
 theme.font_failed=Warning: could not install %s (no internet?); the current font stays as it is.
 theme.font_ready=available to NetBeans
+theme.font_offline=NBKIT_OFFLINE: not downloading; the current font stays as it is
 theme.step_verify=Checking the NetBeans installation (modules, lexers, Java)
 theme.nb_found=NetBeans found
 theme.step_backup=Backup of the original state

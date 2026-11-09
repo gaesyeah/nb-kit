@@ -1,0 +1,5 @@
+# left out of the release zip (git archive): they are only for the repository
+/tests export-ignore
+/.github export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore

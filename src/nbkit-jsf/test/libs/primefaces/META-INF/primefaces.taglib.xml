@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<facelet-taglib xmlns="https://jakarta.ee/xml/ns/jakartaee" version="4.0">
+  <namespace>http://primefaces.org/ui</namespace>
+  <tag><tag-name>dataTable</tag-name><component><component-type>org.primefaces.component.DataTable</component-type></component></tag>
+</facelet-taglib>

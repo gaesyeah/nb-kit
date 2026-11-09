@@ -1,0 +1,31 @@
+# Runs every nbkit test (bash nbkit.sh test) on each push and pull request,
+# with the oldest and the newest Python nbkit supports.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    name: Python ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Lint tools
+        run: |
+          python -m pip install --quiet pyflakes
+          shellcheck --version | head -2
+      - name: Tests
+        run: bash nbkit.sh test

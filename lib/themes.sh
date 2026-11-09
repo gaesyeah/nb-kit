@@ -229,6 +229,8 @@ theme_font() {
   if theme_has_font; then
     NBKIT_THEME_FONT="$THEME_FONT_NAME"
     info "$(t theme.font_present)"
+  elif [ -n "${NBKIT_OFFLINE:-}" ]; then
+    info "$(t theme.font_offline)"
   elif [ ${#THEME_FONT_URLS[@]} -gt 0 ]; then
     if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
       pkg_install curl apt:curl dnf:curl pacman:curl zypper:curl || true
@@ -388,6 +390,8 @@ theme_uninstall() {
   rm -f "$THEME_MANIFEST" "$UD/onedark-version"
   if [ -n "$THEME_TERMINAL_SELECTION" ] && [ -f "$TERMPREF" ]; then
     sed -i "/^term\.selectionBackground=$THEME_TERMINAL_SELECTION\$/d" "$TERMPREF"
+    # empty: the file did not exist before the theme
+    [ -s "$TERMPREF" ] || rm -f "$TERMPREF"
   fi
   touch "$UD/.lastModified"
   # restoring a chosen backup: the next step brings everything back from it

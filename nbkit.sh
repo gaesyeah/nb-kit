@@ -7,7 +7,7 @@
 set -euo pipefail
 # Ctrl+C exits with code 130 (the exit trap uses it to undo a half-done install)
 trap 'exit 130' INT TERM HUP
-NBKIT_VERSION=2.2.0
+NBKIT_VERSION=2.3.0
 SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")"
 NBKIT_DIR="$(dirname "$SELF")"
 ME="$(basename "$SELF")"
@@ -127,7 +127,7 @@ mod_label() {
 
 usage() {
   local ids; ids="$(printf '%s ' "${MODS[@]}")"
-  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
+  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
 }
 
 # ---------- files shared by the engines ----------
@@ -172,7 +172,7 @@ ACTION=""; UD=""; SEL=()
 for a in "$@"; do
   case "$a" in
     -h|--help|help) usage; exit 0 ;;
-    install|uninstall|check) [ -z "$ACTION" ] && ACTION="$a" || die "$(t cli.repeated_command "$a")" ;;
+    install|uninstall|check|test) [ -z "$ACTION" ] && ACTION="$a" || die "$(t cli.repeated_command "$a")" ;;
     all|todos) SEL=("${MODS[@]}") ;;
     *)
       if [ -n "${MOD_FN[$a]:-}" ]; then SEL+=("$a")
@@ -186,6 +186,11 @@ if [ -t 0 ] && [ -t 1 ]; then
   if [ $# -eq 0 ]; then MENU=1; INTERACTIVE=1; elif [ "${NBKIT_TTY:-}" = 1 ]; then INTERACTIVE=1; fi
 fi
 [ -n "$ACTION" ] || ACTION=install
+# tests: they live in the repository, not in the release zip
+if [ "$ACTION" = test ]; then
+  [ -f "$NBKIT_DIR/tests/run.sh" ] || die "$(t cli.no_tests)"
+  exec bash "$NBKIT_DIR/tests/run.sh"
+fi
 
 # ---------- terminal ----------
 # arrow key menu; result in MENU_IDX (-1 = left with Esc or q). MENU_HINT changes the legend.

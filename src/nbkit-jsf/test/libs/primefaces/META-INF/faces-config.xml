@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<faces-config xmlns="https://jakarta.ee/xml/ns/jakartaee" version="4.0">
+  <component><component-type>org.primefaces.component.DataTable</component-type><component-class>org.primefaces.component.datatable.DataTable</component-class></component>
+</faces-config>

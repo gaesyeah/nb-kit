@@ -65,7 +65,9 @@ def to_xml(name, attrs, style):
 def key_lines(path):
     """(table, key) -> line number, to point at the error"""
     lines, table = {}, ''
-    for n, l in enumerate(open(path, encoding='utf-8'), 1):
+    with open(path, encoding='utf-8') as f:
+        text = f.read().splitlines()
+    for n, l in enumerate(text, 1):
         h = re.match(r'\s*\[\s*(.+?)\s*\]\s*(#.*)?$', l)
         if h:
             table = '.'.join(p.strip().strip('"') for p in re.findall(r'"[^"]*"|[^.]+', h.group(1)))

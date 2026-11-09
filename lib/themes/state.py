@@ -27,7 +27,14 @@ def set_profile(value):
     if value is not None:
         a = doc.createElement('attr'); a.setAttribute('name', 'currentFontColorProfile'); a.setAttribute('stringvalue', value)
         fo.appendChild(a)
+    elif not any(n.nodeType == 1 for n in fo.childNodes):
+        root.removeChild(fo)
     body = ''.join(n.toxml() for n in root.childNodes if n.nodeType == 1)
+    if not body:
+        # nothing left: the file did not exist before the theme
+        if os.path.exists(attrs):
+            os.remove(attrs)
+        return
     with open(attrs, 'w') as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE attributes PUBLIC "-//NetBeans//DTD DefaultAttributes 1.0//EN" '
                 '"http://www.netbeans.org/dtds/attributes-1_0.dtd">\n<attributes version="1.0">\n' + body + '\n</attributes>\n')
@@ -41,6 +48,11 @@ def get_laf():
 def set_laf(value):
     lines = open(lafp).read().splitlines() if os.path.exists(lafp) else []
     lines = [l for l in lines if not l.startswith('laf=')] + ([f'laf={value}'] if value else [])
+    if not lines:
+        # nothing left: the file did not exist before the theme
+        if os.path.exists(lafp):
+            os.remove(lafp)
+        return
     os.makedirs(os.path.dirname(lafp), exist_ok=True)
     with open(lafp, 'w') as f:
         f.write('\n'.join(lines) + ('\n' if lines else ''))

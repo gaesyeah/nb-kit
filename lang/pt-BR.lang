@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Erro:
-cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                menu: mostra o status e o que dá pra fazer\n  bash %s install [módulo...] [userdir]  instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir] remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                depois de abrir o NetBeans: confere se tudo carregou\n  bash %s --help                         esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
+cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                menu: mostra o status e o que dá pra fazer\n  bash %s install [módulo...] [userdir]  instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir] remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                depois de abrir o NetBeans: confere se tudo carregou\n  bash %s test                           roda os testes (só no repositório)\n  bash %s --help                         esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
 cli.theme_label=Tema %s
 cli.no_modules_dir=pasta modules/ não encontrada ao lado de %s. Baixe a pasta nbkit inteira.
 cli.no_modules=nenhum módulo em %s.
@@ -90,6 +90,7 @@ cli.menu_uninstall=Desinstalar
 cli.menu_quit=Sair
 cli.ask_uninstall=Desinstalar?
 cli.nothing_installed=Nada instalado.
+cli.no_tests=os testes ficam no repositório, não no zip do release: git clone https://github.com/gaesyeah/nb-kit
 cli.ask_install=Instalar %s agora? Vou rodar: %s
 cli.python_old=O nbkit precisa do Python 3.11 ou mais novo (encontrado: %s).
 cli.python_manual=instale o Python 3.11 ou mais novo pelo gerenciador de pacotes do sistema e rode de novo.
@@ -136,6 +137,7 @@ theme.font_downloading=baixando para %s ...
 theme.font_installed=%s arquivos instalados, cache de fontes atualizado
 theme.font_failed=Aviso: não consegui instalar a %s (sem internet?); a fonte atual fica como está.
 theme.font_ready=disponível para o NetBeans
+theme.font_offline=NBKIT_OFFLINE: não vou baixar; a fonte atual fica como está
 theme.step_verify=Verificando a instalação do NetBeans (módulos, lexers, Java)
 theme.nb_found=NetBeans encontrado
 theme.step_backup=Backup do estado original

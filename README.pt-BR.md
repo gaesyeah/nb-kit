@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://github.com/gaesyeah/nb-kit/releases/latest/download/nbkit.zip"><img alt="Baixar nbkit.zip" src="https://img.shields.io/badge/Baixar-nbkit.zip-2F81F7?style=for-the-badge&logo=github&logoColor=white"></a>
   <a href="https://github.com/gaesyeah/nb-kit/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/gaesyeah/nb-kit?style=for-the-badge&color=30363D"></a>
+  <a href="https://github.com/gaesyeah/nb-kit/actions/workflows/tests.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/gaesyeah/nb-kit/tests.yml?branch=main&style=for-the-badge&label=tests"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/gaesyeah/nb-kit?style=for-the-badge&color=30363D"></a>
 </p>
 
@@ -42,6 +43,7 @@ Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File 
 | `bash nbkit.sh install [módulo...] [userdir]` | Instala ou atualiza (sem módulo: todos) |
 | `bash nbkit.sh uninstall [módulo...] [userdir]` | Remove (sem módulo: todos os instalados) |
 | `bash nbkit.sh check [userdir]` | Com o NetBeans aberto, confere se tudo carregou |
+| `bash nbkit.sh test` | Roda os testes (no repositório, veja "Testes") |
 | `bash nbkit.sh --help` | Ajuda e lista de módulos |
 | `--lang pt-BR` ou `--lang en` | Junto com qualquer comando, troca o idioma |
 
@@ -258,11 +260,13 @@ nbkit/
 │   ├── jsf/                     module.toml + nbkit-jsf.jar
 │   └── themes/
 │       └── one-dark-pro-mix/    theme.toml, ui.properties, colors.toml
-└── src/                         código Java dos módulos do NetBeans
-    ├── build.sh                 compila os jars (veja abaixo)
-    ├── nbkit-core/
-    ├── nbkit-colors/
-    └── nbkit-jsf/               com o teste em test/
+├── src/                         código Java dos módulos do NetBeans
+│   ├── build.sh                 compila os jars (veja abaixo)
+│   ├── nbkit-core/
+│   ├── nbkit-colors/
+│   └── nbkit-jsf/               com o teste em test/
+├── tests/                       testes (veja "Testes")
+└── .github/workflows/tests.yml  roda os testes no GitHub Actions
 ```
 
 Para adicionar um módulo do NetBeans, crie uma pasta em `modules/` com o jar dele e um `module.toml` (veja [como criar um módulo](modules/README.pt-BR.md)).
@@ -276,6 +280,23 @@ bash src/build.sh [pasta do netbeans]
 ```
 
 Ele compila contra os jars da sua instalação do NetBeans (sem a pasta: `NB_HOME`, ou o NetBeans que usou o `~/.netbeans` por último) com um JDK 17 ou mais novo, e atualiza os sha256.
+
+## Testes
+
+```bash
+bash nbkit.sh test
+```
+
+Roda tudo o que está em `tests/`, e também no GitHub Actions a cada push:
+
+- **Lint:** shellcheck e pyflakes.
+- **Testes unitários de Python** (`tests/python/`): o formato do `colors.toml` e as mensagens de erro, a validação do `theme.toml` e do `module.toml`, e os arquivos de `lang/` (mesmas chaves em todos os idiomas, toda chave usada no código existe).
+- **Motor** (`tests/engine.sh`): instala num NetBeans falso (`tests/netbeans/`) e confere que os arquivos são exatamente os esperados (`tests/expected/install.sha1`), que reinstalar mantém as suas personalizações, que o `check` acha um módulo faltando, que desinstalar volta exatamente ao que havia, que uma falha em qualquer passo não muda nada e que arquivos com erro são ignorados com o motivo.
+- **Verificações de JSF** (`tests/jsf.sh`, precisa de JDK 17 ou mais novo): roda o analisador no projeto de exemplo em `src/nbkit-jsf/test/fixture`, cujas páginas marcam onde cada aviso deve aparecer, em inglês e em português.
+
+Uma parte cuja ferramenta não estiver instalada é pulada com aviso. Quando uma mudança num tema altera de propósito os arquivos instalados, `bash tests/engine.sh --update` grava de novo a lista esperada. `bash src/build.sh --test` compila os jars e roda as verificações de JSF.
+
+Os testes não substituem abrir o NetBeans: as dicas e as cores na tela ainda precisam de uma olhada.
 
 ## Problemas
 
