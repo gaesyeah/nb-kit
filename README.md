@@ -1,103 +1,108 @@
+<p align="center">
+  <a href="README.md"><img alt="English" src="https://img.shields.io/badge/English-2F81F7?style=for-the-badge"></a>
+  <a href="README.pt-BR.md"><img alt="Português (Brasil)" src="https://img.shields.io/badge/Portugu%C3%AAs%20(Brasil)-30363D?style=for-the-badge"></a>
+</p>
+
 # nbkit
 
-Kit de módulos para o **Apache NetBeans** no Linux, instalado por um CLI no terminal. Hoje tem dois módulos:
+A kit of modules for **Apache NetBeans** on Linux, installed by a terminal CLI. It has two modules today:
 
-- **Tema One Dark Pro Mix:** as cores do tema do VS Code, com o visual FlatLaf Dark e a fonte JetBrains Mono.
-- **Verificações de JSF:** avisos no editor de xhtml para erros que o NetBeans não mostra, como `#{batataDoce}`.
+- **One Dark Pro Mix theme:** the colors of the VS Code theme, with the FlatLaf Dark look and feel and the JetBrains Mono font.
+- **JSF checks:** warnings in the xhtml editor for errors NetBeans does not show, such as a misspelled bean name (`#{customerVn.name}` instead of `#{customerVm.name}`).
 
-Cada módulo instala e desinstala separado.
+Each module installs and uninstalls on its own.
 
-## Instalação
+## Installation
 
-Baixe a pasta `nbkit` inteira e rode:
+Download the whole `nbkit` folder and run:
 
 ```bash
 bash nbkit/nbkit.sh
 ```
 
-O CLI mostra o status de cada módulo e só as opções que fazem sentido. Use ↑↓ para navegar, Enter para escolher e Esc para voltar.
+The CLI shows the status of each module and only the options that make sense. Use ↑↓ to move, Enter to choose and Esc to go back.
 
-- **Instalar ou atualizar:** escolha "Todos" ou um módulo.
-- **Reinstalar** e **Desinstalar:** também por módulo.
-- **Conferir se carregou no NetBeans:** confere cada módulo instalado.
-- **Backups:** só aparece quando existe algum. Enter restaura, Del apaga, Esc volta, e restaurar e apagar pedem confirmação.
+- **Install or update:** choose "All" or one module.
+- **Reinstall** and **Uninstall:** also per module.
+- **Check that it loaded in NetBeans:** checks each installed module.
+- **Backups:** only shows up when there is one. Enter restores, Del deletes, Esc goes back, and both restore and delete ask for confirmation.
 
-Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File > Exit, então o NetBeans pergunta sobre arquivos não salvos e processos rodando como sempre. No fim, oferece abrir o NetBeans e confere sozinho se tudo carregou. Se algo falhar no meio, ou se você apertar Ctrl+C, tudo volta como estava.
+If NetBeans is open, nbkit offers to close it the same way as File > Exit, so NetBeans asks about unsaved files and running processes as usual. At the end, it offers to open NetBeans and checks by itself that everything loaded. If something fails midway, or if you press Ctrl+C, everything goes back to how it was.
 
-### Sem o menu
+### Without the menu
 
-| Comando | O que faz |
+| Command | What it does |
 |---|---|
-| `bash nbkit.sh install [módulo...] [userdir]` | Instala ou atualiza (sem módulo: todos) |
-| `bash nbkit.sh uninstall [módulo...] [userdir]` | Remove (sem módulo: todos os instalados) |
-| `bash nbkit.sh check [userdir]` | Com o NetBeans aberto, confere se tudo carregou |
-| `bash nbkit.sh --help` | Ajuda e lista de módulos |
-| `--lang pt-BR` ou `--lang en` | Junto com qualquer comando, troca o idioma |
+| `bash nbkit.sh install [module...] [userdir]` | Installs or updates (no module: all) |
+| `bash nbkit.sh uninstall [module...] [userdir]` | Removes (no module: all installed) |
+| `bash nbkit.sh check [userdir]` | With NetBeans open, checks that everything loaded |
+| `bash nbkit.sh --help` | Help and list of modules |
+| `--lang en` or `--lang pt-BR` | With any command, changes the language |
 
-Os ids dos módulos são `one-dark-pro-mix` e `jsf`. O userdir padrão é o NetBeans mais novo em `~/.netbeans/`; se houver mais de um, o menu pergunta qual usar.
+The module ids are `one-dark-pro-mix` and `jsf`. The default userdir is the newest NetBeans in `~/.netbeans/`; if there is more than one, the menu asks which one to use.
 
-## Idiomas
+## Languages
 
-O terminal fala português ou inglês, conforme o idioma do sistema (`LANG`): português quando ele começa com `pt`, inglês nos outros casos. Para escolher, use `--lang pt-BR` ou `--lang en`, ou a variável `NBKIT_LANG`.
+The terminal speaks English or Portuguese, following the system language (`LANG`): Portuguese when it starts with `pt`, English otherwise. To choose, use `--lang en` or `--lang pt-BR`, or the `NBKIT_LANG` variable.
 
-Dentro do NetBeans, as dicas do JSF e a tela de Options seguem o idioma em que o NetBeans roda, que vem do sistema ou do `--locale` no `netbeans.conf`.
+Inside NetBeans, the JSF hints and the Options page follow the language NetBeans runs in, which comes from the system or from `--locale` in `netbeans.conf`.
 
-Para adicionar um idioma:
-- **Terminal:** copie `lang/en.lang` para `lang/<idioma>.lang` (ex.: `es.lang`) e traduza os valores. O `pt-BR.lang` é a referência: uma chave que faltar sai em português.
-- **NetBeans:** crie `Bundle_<idioma>.properties` ao lado do `Bundle.properties` de cada módulo em `src/` e gere o jar de novo.
+To add a language:
+- **Terminal:** copy `lang/en.lang` to `lang/<language>.lang` (e.g. `es.lang`) and translate the values. `pt-BR.lang` is the reference: a missing key comes out in Portuguese.
+- **NetBeans:** create `Bundle_<language>.properties` next to the `Bundle.properties` of each module in `src/` and build the jar again.
 
-## Requisitos
+## Requirements
 
-- Linux com bash 4 ou mais novo, e `python3`.
-- Apache NetBeans, testado na versão 31. Funciona com instalação normal, Flatpak ou Snap.
-- NetBeans rodando com Java 17 ou mais novo.
-- `curl` ou `wget`, só se a JetBrains Mono precisar ser baixada.
+- Linux with bash 4 or newer, and `python3`.
+- Apache NetBeans, tested on version 31. Works with a regular install, Flatpak or Snap.
+- NetBeans running on Java 17 or newer.
+- `curl` or `wget`, only if JetBrains Mono needs to be downloaded.
 
-## Tema One Dark Pro Mix
+## One Dark Pro Mix theme
 
-- Cria o perfil **"One Dark Pro Mix"** como cópia do FlatLaf Dark da sua versão do NetBeans, com as cores do tema. O perfil FlatLaf Dark original não é alterado.
-- Usa as cores do Mix sempre que existe um equivalente. Onde o Mix não define uma cor, usa o padrão do VS Code.
-- Mantém o itálico e o negrito do NetBeans, exceto nas palavras-chave, que ficam sem negrito como no Mix.
-- Seleciona o visual FlatLaf Dark, o perfil e a cor de seleção do terminal, e instala a JetBrains Mono se faltar.
-- Avisos em amarelo e erros em vermelho, os dois com um fundo suave.
-- Um módulo de coloração pinta o que o editor não distingue sozinho:
-  - **JavaScript:** chamadas, objetos e constantes.
-  - **CSS:** unidades, funções e seletores.
-  - **EL:** variáveis.
+- Creates the **"One Dark Pro Mix"** profile as a copy of the FlatLaf Dark of your NetBeans version, with the theme colors. The original FlatLaf Dark profile is not changed.
+- Uses the Mix colors whenever there is an equivalent. Where the Mix does not define a color, it uses the VS Code default.
+- Keeps the NetBeans italics and bold, except for keywords, which are not bold, as in the Mix.
+- Selects the FlatLaf Dark look and feel, the profile and the terminal selection color, and installs JetBrains Mono if it is missing.
+- Warnings in yellow and errors in red, both with a soft background.
+- A coloring module paints what the editor does not tell apart by itself:
+  - **JavaScript:** calls, objects and constants.
+  - **CSS:** units, functions and selectors.
+  - **EL:** variables.
   - **HTML/XML:** DOCTYPE.
-  - **Colchetes coloridos por nível.**
-- **Suas personalizações:** se você mudou valores que o tema também define, o nbkit pergunta se quer manter os seus.
-- **Backup:** antes da primeira instalação, ele guarda um backup do estado original, que volta ao desinstalar.
+  - **Brackets colored by level.**
+- **Your customizations:** if you changed values the theme also defines, nbkit asks whether you want to keep yours.
+- **Backup:** before the first install, it keeps a backup of the original state, which comes back on uninstall.
 
-## Criar um tema
+## Creating a theme
 
-Tudo o que o One Dark Pro Mix tem além das cores fica no motor de temas, em `modules/themes/_engine.sh`. Um tema novo só descreve as cores. O motor já cuida de:
+Everything One Dark Pro Mix has besides the colors lives in the theme engine, `modules/themes/_engine.sh`. A new theme only describes the colors. The engine already takes care of:
 
-- criar o perfil de cores como cópia do perfil base da sua versão do NetBeans, sem mexer no original;
-- fazer backup, restaurar, desinstalar e voltar ao visual e ao perfil de antes;
-- preservar as personalizações de quem usa;
-- instalar a fonte se ela faltar, e removê-la depois só se foi o nbkit que instalou;
-- instalar o módulo de coloração (`nbkit-colors.jar`): chamadas, objetos, constantes, unidades, funções, colchetes por nível, DOCTYPE...;
-- aplicar a cor de seleção do terminal;
-- desfazer tudo com Ctrl+C;
-- conferir com o NetBeans aberto (`check`).
+- creating the color profile as a copy of the base profile of your NetBeans version, without touching the original;
+- backing up, restoring, uninstalling and going back to the previous look and feel and profile;
+- keeping the user's customizations;
+- installing the font if it is missing, and removing it later only if nbkit installed it;
+- installing the coloring module (`nbkit-colors.jar`): calls, objects, constants, units, functions, brackets by level, DOCTYPE...;
+- applying the terminal selection color;
+- undoing everything on Ctrl+C;
+- checking with NetBeans open (`check`).
 
-Crie `modules/themes/<id>.sh`. O nbkit carrega o arquivo sozinho e o tema aparece no menu.
+Create `modules/themes/<id>.sh`. nbkit loads the file by itself and the theme shows up in the menu.
 
 ```bash
 source "$(dirname "${BASH_SOURCE[0]}")/_engine.sh"
-theme_register my-theme mt "My Theme" "Descrição curta" 1
+theme_register my-theme mt "My Theme" "Short description" 1
 
 mt_config() {
-  THEME_PROFILE="My Theme"                  # nome do perfil em Tools > Options > Fonts & Colors
-  THEME_TERMINAL_SELECTION=-12499634        # opcional: cor de seleção do terminal (ARGB como inteiro)
-  THEME_FONT_NAME="JetBrains Mono"          # opcional: fonte do editor
-  THEME_FONT_DIR="JetBrainsMono"            # pasta em ~/.local/share/fonts
+  THEME_PROFILE="My Theme"                  # profile name in Tools > Options > Fonts & Colors
+  THEME_TERMINAL_SELECTION=-12499634        # optional: terminal selection color (ARGB as an integer)
+  THEME_FONT_NAME="JetBrains Mono"          # optional: editor font
+  THEME_FONT_DIR="JetBrainsMono"            # folder in ~/.local/share/fonts
   THEME_FONT_URLS=("https://.../Regular.ttf" "https://.../Bold.ttf")
   THEME_FONT_LICENSE="https://.../OFL.txt"
 }
 
-# interface (FlatLaf): conteúdo do arquivo de propriedades do visual
+# UI (FlatLaf): content of the look and feel properties file
 mt_ui() {
   cat <<'EOF'
 nb.preferred.color.profile=My Theme
@@ -126,119 +131,119 @@ EOF
 }
 ```
 
-O que cada parte faz:
+What each part does:
 
-- **`theme_register <id> <prefixo> "<nome>" "<descrição>" <versão>`:** registra o tema no menu e liga as funções do nbkit ao motor. Aumente a versão quando mudar as cores, para o menu oferecer a atualização. Para a descrição sair no idioma do terminal, crie uma chave nos arquivos de `lang/` e passe `"$(t <chave>)"`, como o One Dark Pro Mix faz.
-- **`<prefixo>_config`:** só `THEME_PROFILE` é obrigatório. Os padrões são:
-  - base `FlatLafDark` (`THEME_BASE`, com `THEME_BASE_NAME` e `THEME_BASE_PROFILE` para as mensagens e para a desinstalação);
-  - visual `com.formdev.flatlaf.FlatDarkLaf` (`THEME_LAF`), com o arquivo `FlatDarkLaf.properties` (`THEME_LAF_FILE`).
+- **`theme_register <id> <prefix> "<name>" "<description>" <version>`:** registers the theme in the menu and wires the nbkit functions to the engine. Raise the version when you change the colors, so the menu offers the update. For the description to follow the terminal language, create a key in the `lang/` files and pass `"$(t <key>)"`, as One Dark Pro Mix does.
+- **`<prefix>_config`:** only `THEME_PROFILE` is required. The defaults are:
+  - base `FlatLafDark` (`THEME_BASE`, with `THEME_BASE_NAME` and `THEME_BASE_PROFILE` for the messages and for the uninstall);
+  - look and feel `com.formdev.flatlaf.FlatDarkLaf` (`THEME_LAF`), with the `FlatDarkLaf.properties` file (`THEME_LAF_FILE`).
 
-  Sem `THEME_FONT_NAME`, a fonte não é alterada. Sem `THEME_TERMINAL_SELECTION`, o terminal não é alterado.
-- **`<prefixo>_ui`:** chaves do FlatLaf (`@background`, `Component.focusColor`...). A linha `nb.preferred.color.profile=<perfil>` faz o NetBeans manter o perfil do tema ao trocar de visual. O motor põe a marca do tema na primeira linha e mescla as chaves que a pessoa já tinha.
-- **`<prefixo>_colors`:** linhas `<fontcolor .../>` do NetBeans, com cores em `ffRRGGBB`.
-  - `colors_tokens` vale para todas as linguagens (`default`, `comment`, `keyword`, `string`, `error`, `warning`...).
-  - `colors_highlights` cobre seleção, linha atual, busca, números de linha...
-  - `colors_annotations` são os sublinhados que os módulos usam.
-  - `colors_language <mime>` são os tokens de uma linguagem.
-  - `colors_extras <mime>` são as categorias do módulo de coloração.
+  Without `THEME_FONT_NAME`, the font is not changed. Without `THEME_TERMINAL_SELECTION`, the terminal is not changed.
+- **`<prefix>_ui`:** FlatLaf keys (`@background`, `Component.focusColor`...). The `nb.preferred.color.profile=<profile>` line makes NetBeans keep the theme profile when the look and feel changes. The engine puts the theme mark on the first line and merges the keys the user already had.
+- **`<prefix>_colors`:** NetBeans `<fontcolor .../>` lines, with colors as `ffRRGGBB`.
+  - `colors_tokens` applies to all languages (`default`, `comment`, `keyword`, `string`, `error`, `warning`...).
+  - `colors_highlights` covers selection, current line, search, line numbers...
+  - `colors_annotations` are the underlines the modules use.
+  - `colors_language <mime>` are the tokens of one language.
+  - `colors_extras <mime>` are the categories of the coloring module.
 
-  Uma cor que o tema não define fica como no perfil base. Para descobrir o nome de um token, mude a cor dele em Tools > Options > Fonts & Colors e veja o arquivo gravado em `~/.netbeans/<versão>/config/Editors/<mime>/FontsColors/`.
+  A color the theme does not define stays as in the base profile. To find the name of a token, change its color in Tools > Options > Fonts & Colors and look at the file saved in `~/.netbeans/<version>/config/Editors/<mime>/FontsColors/`.
 
-Categorias do módulo de coloração, por linguagem (em `colors_extras`):
+Categories of the coloring module, per language (in `colors_extras`):
 
-| Linguagem | Categorias |
+| Language | Categories |
 |---|---|
-| `text/javascript` | `nbkit-call`, `nbkit-object`, `nbkit-type`, `nbkit-constant`, `nbkit-library`, `nbkit-readonly`, `nbkit-library-function`, colchetes |
-| `text/css` | `nbkit-unit`, `nbkit-function`, `nbkit-tag`, `nbkit-id`, `nbkit-attribute`, `nbkit-string`, `nbkit-plain`, `nbkit-url-parameter`, colchetes |
-| `text/x-el` | `nbkit-call`, `nbkit-object`, `nbkit-library`, colchetes |
+| `text/javascript` | `nbkit-call`, `nbkit-object`, `nbkit-type`, `nbkit-constant`, `nbkit-library`, `nbkit-readonly`, `nbkit-library-function`, brackets |
+| `text/css` | `nbkit-unit`, `nbkit-function`, `nbkit-tag`, `nbkit-id`, `nbkit-attribute`, `nbkit-string`, `nbkit-plain`, `nbkit-url-parameter`, brackets |
+| `text/x-el` | `nbkit-call`, `nbkit-object`, `nbkit-library`, brackets |
 | `text/html` | `nbkit-plain`, `nbkit-doctype`, `nbkit-attribute`, `nbkit-string` |
 | `text/xml`, `text/xml-external-parsed-entity` | `nbkit-plain`, `nbkit-attribute`, `nbkit-string`, `nbkit-keyword`, `nbkit-documentroot`, `nbkit-doctype` |
-| `text/x-java`, `text/x-json` | colchetes |
+| `text/x-java`, `text/x-json` | brackets |
 
-Os colchetes são `nbkit-bracket1`, `nbkit-bracket2` e `nbkit-bracket3`, um por nível, e `nbkit-bracket-unexpected` para o colchete sem par.
+The brackets are `nbkit-bracket1`, `nbkit-bracket2` and `nbkit-bracket3`, one per level, and `nbkit-bracket-unexpected` for a bracket without a pair.
 
-O `modules/themes/one-dark-pro-mix.sh` é um exemplo completo.
+`modules/themes/one-dark-pro-mix.sh` is a complete example.
 
-## Verificações de JSF
+## JSF checks
 
-O NetBeans checa tags, atributos e a sintaxe do EL, mas não pega erros que só aparecem rodando, ou que nem aparecem. Este módulo marca esses erros no editor:
-- **Vermelho:** quebra com certeza.
-- **Amarelo:** provável erro, ou depende de algo fora do arquivo.
+NetBeans checks tags, attributes and the EL syntax, but does not catch errors that only show up at runtime, or that never show up. This module marks those errors in the editor:
+- **Red:** certainly breaks.
+- **Yellow:** probable error, or depends on something outside the file.
 
-Cada regra liga e desliga em **Tools > Options > Editor > JSF**. As mensagens saem em português ou inglês, conforme o idioma do NetBeans.
+Each rule turns on and off in **Tools > Options > Editor > JSF**. The messages come out in English or Portuguese, following the NetBeans language.
 
 - **EL:**
-  - nome que não existe;
-  - variável fora do lugar;
-  - propriedade ou método inexistente no bean;
-  - `value` de campo que não pode ser gravado;
-  - método onde se espera propriedade;
-  - constante de enum inexistente;
-  - `cc.attrs` não declarado;
-  - `${}` em componente JSF.
-- **Declarado e não usado:** `ui:param`, `c:set`, `var`, `varStatus`, `cc:attribute`, parâmetro de lambda.
+  - name that does not exist;
+  - variable out of place;
+  - property or method missing in the bean;
+  - input `value` that cannot be written;
+  - method where a property is expected;
+  - enum constant that does not exist;
+  - undeclared `cc.attrs`;
+  - `${}` in a JSF component.
+- **Declared and never used:** `ui:param`, `c:set`, `var`, `varStatus`, `cc:attribute`, lambda parameter.
 - **IDs:**
-  - `update`/`process`/`for` para id inexistente;
-  - palavra de busca errada (`@from`);
-  - id inválido ou repetido;
-  - update de componente com `rendered`;
-  - `PF('x')` sem `widgetVar`.
-- **Formulários:**
-  - botão ou campo fora de `h:form`;
-  - form dentro de form;
-  - `p:dialog` com `appendTo` body;
-  - `p:fileUpload` sem multipart;
-  - validação sem componente de mensagem.
-- **Ciclo de vida:**
-  - `c:if`/`c:forEach` com a variável de um `ui:repeat`/`p:dataTable`;
-  - `f:viewParam` fora de `f:metadata`;
-  - evento de `p:ajax` que o componente não tem.
-- **Templates e arquivos:**
-  - `ui:define` sem `ui:insert`;
-  - conteúdo fora de `ui:define`;
-  - include, template, recurso ou página de navegação inexistente.
-- **Outros:**
-  - EL dentro de comentário (o Facelets executa);
-  - `&nbsp;` e outras entidades HTML;
+  - `update`/`process`/`for` pointing to a missing id;
+  - wrong search keyword (`@from`);
+  - invalid or repeated id;
+  - update of a component with `rendered`;
+  - `PF('x')` without `widgetVar`.
+- **Forms:**
+  - button or input outside `h:form`;
+  - form inside a form;
+  - `p:dialog` with `appendTo` body;
+  - `p:fileUpload` without multipart;
+  - validation without a message component.
+- **Lifecycle:**
+  - `c:if`/`c:forEach` using the variable of a `ui:repeat`/`p:dataTable`;
+  - `f:viewParam` outside `f:metadata`;
+  - `p:ajax` event the component does not have.
+- **Templates and files:**
+  - `ui:define` without `ui:insert`;
+  - content outside `ui:define`;
+  - missing include, template, resource or navigation page.
+- **Others:**
+  - EL inside a comment (Facelets runs it);
+  - `&nbsp;` and other HTML entities;
   - `escape="false"`.
 
-Os beans (Spring `@Component` e derivados, `@Bean`, CDI `@Named`, `@ManagedBean`) e os tipos vêm das classes compiladas do projeto e dos jars do classpath, então funciona em qualquer projeto sem configurar nada. Classes ainda não compiladas entram pelo nome, lido do código-fonte.
+The beans (Spring `@Component` and its derivatives, `@Bean`, CDI `@Named`, `@ManagedBean`) and the types come from the compiled classes of the project and from the classpath jars, so it works in any project without configuration. Classes not compiled yet come in by name, read from the source code.
 
-## Estrutura
+## Structure
 
 ```
 nbkit/
 ├── nbkit.sh                     CLI
 ├── lang/
-│   ├── pt-BR.lang               textos do terminal em português (referência)
-│   └── en.lang                  textos do terminal em inglês
+│   ├── pt-BR.lang               terminal texts in Portuguese (reference)
+│   └── en.lang                  terminal texts in English
 ├── modules/
-│   ├── README.md                como criar um módulo
+│   ├── README.md                how to create a module
 │   ├── themes/
-│   │   ├── _engine.sh           motor de temas (veja "Criar um tema")
-│   │   └── one-dark-pro-mix.sh  só as cores do tema
+│   │   ├── _engine.sh           theme engine (see "Creating a theme")
+│   │   └── one-dark-pro-mix.sh  only the theme colors
 │   └── jsf.sh
-└── src/                         código Java dos módulos do NetBeans
-    ├── nbkit-core/              fechar o NetBeans pelo terminal
-    ├── nbkit-colors/            coloração por padrão de texto (usado pelos temas)
-    └── nbkit-jsf/               verificações de JSF, com o teste em test/
+└── src/                         Java code of the NetBeans modules
+    ├── nbkit-core/              closing NetBeans from the terminal
+    ├── nbkit-colors/            coloring by text pattern (used by the themes)
+    └── nbkit-jsf/               JSF checks, with the test in test/
 ```
 
-Para adicionar um módulo, basta colocar um `.sh` em `modules/` seguindo o [contrato](modules/README.md).
+To add a module, just put a `.sh` in `modules/` following the [contract](modules/README.md).
 
-## Problemas
+## Troubleshooting
 
-- **"não achei a instalação do NetBeans":** rode com `NB_HOME=/caminho/do/netbeans bash nbkit.sh`.
-- **Módulo não carregou:** confira se o NetBeans roda com Java 17 ou mais novo. O `check` mostra qual Java ele está usando.
+- **"could not find the NetBeans installation":** run with `NB_HOME=/path/to/netbeans bash nbkit.sh`.
+- **Module did not load:** check that NetBeans runs on Java 17 or newer. `check` shows which Java it is using.
 
-## Licença
+## License
 
 [MIT](LICENSE).
 
-### Terceiros
+### Third parties
 
-- **Cores:** [One Dark Pro](https://github.com/Binaryify/OneDark-Pro), variante Mix. Copyright (c) 2013-2022 Binaryify, licença MIT.
-- **Fonte:** [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), baixada do repositório oficial durante a instalação. Copyright 2020 The JetBrains Mono Project Authors, licença SIL Open Font License 1.1.
-- **Apache NetBeans** e **FlatLaf** são licenciados sob Apache 2.0. Os módulos usam as APIs públicas do NetBeans.
+- **Colors:** [One Dark Pro](https://github.com/Binaryify/OneDark-Pro), Mix variant. Copyright (c) 2013-2022 Binaryify, MIT license.
+- **Font:** [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), downloaded from the official repository during the install. Copyright 2020 The JetBrains Mono Project Authors, SIL Open Font License 1.1.
+- **Apache NetBeans** and **FlatLaf** are licensed under Apache 2.0. The modules use the public NetBeans APIs.
 
-Projeto independente, sem vínculo com a Apache Software Foundation, com a JetBrains nem com os autores do One Dark Pro. "Apache NetBeans" é marca registrada da Apache Software Foundation.
+Independent project, not affiliated with the Apache Software Foundation, JetBrains or the One Dark Pro authors. "Apache NetBeans" is a registered trademark of the Apache Software Foundation.

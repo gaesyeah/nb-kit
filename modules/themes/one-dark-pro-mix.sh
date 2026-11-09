@@ -1,6 +1,6 @@
 # One Dark Pro Mix theme for nbkit (loaded by nbkit.sh with source).
 # Data only: what is the same for every theme (profile, backup, font, coloring module,
-# keeping your customizations, check) lives in the engine, _engine.sh. See "Criar um tema" in the README.
+# keeping your customizations, check) lives in the engine, _engine.sh. See "Creating a theme" in the README.
 
 source "$(dirname "${BASH_SOURCE[0]}")/_engine.sh"
 theme_register one-dark-pro-mix odpm "One Dark Pro Mix" "$(t odpm.description)" 29

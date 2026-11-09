@@ -5,7 +5,7 @@
 #   <prefix>_colors     editor colors: colors_tokens, colors_highlights, colors_annotations,
 #                       colors_language <mime> and colors_extras <mime> (categories of the coloring module)
 # Optional: <prefix>_legacy_version (version installed by an old installer, to offer the update).
-# See the "Criar um tema" section of the README.
+# See the "Creating a theme" section of the README.
 
 [ -n "${NBKIT_THEME_ENGINE:-}" ] && return 0
 NBKIT_THEME_ENGINE=1

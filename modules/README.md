@@ -1,56 +1,60 @@
-# Como criar um módulo do nbkit
+<p align="center">
+  <a href="README.md"><img alt="English" src="https://img.shields.io/badge/English-2F81F7?style=for-the-badge"></a>
+  <a href="README.pt-BR.md"><img alt="Português (Brasil)" src="https://img.shields.io/badge/Portugu%C3%AAs%20(Brasil)-30363D?style=for-the-badge"></a>
+</p>
 
-Cada arquivo `.sh` em `modules/` (ou em `modules/themes/`, para temas) é carregado pelo `nbkit.sh` com `source`.
-O menu, o status, o "Todos", o progresso `[n/N]`, o ponto de restauração e a conferência já funcionam
-para qualquer módulo que siga o contrato abaixo.
+# Creating an nbkit module
 
-Para temas, use o motor (`modules/themes/_engine.sh`): `theme_register` cria todas as funções do contrato.
-O tema só define as cores (veja "Criar um tema" no README). Arquivos que começam com `_` não são carregados
-como módulo.
+Each `.sh` file in `modules/` (or in `modules/themes/`, for themes) is loaded by `nbkit.sh` with `source`.
+The menu, the status, "All", the `[n/N]` progress, the restore point and the check already work
+for any module that follows the contract below.
 
-## Registro
+For themes, use the engine (`modules/themes/_engine.sh`): `theme_register` creates every function of the contract.
+The theme only defines the colors (see "Creating a theme" in the [README](../README.md#creating-a-theme)). Files starting
+with `_` are not loaded as modules.
+
+## Registration
 
 ```bash
-nbkit_register <id> <prefixo> <categoria> "<nome>" "<descrição>" <versão>
+nbkit_register <id> <prefix> <category> "<name>" "<description>" <version>
 ```
 
-- **id:** o que aparece na linha de comando (`bash nbkit.sh install <id>`).
-- **prefixo:** início do nome das funções do módulo (`<prefixo>_status`, `<prefixo>_install`...).
-- **categoria:** `theme` (só um tema fica ativo por vez; instalar outro troca) ou `tool`.
-- **versão:** número inteiro. Quando muda, o menu oferece atualizar.
+- **id:** what shows up on the command line (`bash nbkit.sh install <id>`).
+- **prefix:** start of the module function names (`<prefix>_status`, `<prefix>_install`...).
+- **category:** `theme` (only one theme is active at a time; installing another one switches) or `tool`.
+- **version:** an integer. When it changes, the menu offers the update.
 
-## Funções obrigatórias
+## Required functions
 
-| Função | O que faz |
+| Function | What it does |
 |---|---|
-| `<prefixo>_status` | Imprime `no` ou chama `version_status <id>` (devolve `ok`, `old:<v>` ou `new:<v>`). |
-| `<prefixo>_install_steps` | Imprime quantos `step` a instalação usa. |
-| `<prefixo>_install` | Instala. Usa `step`, `ok`, `info`, `warn` e `die` do nbkit. |
-| `<prefixo>_uninstall_steps` | Imprime quantos `step` a desinstalação usa. |
-| `<prefixo>_uninstall` | Remove. |
-| `<prefixo>_paths` | Caminhos (relativos ao userdir) que o módulo altera: entram no ponto de restauração. |
-| `<prefixo>_uninstall_summary` | Linhas "Sai / Volta / Fica" mostradas antes de confirmar. |
-| `<prefixo>_check` | Com o NetBeans aberto: imprime `res 0 "..."` ou `res 1 "..."`. Retorna 0 (ok), 1 (reinstalar corrige) ou 2 (não corrige). |
+| `<prefix>_status` | Prints `no` or calls `version_status <id>` (returns `ok`, `old:<v>` or `new:<v>`). |
+| `<prefix>_install_steps` | Prints how many `step` calls the install uses. |
+| `<prefix>_install` | Installs. Uses the nbkit `step`, `ok`, `info`, `warn` and `die`. |
+| `<prefix>_uninstall_steps` | Prints how many `step` calls the uninstall uses. |
+| `<prefix>_uninstall` | Removes. |
+| `<prefix>_paths` | Paths (relative to the userdir) the module changes: they go into the restore point. |
+| `<prefix>_uninstall_summary` | "Goes / Back / Stays" lines shown before confirming. |
+| `<prefix>_check` | With NetBeans open: prints `res 0 "..."` or `res 1 "..."`. Returns 0 (ok), 1 (reinstalling fixes it) or 2 (it does not). |
 
-## Funções opcionais
+## Optional functions
 
-| Função | O que faz |
+| Function | What it does |
 |---|---|
-| `<prefixo>_backups` | Lista os arquivos de backup do módulo (o mais antigo primeiro). Faz o item "Backups" aparecer. |
-| `<prefixo>_backup_desc <arquivo>` | Descrição curta do que tem no backup. |
-| `<prefixo>_restore_steps <arquivo>` e `<prefixo>_restore <arquivo>` | Restaura um backup. |
-| `<prefixo>_rollback` | Desfaz algo fora do userdir se a instalação parar no meio. |
+| `<prefix>_backups` | Lists the module backup files (the oldest first). Makes the "Backups" item show up. |
+| `<prefix>_backup_desc <file>` | Short description of what is in the backup. |
+| `<prefix>_restore_steps <file>` and `<prefix>_restore <file>` | Restores a backup. |
+| `<prefix>_rollback` | Undoes something outside the userdir if the install stops midway. |
 
-## Ajudantes do nbkit
+## nbkit helpers
 
-`$UD` (userdir), `$C` (`$UD/config`), `tmpdir` (pasta temporária apagada no fim), `ask_yn <pergunta> Y|N`, `bk_date`,
-`version_status`, `log_has_module <nome>` e `log_module_errors <regex>` (para o `conferir`).
+`$UD` (userdir), `$C` (`$UD/config`), `tmpdir` (temporary folder deleted at the end), `ask_yn <question> Y|N`, `bk_date`,
+`version_status`, `log_has_module <name>` and `log_module_errors <regex>` (for `check`).
 
-A versão instalada de cada módulo fica em `$UD/nbkit/<id>.version`, gravada pelo nbkit.
+The installed version of each module is kept in `$UD/nbkit/<id>.version`, written by nbkit.
 
-## Textos
+## Texts
 
-Tudo o que aparece no terminal vem de `lang/<idioma>.lang`. Use `t <chave> [valores...]`, que imprime o texto com os `%s`
-preenchidos na ordem (ex.: `step "$(t meu.passo "$nome")"`), e crie a chave em todos os arquivos de `lang/`, com o
-prefixo do módulo (`jsf.`, `theme.`...). Trechos em Python recebem os mesmos arquivos em `NBKIT_LANG_FILES`
-(veja a função `T` no `_engine.sh`).
+Everything shown in the terminal comes from `lang/<language>.lang`. Use `t <key> [values...]`, which prints the text with
+the `%s` filled in order (e.g. `step "$(t my.step "$name")"`), and create the key in every file in `lang/`, with the module
+prefix (`jsf.`, `theme.`...). Python parts get the same files in `NBKIT_LANG_FILES` (see the `T` function in `_engine.sh`).
