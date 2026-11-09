@@ -58,6 +58,96 @@ Os ids dos módulos são `one-dark-pro-mix` e `jsf`. O userdir padrão é o NetB
 - **Suas personalizações:** se você mudou valores que o tema também define, o nbkit pergunta se quer manter os seus.
 - **Backup:** antes da primeira instalação, ele guarda um backup do estado original, que volta ao desinstalar.
 
+## Criar um tema
+
+Tudo o que o One Dark Pro Mix tem além das cores fica no motor de temas, em `modulos/temas/_motor.sh`. Um tema novo só descreve as cores. O motor já cuida de:
+
+- criar o perfil de cores como cópia do perfil base da sua versão do NetBeans, sem mexer no original;
+- fazer backup, restaurar, desinstalar e voltar ao visual e ao perfil de antes;
+- preservar as personalizações de quem usa;
+- instalar a fonte se ela faltar, e removê-la depois só se foi o nbkit que instalou;
+- instalar o módulo de coloração (`nbkit-cores.jar`): chamadas, objetos, constantes, unidades, funções, colchetes por nível, DOCTYPE...;
+- aplicar a cor de seleção do terminal;
+- desfazer tudo com Ctrl+C;
+- conferir com o NetBeans aberto (`check`).
+
+Crie `modulos/temas/<id>.sh`. O nbkit carrega o arquivo sozinho e o tema aparece no menu.
+
+```bash
+source "$(dirname "${BASH_SOURCE[0]}")/_motor.sh"
+tema_registrar meu-tema mt "Meu Tema" "Descrição curta" 1
+
+mt_config() {
+  TEMA_PERFIL="Meu Tema"                    # nome do perfil em Tools > Options > Fonts & Colors
+  TEMA_TERMINAL_SELECAO=-12499634           # opcional: cor de seleção do terminal (ARGB como inteiro)
+  TEMA_FONTE_NOME="JetBrains Mono"          # opcional: fonte do editor
+  TEMA_FONTE_PASTA="JetBrainsMono"          # pasta em ~/.local/share/fonts
+  TEMA_FONTE_URLS=("https://.../Regular.ttf" "https://.../Bold.ttf")
+  TEMA_FONTE_LICENCA="https://.../OFL.txt"
+}
+
+# interface (FlatLaf): conteúdo do arquivo de propriedades do visual
+mt_interface() {
+  cat <<'EOF'
+nb.preferred.color.profile=Meu Tema
+@background=#1e1e1e
+@foreground=#d4d4d4
+EOF
+}
+
+# editor
+mt_cores() {
+  cores_tokens <<'EOF'
+    <fontcolor name="default" foreColor="ffd4d4d4" bgColor="ff1e1e1e"/>
+    <fontcolor name="comment" foreColor="ff6a9955"/>
+EOF
+  cores_destaques <<'EOF'
+    <fontcolor name="selection" bgColor="ff264f78"/>
+EOF
+  cores_anotacoes <<'EOF'
+EOF
+  cores_linguagem text/x-java <<'EOF'
+    <fontcolor name="method-declaration" foreColor="ffdcdcaa"/>
+EOF
+  cores_extras text/javascript <<'EOF'
+    <fontcolor name="nbkit-call" foreColor="ffdcdcaa"/>
+EOF
+}
+```
+
+O que cada parte faz:
+
+- **`tema_registrar <id> <prefixo> "<nome>" "<descrição>" <versão>`:** registra o tema no menu e liga as funções do nbkit ao motor. Aumente a versão quando mudar as cores, para o menu oferecer a atualização.
+- **`<prefixo>_config`:** só `TEMA_PERFIL` é obrigatório. Os padrões são:
+  - base `FlatLafDark` (`TEMA_BASE`, com `TEMA_BASE_NOME` e `TEMA_BASE_PERFIL` para as mensagens e para a desinstalação);
+  - visual `com.formdev.flatlaf.FlatDarkLaf` (`TEMA_LAF`), com o arquivo `FlatDarkLaf.properties` (`TEMA_LAF_ARQ`).
+
+  Sem `TEMA_FONTE_NOME`, a fonte não é alterada. Sem `TEMA_TERMINAL_SELECAO`, o terminal não é alterado.
+- **`<prefixo>_interface`:** chaves do FlatLaf (`@background`, `Component.focusColor`...). A linha `nb.preferred.color.profile=<perfil>` faz o NetBeans manter o perfil do tema ao trocar de visual. O motor põe a marca do tema na primeira linha e mescla as chaves que a pessoa já tinha.
+- **`<prefixo>_cores`:** linhas `<fontcolor .../>` do NetBeans, com cores em `ffRRGGBB`.
+  - `cores_tokens` vale para todas as linguagens (`default`, `comment`, `keyword`, `string`, `error`, `warning`...).
+  - `cores_destaques` cobre seleção, linha atual, busca, números de linha...
+  - `cores_anotacoes` são os sublinhados que os módulos usam.
+  - `cores_linguagem <mime>` são os tokens de uma linguagem.
+  - `cores_extras <mime>` são as categorias do módulo de coloração.
+
+  Uma cor que o tema não define fica como no perfil base. Para descobrir o nome de um token, mude a cor dele em Tools > Options > Fonts & Colors e veja o arquivo gravado em `~/.netbeans/<versão>/config/Editors/<mime>/FontsColors/`.
+
+Categorias do módulo de coloração, por linguagem (em `cores_extras`):
+
+| Linguagem | Categorias |
+|---|---|
+| `text/javascript` | `nbkit-call`, `nbkit-object`, `nbkit-type`, `nbkit-constant`, `nbkit-library`, `nbkit-readonly`, `nbkit-library-function`, colchetes |
+| `text/css` | `nbkit-unit`, `nbkit-function`, `nbkit-tag`, `nbkit-id`, `nbkit-attribute`, `nbkit-string`, `nbkit-plain`, `nbkit-url-parameter`, colchetes |
+| `text/x-el` | `nbkit-call`, `nbkit-object`, `nbkit-library`, colchetes |
+| `text/html` | `nbkit-plain`, `nbkit-doctype`, `nbkit-attribute`, `nbkit-string` |
+| `text/xml`, `text/xml-external-parsed-entity` | `nbkit-plain`, `nbkit-attribute`, `nbkit-string`, `nbkit-keyword`, `nbkit-documentroot`, `nbkit-doctype` |
+| `text/x-java`, `text/x-json` | colchetes |
+
+Os colchetes são `nbkit-bracket1`, `nbkit-bracket2` e `nbkit-bracket3`, um por nível, e `nbkit-bracket-unexpected` para o colchete sem par.
+
+O `modulos/temas/one-dark-pro-mix.sh` é um exemplo completo.
+
 ## Verificações de JSF
 
 O NetBeans checa tags, atributos e a sintaxe do EL, mas não pega erros que só aparecem rodando, ou que nem aparecem. Este módulo marca esses erros no editor:
@@ -110,7 +200,9 @@ nbkit/
 ├── nbkit.sh                     CLI
 ├── modulos/
 │   ├── LEIAME.md                como criar um módulo
-│   ├── temas/one-dark-pro-mix.sh
+│   ├── temas/
+│   │   ├── _motor.sh            motor de temas (veja "Criar um tema")
+│   │   └── one-dark-pro-mix.sh  só as cores do tema
 │   └── jsf.sh
 └── fontes/                      código Java dos módulos do NetBeans
 ```

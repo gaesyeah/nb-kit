@@ -68,6 +68,7 @@ EOF
 declare -A LOADED=()
 [ -d "$NBKIT_DIR/modulos" ] || die "pasta modulos/ não encontrada ao lado de $ME. Baixe a pasta nbkit inteira."
 for f in "$NBKIT_DIR"/modulos/temas/*.sh "$NBKIT_DIR"/modulos/*.sh "$NBKIT_DIR"/modulos/*/*.sh; do
+  case "${f##*/}" in _*) continue ;; esac   # _motor.sh etc.: carregados pelos próprios módulos
   case "$f" in "$NBKIT_DIR"/modulos/temas/*) [ -n "${LOADED[$f]:-}" ] && continue ;; esac
   LOADED[$f]=1
   [ -f "$f" ] || continue

@@ -4,6 +4,10 @@ Cada arquivo `.sh` em `modulos/` (ou em `modulos/temas/`, para temas) é carrega
 O menu, o status, o "Todos", o progresso `[n/N]`, o ponto de restauração e a conferência já funcionam
 para qualquer módulo que siga o contrato abaixo.
 
+Para temas, use o motor (`modulos/temas/_motor.sh`): `tema_registrar` cria todas as funções do contrato.
+O tema só define as cores (veja "Criar um tema" no README). Arquivos que começam com `_` não são carregados
+como módulo.
+
 ## Registro
 
 ```bash
