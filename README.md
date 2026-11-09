@@ -1,83 +1,126 @@
-# One Dark Pro Mix para NetBeans
+# nbkit
 
-Instalador em bash que leva as cores do tema **One Dark Pro Mix**, do VS Code, para o **Apache NetBeans** no Linux. Ele cria um perfil de cores próprio, seleciona o visual FlatLaf Dark e instala um pequeno módulo que colore o que o NetBeans sozinho não consegue colorir.
+Kit de módulos para o **Apache NetBeans** no Linux, instalado por um CLI no terminal. Hoje tem dois módulos:
 
-Tudo é feito por um menu no terminal, com perguntas `[S/n]` só quando há algo a decidir.
+- **Tema One Dark Pro Mix:** as cores do tema do VS Code, com o visual FlatLaf Dark e a fonte JetBrains Mono.
+- **Verificações de JSF:** avisos no editor de xhtml para erros que o NetBeans não mostra, como `#{batataDoce}`.
 
-## O que ele faz
+Cada módulo instala e desinstala separado.
+
+## Instalação
+
+Baixe a pasta `nbkit` inteira e rode:
+
+```bash
+bash nbkit/nbkit.sh
+```
+
+O CLI mostra o status de cada módulo e só as opções que fazem sentido. Use ↑↓ para navegar, Enter para escolher e Esc para voltar.
+
+- **Instalar ou atualizar:** escolha "Todos" ou um módulo.
+- **Reinstalar** e **Desinstalar:** também por módulo.
+- **Conferir se carregou no NetBeans:** confere cada módulo instalado.
+- **Backups:** só aparece quando existe algum. Enter restaura, Del apaga, Esc volta, e restaurar e apagar pedem confirmação.
+
+Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File > Exit, então o NetBeans pergunta sobre arquivos não salvos e processos rodando como sempre. No fim, oferece abrir o NetBeans e confere sozinho se tudo carregou. Se algo falhar no meio, ou se você apertar Ctrl+C, tudo volta como estava.
+
+### Sem o menu
+
+| Comando | O que faz |
+|---|---|
+| `bash nbkit.sh install [módulo...] [userdir]` | Instala ou atualiza (sem módulo: todos) |
+| `bash nbkit.sh uninstall [módulo...] [userdir]` | Remove (sem módulo: todos os instalados) |
+| `bash nbkit.sh check [userdir]` | Com o NetBeans aberto, confere se tudo carregou |
+| `bash nbkit.sh --help` | Ajuda e lista de módulos |
+
+Os ids dos módulos são `one-dark-pro-mix` e `jsf`. O userdir padrão é o NetBeans mais novo em `~/.netbeans/`; se houver mais de um, o menu pergunta qual usar.
+
+## Requisitos
+
+- Linux com bash 4 ou mais novo, e `python3`.
+- Apache NetBeans, testado na versão 31. Funciona com instalação normal, Flatpak ou Snap.
+- NetBeans rodando com Java 17 ou mais novo.
+- `curl` ou `wget`, só se a JetBrains Mono precisar ser baixada.
+
+## Tema One Dark Pro Mix
 
 - Cria o perfil **"One Dark Pro Mix"** como cópia do FlatLaf Dark da sua versão do NetBeans, com as cores do tema. O perfil FlatLaf Dark original não é alterado.
 - Usa as cores do Mix sempre que existe um equivalente. Onde o Mix não define uma cor, usa o padrão do VS Code.
 - Mantém o itálico e o negrito do NetBeans, exceto nas palavras-chave, que ficam sem negrito como no Mix.
-- Seleciona o visual FlatLaf Dark, o perfil do tema e a cor de seleção do terminal integrado.
-- Instala e seleciona a fonte **JetBrains Mono** se ela ainda não estiver instalada.
-- Instala um módulo de coloração que pinta o que o editor do NetBeans não distingue sozinho:
-  - **JavaScript:** chamadas de função, objetos, constantes e funções e classes da biblioteca padrão.
-  - **CSS, SCSS e LESS:** unidades, funções, tags, ids, seletores de atributo e `@keyframes`.
-  - **EL (JSF/Facelets):** variáveis locais e objetos implícitos.
-  - **HTML, XML, JSP:** DOCTYPE e instruções de processamento.
-  - **Colchetes coloridos por nível,** como no VS Code, em Java, JavaScript, JSON, CSS e EL.
+- Seleciona o visual FlatLaf Dark, o perfil e a cor de seleção do terminal, e instala a JetBrains Mono se faltar.
+- Avisos em amarelo e erros em vermelho, os dois com um fundo suave.
+- Um módulo de coloração pinta o que o editor não distingue sozinho:
+  - **JavaScript:** chamadas, objetos e constantes.
+  - **CSS:** unidades, funções e seletores.
+  - **EL:** variáveis.
+  - **HTML/XML:** DOCTYPE.
+  - **Colchetes coloridos por nível.**
+- **Suas personalizações:** se você mudou valores que o tema também define, o nbkit pergunta se quer manter os seus.
+- **Backup:** antes da primeira instalação, ele guarda um backup do estado original, que volta ao desinstalar.
 
-## Requisitos
+## Verificações de JSF
 
-- Linux com bash 4 ou mais novo.
-- Apache NetBeans, testado na versão 31. Funciona com instalação normal, Flatpak ou Snap.
-- NetBeans rodando com Java 17 ou mais novo, que o módulo de coloração exige.
-- `python3`.
-- `curl` ou `wget`, só se a JetBrains Mono precisar ser baixada.
+O NetBeans checa tags, atributos e a sintaxe do EL, mas não pega erros que só aparecem rodando, ou que nem aparecem. Este módulo marca esses erros no editor:
+- **Vermelho:** quebra com certeza.
+- **Amarelo:** provável erro, ou depende de algo fora do arquivo.
 
-## Instalação
+Cada regra liga e desliga em **Tools > Options > Editor > JSF**.
 
-Baixe o `netbeans-onedark.sh` e rode:
+- **EL:**
+  - nome que não existe;
+  - variável fora do lugar;
+  - propriedade ou método inexistente no bean;
+  - `value` de campo que não pode ser gravado;
+  - método onde se espera propriedade;
+  - constante de enum inexistente;
+  - `cc.attrs` não declarado;
+  - `${}` em componente JSF.
+- **Declarado e não usado:** `ui:param`, `c:set`, `var`, `varStatus`, `cc:attribute`, parâmetro de lambda.
+- **IDs:**
+  - `update`/`process`/`for` para id inexistente;
+  - palavra de busca errada (`@from`);
+  - id inválido ou repetido;
+  - update de componente com `rendered`;
+  - `PF('x')` sem `widgetVar`.
+- **Formulários:**
+  - botão ou campo fora de `h:form`;
+  - form dentro de form;
+  - `p:dialog` com `appendTo` body;
+  - `p:fileUpload` sem multipart;
+  - validação sem componente de mensagem.
+- **Ciclo de vida:**
+  - `c:if`/`c:forEach` com a variável de um `ui:repeat`/`p:dataTable`;
+  - `f:viewParam` fora de `f:metadata`;
+  - evento de `p:ajax` que o componente não tem.
+- **Templates e arquivos:**
+  - `ui:define` sem `ui:insert`;
+  - conteúdo fora de `ui:define`;
+  - include, template, recurso ou página de navegação inexistente.
+- **Outros:**
+  - EL dentro de comentário (o Facelets executa);
+  - `&nbsp;` e outras entidades HTML;
+  - `escape="false"`.
 
-```bash
-bash netbeans-onedark.sh
+Os beans (Spring `@Component` e derivados, `@Bean`, CDI `@Named`, `@ManagedBean`) e os tipos vêm das classes compiladas do projeto e dos jars do classpath, então funciona em qualquer projeto sem configurar nada. Classes ainda não compiladas entram pelo nome, lido do código-fonte.
+
+## Estrutura
+
+```
+nbkit/
+├── nbkit.sh                     CLI
+├── modulos/
+│   ├── LEIAME.md                como criar um módulo
+│   ├── temas/one-dark-pro-mix.sh
+│   └── jsf.sh
+└── fontes/                      código Java dos módulos do NetBeans
 ```
 
-O script mostra o status e só as opções que fazem sentido:
-
-- **Não instalado:** pergunta `Instalar agora? [S/n]`.
-- **Instalado:** abre um menu com Reinstalar (ou Atualizar, se houver versão nova), Conferir, Backups, Desinstalar e Sair. Use ↑↓ para navegar, Enter para escolher e Esc para sair.
-- **Backups:** só aparece quando existe algum backup. Lista cada um com data, tamanho e o que tem dentro. Use ↑↓ para navegar, Enter para restaurar, Del para apagar e Esc para voltar. Restaurar e apagar pedem confirmação.
-- **Mais de um NetBeans no computador:** pergunta em qual deles instalar.
-
-Se o NetBeans estiver aberto, o script oferece fechar. Ele fecha pelo mesmo caminho do File > Exit, então o NetBeans pergunta sobre arquivos não salvos e processos rodando como sempre. No fim, oferece abrir o NetBeans e confere sozinho se tudo carregou.
-
-> Na primeira instalação, ou ao atualizar de uma versão anterior à v24, o script ainda não consegue fechar o NetBeans sozinho. Feche você e ele continua automaticamente.
-
-## Comandos
-
-Para usar em scripts ou sem o menu:
-
-| Comando | O que faz |
-|---|---|
-| `bash netbeans-onedark.sh` | Abre o menu |
-| `bash netbeans-onedark.sh install [userdir]` | Instala ou atualiza direto |
-| `bash netbeans-onedark.sh uninstall [userdir]` | Remove o tema e volta o que você usava antes |
-| `bash netbeans-onedark.sh check [userdir]` | Com o NetBeans já aberto, confere se tudo carregou |
-| `bash netbeans-onedark.sh --help` | Mostra a ajuda |
-
-O `userdir` é opcional. O padrão é o NetBeans mais novo em `~/.netbeans/`. O caminho certo aparece em Help > About, na linha User directory.
-
-## Suas configurações
-
-- **Personalizações:** se você mudou valores que o tema também define, como chaves da interface ou a fonte, o script pergunta se quer manter os seus.
-- **Backup:** antes da primeira instalação, ele guarda um backup do estado original no userdir (`onedark-backup-*.tar.gz`). O mais antigo é o usado ao desinstalar.
-- **Restaurar um backup:** com o tema instalado, ele é desinstalado antes. Sem o tema, o que você tem hoje vira um backup novo antes, então dá pra desfazer.
-- **Falha ou Ctrl+C no meio:** se a instalação falhar ou for interrompida, tudo volta como estava.
-- **Desinstalar:**
-  - Volta o visual e o perfil de cores anteriores.
-  - Remove a JetBrains Mono só se foi o script que instalou.
-  - Pergunta se quer apagar os backups.
+Para adicionar um módulo, basta colocar um `.sh` em `modulos/` seguindo o [contrato](modulos/LEIAME.md).
 
 ## Problemas
 
-- **"não achei a instalação do NetBeans":** informe a pasta do NetBeans, a que tem `platform/` e `ide/`:
-  ```bash
-  NB_HOME=/caminho/do/netbeans bash netbeans-onedark.sh
-  ```
-- **Módulo de coloração não carregou:** confira se o NetBeans roda com Java 17 ou mais novo. O `check` mostra qual Java ele está usando.
-- **Algo diferente do esperado:** rode o `check` com o NetBeans aberto e veja quais itens aparecem como `PROBLEMA`.
+- **"não achei a instalação do NetBeans":** rode com `NB_HOME=/caminho/do/netbeans bash nbkit.sh`.
+- **Módulo não carregou:** confira se o NetBeans roda com Java 17 ou mais novo. O `check` mostra qual Java ele está usando.
 
 ## Licença
 
@@ -85,11 +128,8 @@ O `userdir` é opcional. O padrão é o NetBeans mais novo em `~/.netbeans/`. O 
 
 ### Terceiros
 
-- **Cores:** [One Dark Pro](https://github.com/Binaryify/OneDark-Pro), variante Mix.
-  Copyright (c) 2013-2022 Binaryify, licença MIT.
-- **Fonte:** [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), baixada do repositório
-  oficial durante a instalação. Copyright 2020 The JetBrains Mono Project Authors, licença SIL Open Font License 1.1.
-- **Apache NetBeans** e **FlatLaf** são licenciados sob Apache 2.0. O módulo usa as APIs públicas do NetBeans.
+- **Cores:** [One Dark Pro](https://github.com/Binaryify/OneDark-Pro), variante Mix. Copyright (c) 2013-2022 Binaryify, licença MIT.
+- **Fonte:** [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), baixada do repositório oficial durante a instalação. Copyright 2020 The JetBrains Mono Project Authors, licença SIL Open Font License 1.1.
+- **Apache NetBeans** e **FlatLaf** são licenciados sob Apache 2.0. Os módulos usam as APIs públicas do NetBeans.
 
-Projeto independente, sem vínculo com a Apache Software Foundation, com a JetBrains nem com os autores do One Dark Pro.
-"Apache NetBeans" é marca registrada da Apache Software Foundation.
+Projeto independente, sem vínculo com a Apache Software Foundation, com a JetBrains nem com os autores do One Dark Pro. "Apache NetBeans" é marca registrada da Apache Software Foundation.

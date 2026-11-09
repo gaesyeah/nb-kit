@@ -1,0 +1,47 @@
+<ui:composition template="/WEB-INF/templates/main.xhtml" xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:ui="jakarta.faces.facelets" xmlns:c="jakarta.tags.core" xmlns:p="http://primefaces.org/ui" xmlns:comp="jakarta.faces.composite/comp">
+  <ui:param name="titulo" value="Clientes"/>
+  <ui:param name="naoUsado" value="x"/><!--W:unused-->
+  <h:outputText value="perdido"/><!--E:tpl.define-->
+  <ui:define name="conteudo">
+    <h:outputText value="#{clienteVM.titulo} #{msg['ola']} #{relatorioService.nome} #{clientePadrao.nome} #{novoBean}"/>
+    <h:outputText value="#{batataDoce}"/><!--E:el.unknown-->
+    <h:outputText value="#{clienteVM.titlo}"/><!--E:el.member-->
+    <h:outputText value="#{clienteVM.cliente.nomee}"/><!--E:el.member-->
+    <h:outputText value="#{clienteVM.mapa.qualquerChave} #{clienteVM.lista.size()} #{clienteVM.formatar('a')}"/>
+    <h:outputText value="#{clienteVM.salvar}"/><!--E:el.kind-->
+    <p:commandButton value="x" action="#{clienteVM.titulo}"/><!--E:el.kind-->
+    <p:commandButton value="x" action="#{clienteVM.excluir(clienteVM.cliente)}" update="tabela msgs @form"/>
+    <p:commandButton value="x" update="@from"/><!--E:id.keyword-->
+    <p:commandButton value="x" update="tabelaa"/><!--E:id.missing-->
+    <p:commandButton value="x" update="painel"/><!--W:id.rendered-->
+    <h:panelGroup id="painel" rendered="#{clienteVM.podeEditar}"/>
+    <h:inputText value="#{clienteVM.cliente.nome}"/>
+    <h:inputText value="#{clienteVM.cliente.codigo}"/><!--E:el.readonly-->
+    <h:inputText value="#{clienteVM.formatar('a')}"/><!--E:el.readonly-->
+    <h:outputText rendered="#{clienteVM.cliente.status eq 'ATIVOO'}" value="a"/><!--E:el.enum-->
+    <h:outputText rendered="#{clienteVM.cliente.status eq 'ATIVO' and clienteVM.cliente.ativo}" value="a"/>
+    <p:dataTable id="tabela" var="cli" value="#{clienteVM.lista}" rowKey="#{cli.nome}" varStatus="st"><!--W:unused-->
+      <p:ajax event="rowSelect" listener="#{clienteVM.salvar}"/>
+      <p:ajax event="rowSelecte"/><!--E:ajax.event-->
+      <p:column><h:outputText value="#{cli.nome}"/></p:column>
+      <c:if test="#{cli.nome != null}"><h:outputText value="a"/></c:if><!--E:jstl.iteration-->
+      <ui:include src="/pages/fragmento.xhtml"><ui:param name="item" value="#{cli}"/><ui:param name="rotuloExterno" value="x"/><ui:param name="sobra" value="1"/></ui:include><!--W:unused-->
+    </p:dataTable>
+    <h:outputText value="#{cli.nome}"/><!--E:el.scope-->
+    <c:forEach items="#{clienteVM.lista}" var="x"><h:inputText id="repetido" value="#{x.nome}"/></c:forEach><!--E:id.duplicate-->
+    <h:outputText id="dup" value="1"/>
+    <h:outputText id="dup" value="2"/><!--E:id.duplicate-->
+    <h:outputText id="1invalido" value="2"/><!--E:id.invalid-->
+    <h:inputText value="#{clienteVM.cliente.nome}" required="true"><f:ajax event="blurr"/></h:inputText><!--E:ajax.event-->
+    <comp:campo rotulo="a"><f:ajax event="mudou"/></comp:campo>
+    <c:set var="local" value="1"/>
+    <h:outputText value="#{local}"/>
+    <c:set var="semUso" value="1"/><!--W:unused-->
+    <h:outputText value="#{lista.stream().filter(x -> x.ativo).map((a, b) -> a).toList()}"/><!--E:el.unknown W:unused-->
+    <h:outputText value="${clienteVM.titulo}" escape="false"/><!--W:el.immediate W:sec.escape-->
+    <ui:include src="/pages/naoexiste.xhtml"/><!--E:tpl.path-->
+    <button onclick="PF('dlgx').show()">a</button><!--W:js.widgetvar-->
+    <p:dialog widgetVar="dlg"/>
+  </ui:define>
+  <ui:define name="rodapee"><h:outputText value="x"/></ui:define><!--E:tpl.define-->
+</ui:composition>

@@ -1,0 +1,11 @@
+<ui:component xmlns="http://www.w3.org/1999/xhtml" xmlns:cc="jakarta.faces.composite" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets">
+  <cc:interface>
+    <cc:attribute name="rotulo"/>
+    <cc:attribute name="sobrando"/><!--W:unused-->
+    <cc:clientBehavior name="mudou" event="change" targets="in"/>
+  </cc:interface>
+  <cc:implementation>
+    <h:outputLabel value="#{cc.attrs.rotulo}" for="in"/>
+    <h:inputText id="in" value="#{cc.attrs.rotuloo}"/><!--E:cc.attrs-->
+  </cc:implementation>
+</ui:component>

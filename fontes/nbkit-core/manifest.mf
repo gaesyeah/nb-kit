@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+OpenIDE-Module: nbkit.core
+OpenIDE-Module-Specification-Version: 1.0
+OpenIDE-Module-Name: nbkit
+OpenIDE-Module-Short-Description: Base do nbkit (fechar o NetBeans pelo terminal)
+OpenIDE-Module-Java-Dependencies: Java > 17
+OpenIDE-Module-Module-Dependencies: org.netbeans.modules.sendopts/2 > 2.0, org.openide.util.ui > 9.0

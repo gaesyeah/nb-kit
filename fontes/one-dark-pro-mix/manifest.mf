@@ -1,0 +1,10 @@
+Manifest-Version: 1.0
+OpenIDE-Module: com.onedarkmix.netbeans
+OpenIDE-Module-Specification-Version: 1.5
+OpenIDE-Module-Name: One Dark Pro Mix Highlights
+OpenIDE-Module-Short-Description: Coloracao por padrao de texto (JS, EL, CSS) com as cores do One Dark Pro Mix
+OpenIDE-Module-Layer: com/onedarkmix/netbeans/layer.xml
+OpenIDE-Module-Public-Packages: -
+OpenIDE-Module-Java-Dependencies: Java > 17
+OpenIDE-Module-Module-Dependencies: org.netbeans.modules.editor.lib2/1 > 1.0, org.netbeans.modules.lexer/2 > 1.0, org.netbeans.modules.editor.mimelookup/1 > 1.0, org.netbeans.modules.editor.settings/1 > 1.0, org.openide.util.lookup > 8.0
+

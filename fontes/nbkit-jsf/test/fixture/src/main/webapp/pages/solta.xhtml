@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui">
+<h:head><h:outputStylesheet name="css/nao.css"/><h:outputStylesheet library="primefaces" name="theme.css"/></h:head><!--E:res.missing-->
+<h:body>
+  <f:viewParam name="id" value="#{clienteVM.titulo}"/><!--E:meta.viewparam-->
+  <!-- #{clienteVM.salvar()} --><!--W:comment.el-->
+  <ui:remove><h:outputText value="#{removidoNaoConta}"/></ui:remove>
+  <p>Texto&nbsp;aqui &amp; ok &#160;</p><!--E:xml.entity-->
+  <p:commandButton value="fora" action="#{clienteVM.salvar}"/><!--E:form.outside-->
+  <p:commandButton value="js" type="button" onclick="PF('dlg').show()"/>
+  <h:inputText value="#{clienteVM.cliente.nome}"/><!--W:form.outside-->
+  <h:form id="a">
+    <h:commandButton value="nav" action="clientes"/>
+    <h:commandButton value="nav2" action="naoTem?faces-redirect=true"/><!--E:nav.missing-->
+    <h:commandButton value="nav3" action="home"/>
+    <h:form id="b"/><!--E:form.nested-->
+    <p:dialog widgetVar="dlg" appendTo="@(body)">
+      <p:commandButton value="no dialogo" action="#{clienteVM.salvar}"/><!--E:form.dialog-->
+    </p:dialog>
+    <p:fileUpload mode="simple" value="#{clienteVM.titulo}"/><!--W:form.upload-->
+  </h:form>
+</h:body>
+</html>

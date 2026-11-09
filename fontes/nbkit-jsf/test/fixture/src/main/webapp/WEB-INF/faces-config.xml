@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<faces-config xmlns="https://jakarta.ee/xml/ns/jakartaee" version="4.0">
+  <application><resource-bundle><base-name>msgs</base-name><var>msg</var></resource-bundle></application>
+  <navigation-rule><navigation-case><from-outcome>home</from-outcome><to-view-id>/index.xhtml</to-view-id></navigation-case></navigation-rule>
+</faces-config>
