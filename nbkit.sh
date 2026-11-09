@@ -1,25 +1,19 @@
 #!/usr/bin/env bash
 # nbkit: kit of modules for Apache NetBeans on Linux (themes and checks).
 # This file is the CLI: menu, status, progress, closing/opening NetBeans, backups and restore point.
-# Each module lives in modules/ (themes in modules/themes/) and is loaded with source. See modules/README.md.
+# The code is in lib/ (theme and module engines, Python parts, base jars) and the modules are data in modules/:
+# one folder per NetBeans module (module.toml) and per theme (modules/themes/<id>). See modules/README.md.
 # Everything shown in the terminal comes from lang/<language>.lang (see "t" below).
 set -euo pipefail
 # Ctrl+C exits with code 130 (the exit trap uses it to undo a half-done install)
 trap 'exit 130' INT TERM HUP
-NBKIT_VERSION=2.1.0
+NBKIT_VERSION=2.2.0
 SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")"
 NBKIT_DIR="$(dirname "$SELF")"
 ME="$(basename "$SELF")"
 
-if [ -t 1 ]; then B=$'\e[1m'; BL=$'\e[1;34m'; G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; D=$'\e[2m'; N=$'\e[0m'
-else B=; BL=; G=; Y=; R=; D=; N=; fi
-# the Python parts of the modules (e.g. check) use the same colors
-export NBKIT_G="$G" NBKIT_R="$R" NBKIT_D="$D" NBKIT_N="$N"
-
-# ---------- language ----------
-# lang/<id>.lang: one "key=value" per line, # for comments. Values are printf formats (%s, \n) and may use
-# {B} {N} {D} {G} {Y} {R} {BL} for bold, normal, dim and colors. pt-BR is the reference: missing keys come from it.
-[ -f "$NBKIT_DIR/lang/pt-BR.lang" ] || { echo "nbkit: lang/ folder not found next to $ME. Download the whole nbkit folder." >&2; exit 1; }
+[ -f "$NBKIT_DIR/lang/pt-BR.lang" ] && [ -f "$NBKIT_DIR/lib/terminal.sh" ] || { echo "nbkit: lang/ or lib/ not found next to $ME. Download the whole nbkit folder." >&2; exit 1; }
+# --lang <id> or --lang=<id>, anywhere in the arguments
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -30,48 +24,8 @@ while [ $# -gt 0 ]; do
   shift
 done
 set -- ${ARGS[@]+"${ARGS[@]}"}
-# language: --lang, NBKIT_LANG or the system one (LC_ALL, LC_MESSAGES, LANG); without a file for it, English
-lang_pick() {
-  local want="${NBKIT_LANG:-}" l c
-  if [ -z "$want" ]; then
-    l="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"; l="${l%%.*}"; l="${l%%@*}"
-    case "$l" in pt*) want=pt-BR ;; ''|C|POSIX) want=en ;; *) want="${l/_/-}" ;; esac
-  fi
-  for c in "$want" "${want%%-*}" en; do
-    if [ -f "$NBKIT_DIR/lang/$c.lang" ]; then echo "$c"; return 0; fi
-  done
-  echo pt-BR
-}
-declare -A L=()
-lang_load() {
-  local line
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in ''|'#'*) continue ;; esac
-    L["${line%%=*}"]="${line#*=}"
-  done < "$1"
-}
-NBKIT_LANG="$(lang_pick)"
-export NBKIT_LANG
-lang_load "$NBKIT_DIR/lang/pt-BR.lang"
-[ "$NBKIT_LANG" = pt-BR ] || lang_load "$NBKIT_DIR/lang/$NBKIT_LANG.lang"
-# the Python parts of the modules read the same files
-NBKIT_LANG_FILES="$NBKIT_DIR/lang/pt-BR.lang"$'\n'"$NBKIT_DIR/lang/$NBKIT_LANG.lang"
-export NBKIT_LANG_FILES
-# t <key> [args...]: prints the text of the key, filling %s with the args
-t() {
-  local f="${L[$1]-$1}"; shift
-  f="${f//\{BL\}/$BL}"; f="${f//\{B\}/$B}"; f="${f//\{N\}/$N}"; f="${f//\{D\}/$D}"
-  f="${f//\{G\}/$G}"; f="${f//\{Y\}/$Y}"; f="${f//\{R\}/$R}"
-  # shellcheck disable=SC2059
-  printf -- "$f" "$@"
-}
-
-die() { echo "${R}$(t cli.error)${N} $*" >&2; exit 1; }
-STEP=0; TOTAL=0
-step() { STEP=$((STEP + 1)); printf '%s[%d/%d]%s %s\n' "$BL" "$STEP" "$TOTAL" "$N" "$*"; }
-ok()   { printf '      %s✓%s %s\n' "$G" "$N" "$*"; }
-info() { printf '      %s%s%s\n' "$D" "$*" "$N"; }
-warn() { printf '      %s!%s %s\n' "$Y" "$N" "$*"; }
+# shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/terminal.sh"
 
 # ---------- yes/no ----------
 # yes/no question; the uppercase letter is the Enter default (Y or N in $2)
@@ -127,6 +81,8 @@ if [ -z "$NBKIT_PY" ]; then
   [ -n "$NBKIT_PY" ] || die "$(t cli.python_manual)"
 fi
 export NBKIT_PY
+# the Python parts import lib/text.py (texts of lang/); no __pycache__ inside the nbkit folder
+export PYTHONPATH="$NBKIT_DIR/lib${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1
 
 # ---------- module registry ----------
 # nbkit_register <id> <function prefix> <category: theme|tool> <name> <description> <version>
@@ -161,13 +117,37 @@ usage() {
   t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
 }
 
+# ---------- files shared by the engines ----------
+# copies a file and checks its sha256 (catches a broken download of nbkit)
+file_copy() { cp "$1" "$2" && echo "$3  $2" | sha256sum -c --quiet -; }
+# copies one of the base jars of lib/jars/, checked against lib/jars/SHA256SUMS
+jar_copy() {
+  local sum; sum="$(awk -v f="$1" '$2 == f {print $1}' "$NBKIT_DIR/lib/jars/SHA256SUMS")"
+  [ -n "$sum" ] && file_copy "$NBKIT_DIR/lib/jars/$1" "$2" "$sum"
+}
+# config/Modules/<name>.xml that turns a module on in NetBeans
+module_xml() {
+  cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC "-//NetBeans//DTD Module Status 1.0//EN" "http://www.netbeans.org/dtds/module-status-1_0.dtd">
+<module name="$1">
+    <param name="autoload">false</param>
+    <param name="eager">false</param>
+    <param name="enabled">true</param>
+    <param name="jar">modules/${1//./-}.jar</param>
+    <param name="reloadable">false</param>
+</module>
+EOF
+}
+
 # ---------- loads the modules (themes first) ----------
-[ -d "$NBKIT_DIR/modules" ] || die "$(t cli.no_modules_dir "$ME")"
-# the theme engine registers every folder in modules/themes/
+[ -d "$NBKIT_DIR/modules" ] && [ -d "$NBKIT_DIR/lib" ] || die "$(t cli.no_modules_dir "$ME")"
 # shellcheck disable=SC1091
-[ -f "$NBKIT_DIR/modules/themes/_engine.sh" ] && source "$NBKIT_DIR/modules/themes/_engine.sh"
-for f in "$NBKIT_DIR"/modules/*.sh "$NBKIT_DIR"/modules/*/*.sh; do
-  case "${f##*/}" in _*) continue ;; esac   # _engine.sh: already loaded above
+source "$NBKIT_DIR/lib/themes.sh"     # every folder in modules/themes/
+# shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/modules.sh"    # every folder in modules/ with a module.toml
+# modules written in bash (see modules/README.md)
+for f in "$NBKIT_DIR"/modules/*.sh; do
   [ -f "$f" ] || continue
   # shellcheck disable=SC1090
   source "$f"
@@ -406,65 +386,8 @@ ensure_closed() {
 # ---------- base module (nbkit.core): only the option to close NetBeans from the terminal ----------
 core_install() {
   mkdir -p "$UD/modules" "$C/Modules"
-  base64 -d > "$CORE_JAR" <<'B64'
-UEsDBAoAAAgAAPOFaV0AAAAAAAAAAAAAAAAJAAQATUVUQS1JTkYv/soAAFBLAwQUAAgICADzhWld
-AAAAAAAAAAAAAAAAFAAAAE1FVEEtSU5GL01BTklGRVNULk1GZZC7TsNAEEV7S/6HKUFix143CBcu
-QlIkIqJA0K93J9EIM7vaR6Tk65EDQoCrke499xSzN8IHSlm9UUzspQeNbV09B5LteqP23pWJepDx
-nTNaH+l/p14CWT6wNZm9/NboBfrkrZn4wnJUqyLuR9zM4uYrwhB9oJiZ0mK/Myej1hRIHIllSj3M
-EQyg7xfw9/mL+3hEoTySkYQfVyJhInE+5NR0MECHdQXt3ZX0gYQdYck8YWEY4GF+zmMkk8mp1bmH
-TmOLukMNN69jkVxu66quPgFQSwcI64jueNEAAABWAQAAUEsDBAoAAAgAABV/aV0AAAAAAAAAAAAA
-AAASAAAATUVUQS1JTkYvc2VydmljZXMvUEsDBBQACAgIABV/aV0AAAAAAAAAAAAAAAA7AAAATUVU
-QS1JTkYvc2VydmljZXMvb3JnLm5ldGJlYW5zLnNwaS5zZW5kb3B0cy5PcHRpb25Qcm9jZXNzb3LL
-S8rOLNFLzi9K1XPOyS9O9S8oyczP4wIAUEsHCDcR4nQZAAAAFwAAAFBLAwQKAAAIAAAVf2ldAAAA
-AAAAAAAAAAAABgAAAG5ia2l0L1BLAwQKAAAIAADvhWldAAAAAAAAAAAAAAAACwAAAG5ia2l0L2Nv
-cmUvUEsDBBQACAgIAO+FaV0AAAAAAAAAAAAAAAAcAAAAbmJraXQvY29yZS9CdW5kbGUucHJvcGVy
-dGllc12NMQrCQBBF+5xiwCYB9wKCjSSFhbHwBJvNj7u4OxN2JujxBS0E6/d4b0c8PZJRkIoDGV6m
-pFGeTIlphJ3gWakd+J6Txj3NWPyWrWuuK/jcD+4i85bhRl9w/KT+yS1KNddDQ02rJeGvRpNXUBuy
-KPR3WqoUsggy1JLY5655A1BLBwjzPV5ZfgAAAKMAAABQSwMEFAAICAgA74VpXQAAAAAAAAAAAAAA
-AB8AAABuYmtpdC9jb3JlL0J1bmRsZV9wdC5wcm9wZXJ0aWVzXc2xCsIwEIfxvU9x4NIOeQGhS6mD
-g3XoE8T0rw0muXB3AR9fEAdx/uD7HajcntEosOBIhpexUmY18RsrFaYFNsEXpb6yWHs06NBdK8p5
-PrkLby3BLT5j/Iz+y7qzmJuhQWK1yGWcvII2/rr9HWH3Qj9ORWIySI7Fp6F7A1BLBwieIF6bfAAA
-AKIAAABQSwMEFAAICAgAFX9pXQAAAAAAAAAAAAAAABwAAABuYmtpdC9jb3JlL0Nsb3NlT3B0aW9u
-LmNsYXNznZXfVtxUGMV/hwEyZEIZ/ttKAYHqTG2botaqoWg7UFubKW0HudCrTDgMKeFkVnJC5VF8
-C1vXUuyFD+DymWxXMrMEoUL18uTbe3/7+3NO/vjr5e/ALb416aFg0GvRR7+gGsUtW0ndlJ5K7KQd
-2IlUm1FbJ/ZaWweRehRHvkySKBb0LwUq0MuCQqW6MUCRAQPTooQlmFDNnUDbfhRLuxZGieywBX01
-d62xKphzz8rkmJxjyKBsMcyIYPypt+fZqQ5CuxaFofQzUCIYSALVCqXO1Ocrbo4KPdWy15pPpa+d
-qntIbEjtlBhj3GDCYpJ3BIOH0brXFpT8SGkvUMkDuS8Yf5PgdyPABYt3mRIU4lQJJirVI8AnqVJe
-M5SOyTQzBrMW7zEnGM0h3jNtr+5JpR+nMpWCUqD2oh3pelrGgsnKm4SqGyYLXDJ43+IDKoKprH1R
-W6pgU9pusCX9fT+UdU95rUzFbEm9Ire8NNSC2UrVPQ3uZNqXLT7MNqBX/hBog6uC2bMmVIBXr4pc
-F5TycV/1s0mbXOEji4/5RDD0LNDbUapvx610VyotuFmpHamvoeNAtZzq2csg6K1Fm1Iw5AZKPkx3
-mzJez1rTqbWDSgTDlePzFgw0gpbydBpLwY3j8aWzcy87AqPdWXzBYuUUxqrac9x/bJRT3RAMNrTn
-79S9dtfy9n/TeAuP35/s6nKeuhx6u81Nb6Hrf+G6oLjkh92razaiNPbl3SBzVT5yU69lcoLynSjS
-iY69dl3q7WgzKdM/1M9dkyJfW3yZn+6bfMMDA9eizkPB3KGVzmrbbu6hLrW35fk6ivcFpd2jpz+P
-bn2X1Ml4z1OboUwW3CjaSdvOyTL/jbi+35b/L9hJeTq3ejJa88KwEWjpCKz7Ssm4FnpJIhODx4JL
-b1WeQUMwfTpU0N8Bs0iRHkBwIXt1gT5E9o4juAFcRCCyr5d/RTzPgZ9CHoZhernJZ/Tk0Jku1HiB
-ccDgT8fAk3wO9PAFvTgsdUnL2b8DGL/yAuM3Rnv4kdJLzsMBF5/nhEziXA6awmKaMWa5BRQQY13N
-5bKZ7VHX80yej8zF/C9Uj7uepshXf4Pn8/KhNHJtxD5g8WeM44RRCtzO89yhBlgI7lFghVVWWANM
-BI94wjrnXwNQSwcIWdkr3VkDAAAXBwAAUEsBAgoACgAACAAA84VpXQAAAAAAAAAAAAAAAAkABAAA
-AAAAAAAAAAAAAAAAAE1FVEEtSU5GL/7KAABQSwECFAAUAAgICADzhWld64jueNEAAABWAQAAFAAA
-AAAAAAAAAAAAAAArAAAATUVUQS1JTkYvTUFOSUZFU1QuTUZQSwECCgAKAAAIAAAVf2ldAAAAAAAA
-AAAAAAAAEgAAAAAAAAAAAAAAAAA+AQAATUVUQS1JTkYvc2VydmljZXMvUEsBAhQAFAAICAgAFX9p
-XTcR4nQZAAAAFwAAADsAAAAAAAAAAAAAAAAAbgEAAE1FVEEtSU5GL3NlcnZpY2VzL29yZy5uZXRi
-ZWFucy5zcGkuc2VuZG9wdHMuT3B0aW9uUHJvY2Vzc29yUEsBAgoACgAACAAAFX9pXQAAAAAAAAAA
-AAAAAAYAAAAAAAAAAAAAAAAA8AEAAG5ia2l0L1BLAQIKAAoAAAgAAO+FaV0AAAAAAAAAAAAAAAAL
-AAAAAAAAAAAAAAAAABQCAABuYmtpdC9jb3JlL1BLAQIUABQACAgIAO+FaV3zPV5ZfgAAAKMAAAAc
-AAAAAAAAAAAAAAAAAD0CAABuYmtpdC9jb3JlL0J1bmRsZS5wcm9wZXJ0aWVzUEsBAhQAFAAICAgA
-74VpXZ4gXpt8AAAAogAAAB8AAAAAAAAAAAAAAAAABQMAAG5ia2l0L2NvcmUvQnVuZGxlX3B0LnBy
-b3BlcnRpZXNQSwECFAAUAAgICAAVf2ldWdkr3VkDAAAXBwAAHAAAAAAAAAAAAAAAAADOAwAAbmJr
-aXQvY29yZS9DbG9zZU9wdGlvbi5jbGFzc1BLBQYAAAAACQAJAHQCAABxBwAAAAA=
-B64
-  echo "23856a2edf8013c5cce21aa490e729ece45ff475846df5592796b64916872d01  $CORE_JAR" | sha256sum -c --quiet - || die "$(t cli.core_corrupt)"
-  cat > "$CORE_XML" <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE module PUBLIC "-//NetBeans//DTD Module Status 1.0//EN" "http://www.netbeans.org/dtds/module-status-1_0.dtd">
-<module name="nbkit.core">
-    <param name="autoload">false</param>
-    <param name="eager">false</param>
-    <param name="enabled">true</param>
-    <param name="jar">modules/nbkit-core.jar</param>
-    <param name="reloadable">false</param>
-</module>
-EOF
+  jar_copy nbkit-core.jar "$CORE_JAR" || die "$(t cli.core_corrupt)"
+  module_xml nbkit.core > "$CORE_XML"
   touch "$UD/.lastModified"
 }
 core_uninstall() {

@@ -55,7 +55,7 @@ Dentro do NetBeans, as dicas do JSF e a tela de Options seguem o idioma em que o
 
 Para adicionar um idioma:
 - **Terminal:** copie `lang/en.lang` para `lang/<idioma>.lang` (ex.: `es.lang`) e traduza os valores. O `pt-BR.lang` é a referência: uma chave que faltar sai em português.
-- **NetBeans:** crie `Bundle_<idioma>.properties` ao lado do `Bundle.properties` de cada módulo em `src/` e gere o jar de novo.
+- **NetBeans:** crie `Bundle_<idioma>.properties` ao lado do `Bundle.properties` de cada módulo em `src/` e rode `bash src/build.sh` (veja "Compilar os jars").
 
 ## Requisitos
 
@@ -82,7 +82,7 @@ Para adicionar um idioma:
 
 ## Criar um tema
 
-Um tema é uma pasta em `modules/themes/` com três arquivos de dados, sem código. O nbkit acha a pasta sozinho e o tema aparece no menu. Todo o resto fica com o motor de temas (`modules/themes/_engine.sh`):
+Um tema é uma pasta em `modules/themes/` com três arquivos de dados, sem código. O nbkit acha a pasta sozinho e o tema aparece no menu. Todo o resto fica com o motor de temas (`lib/themes.sh`):
 
 - criar o perfil de cores como cópia do perfil base da sua versão do NetBeans, sem mexer no original;
 - fazer backup, restaurar, desinstalar e voltar ao visual e ao perfil de antes;
@@ -245,22 +245,37 @@ Os beans (Spring `@Component` e derivados, `@Bean`, CDI `@Named`, `@ManagedBean`
 ```
 nbkit/
 ├── nbkit.sh                     CLI
-├── lang/
-│   ├── pt-BR.lang               textos do terminal em português (referência)
-│   └── en.lang                  textos do terminal em inglês
-├── modules/
+├── lang/                        textos do terminal: pt-BR.lang (referência) e en.lang
+├── lib/                         código usado pelo CLI
+│   ├── terminal.sh              cores, idioma e funções de saída
+│   ├── themes.sh                motor de temas (veja "Criar um tema")
+│   ├── themes/                  partes em Python do motor de temas
+│   ├── modules.sh, modules.py   motor dos módulos do NetBeans (module.toml)
+│   ├── text.py                  textos de lang/ para as partes em Python
+│   └── jars/                    módulos base: nbkit-core (fecha o NetBeans) e nbkit-colors (usado pelos temas)
+├── modules/                     só dados
 │   ├── README.md                como criar um módulo
-│   ├── themes/
-│   │   ├── _engine.sh           motor de temas (veja "Criar um tema")
-│   │   └── one-dark-pro-mix/    só dados: theme.toml, ui.properties, colors.toml
-│   └── jsf.sh
+│   ├── jsf/                     module.toml + nbkit-jsf.jar
+│   └── themes/
+│       └── one-dark-pro-mix/    theme.toml, ui.properties, colors.toml
 └── src/                         código Java dos módulos do NetBeans
-    ├── nbkit-core/              fechar o NetBeans pelo terminal
-    ├── nbkit-colors/            coloração por padrão de texto (usado pelos temas)
-    └── nbkit-jsf/               verificações de JSF, com o teste em test/
+    ├── build.sh                 compila os jars (veja abaixo)
+    ├── nbkit-core/
+    ├── nbkit-colors/
+    └── nbkit-jsf/               com o teste em test/
 ```
 
-Para adicionar um módulo, basta colocar um `.sh` em `modules/` seguindo o [contrato](modules/README.pt-BR.md).
+Para adicionar um módulo do NetBeans, crie uma pasta em `modules/` com o jar dele e um `module.toml` (veja [como criar um módulo](modules/README.pt-BR.md)).
+
+### Compilar os jars
+
+Os jars já vêm compilados em `lib/jars/` e `modules/jsf/`. Para compilar de novo a partir do `src/`, depois de mudar o código Java ou os textos:
+
+```bash
+bash src/build.sh [pasta do netbeans]
+```
+
+Ele compila contra os jars da sua instalação do NetBeans (sem a pasta: `NB_HOME`, ou o NetBeans que usou o `~/.netbeans` por último) com um JDK 17 ou mais novo, e atualiza os sha256.
 
 ## Problemas
 

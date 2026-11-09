@@ -96,21 +96,21 @@ cli.python_manual=install Python 3.11 or newer with your system package manager 
 cli.res_warn=warning
 cli.java_too_old=nbkit modules need Java 17 or newer, and NetBeans runs on %s. Point netbeans_jdkhome in netbeans.conf to a newer Java.
 
-# ---------- JSF checks (modules/jsf.sh) ----------
-jsf.name=JSF checks
-jsf.description=Warnings in the xhtml editor: EL, ids, forms, templates
-jsf.summary_out=    {B}Goes:{N}  the checks module (the warnings leave the xhtml editor)
-jsf.summary_stays=    {B}Stays:{N} what you ticked in Tools > Options > Editor > JSF, for a next install
-jsf.step_install=JSF checks (NetBeans module)
-jsf.corrupt=the JSF module got corrupted while copying nbkit.
-jsf.copied=module copied and verified (sha256)
-jsf.toggle_hint=the rules turn on and off in Tools > Options > Editor > JSF
-jsf.step_uninstall=Removing the JSF checks
-jsf.removed=module removed
-jsf.check_loaded=checks module loaded
-jsf.check_missing=checks module is not among the enabled modules
+# ---------- NetBeans modules (lib/modules.sh) ----------
+mod.summary_out=    {B}Goes:{N}  %s
+mod.summary_stays=    {B}Stays:{N} %s
+mod.step_install=%s (NetBeans module)
+mod.corrupt=%s is corrupted (its sha256 does not match). Download nbkit again.
+mod.copied=module copied and verified (sha256)
+mod.step_uninstall=Removing: %s
+mod.removed=module removed
+mod.check_loaded=module loaded
+mod.check_missing=the module is not among the enabled modules
+mod.invalid=Warning: module "%s" skipped: %s
+mod.missing_key="%s" is missing in module.toml
+mod.bad_value=invalid value for "%s" in module.toml
 
-# ---------- theme engine (modules/themes/_engine.sh) ----------
+# ---------- theme engine (lib/themes.sh) ----------
 theme.summary_out=    {B}Goes:{N}  profile "%s", coloring module, theme UI%s
 theme.summary_out_terminal=, terminal selection color
 theme.summary_back=    {B}Back:{N}  the look and feel and the color profile you used before
@@ -207,3 +207,13 @@ theme.bad_id=the folder name may only have lowercase letters, digits and hyphens
 theme.missing_key="%s" is missing in theme.toml
 theme.bad_value=invalid value for "%s" in theme.toml
 theme.missing_file=file %s is missing
+
+# ---------- building the modules (src/build.sh) ----------
+build.no_netbeans=could not find the NetBeans installation. Pass its folder: bash src/build.sh /path/to/netbeans
+build.no_jdk=could not find javac and jar (JDK 17 or newer). Install a JDK or set JAVA_HOME.
+build.old_jdk=javac is version %s; it needs 17 or newer.
+build.using=NetBeans: %s | %s
+build.step=Building %s
+build.done=%s written
+build.step_sums=Updating the sha256 sums
+build.finished=Done. If you changed JSF, raise the version in modules/jsf/module.toml so the menu offers the update.

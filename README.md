@@ -55,7 +55,7 @@ Inside NetBeans, the JSF hints and the Options page follow the language NetBeans
 
 To add a language:
 - **Terminal:** copy `lang/en.lang` to `lang/<language>.lang` (e.g. `es.lang`) and translate the values. `pt-BR.lang` is the reference: a missing key comes out in Portuguese.
-- **NetBeans:** create `Bundle_<language>.properties` next to the `Bundle.properties` of each module in `src/` and build the jar again.
+- **NetBeans:** create `Bundle_<language>.properties` next to the `Bundle.properties` of each module in `src/` and run `bash src/build.sh` (see "Building the jars").
 
 ## Requirements
 
@@ -82,7 +82,7 @@ To add a language:
 
 ## Creating a theme
 
-A theme is a folder in `modules/themes/` with three data files, no code. nbkit finds the folder by itself and the theme shows up in the menu. Everything else is done by the theme engine (`modules/themes/_engine.sh`):
+A theme is a folder in `modules/themes/` with three data files, no code. nbkit finds the folder by itself and the theme shows up in the menu. Everything else is done by the theme engine (`lib/themes.sh`):
 
 - creating the color profile as a copy of the base profile of your NetBeans version, without touching the original;
 - backing up, restoring, uninstalling and going back to the previous look and feel and profile;
@@ -245,22 +245,37 @@ The beans (Spring `@Component` and its derivatives, `@Bean`, CDI `@Named`, `@Man
 ```
 nbkit/
 ├── nbkit.sh                     CLI
-├── lang/
-│   ├── pt-BR.lang               terminal texts in Portuguese (reference)
-│   └── en.lang                  terminal texts in English
-├── modules/
+├── lang/                        terminal texts: pt-BR.lang (reference) and en.lang
+├── lib/                         code used by the CLI
+│   ├── terminal.sh              colors, language and output helpers
+│   ├── themes.sh                theme engine (see "Creating a theme")
+│   ├── themes/                  Python parts of the theme engine
+│   ├── modules.sh, modules.py   engine for NetBeans modules (module.toml)
+│   ├── text.py                  texts of lang/ for the Python parts
+│   └── jars/                    base modules: nbkit-core (closes NetBeans) and nbkit-colors (used by the themes)
+├── modules/                     only data
 │   ├── README.md                how to create a module
-│   ├── themes/
-│   │   ├── _engine.sh           theme engine (see "Creating a theme")
-│   │   └── one-dark-pro-mix/    only data: theme.toml, ui.properties, colors.toml
-│   └── jsf.sh
+│   ├── jsf/                     module.toml + nbkit-jsf.jar
+│   └── themes/
+│       └── one-dark-pro-mix/    theme.toml, ui.properties, colors.toml
 └── src/                         Java code of the NetBeans modules
-    ├── nbkit-core/              closing NetBeans from the terminal
-    ├── nbkit-colors/            coloring by text pattern (used by the themes)
-    └── nbkit-jsf/               JSF checks, with the test in test/
+    ├── build.sh                 builds the jars (see below)
+    ├── nbkit-core/
+    ├── nbkit-colors/
+    └── nbkit-jsf/               with the test in test/
 ```
 
-To add a module, just put a `.sh` in `modules/` following the [contract](modules/README.md).
+To add a NetBeans module, create a folder in `modules/` with its jar and a `module.toml` (see [how to create a module](modules/README.md)).
+
+### Building the jars
+
+The jars are already built in `lib/jars/` and `modules/jsf/`. To build them again from `src/`, after changing the Java code or the texts:
+
+```bash
+bash src/build.sh [netbeans folder]
+```
+
+It compiles against the jars of your NetBeans installation (without the folder: `NB_HOME`, or the NetBeans that last used `~/.netbeans`) with a JDK 17 or newer, and updates the sha256 sums.
 
 ## Troubleshooting
 

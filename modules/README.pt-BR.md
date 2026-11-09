@@ -5,15 +5,35 @@
 
 # Como criar um módulo do nbkit
 
-Cada arquivo `.sh` em `modules/` (ou em `modules/themes/`, para temas) é carregado pelo `nbkit.sh` com `source`.
-O menu, o status, o "Todos", o progresso `[n/N]`, o ponto de restauração e a conferência já funcionam
-para qualquer módulo que siga o contrato abaixo.
+Um módulo do NetBeans é uma pasta em `modules/` com o jar dele e um `module.toml`, sem código. O nbkit acha a pasta
+sozinho e o módulo aparece no menu, com instalar, atualizar, reinstalar, desinstalar, o progresso `[n/N]`, o ponto de
+restauração e a conferência. O motor é o `lib/modules.sh`. Temas são pastas em `modules/themes/` (veja "Criar um
+tema" no [README](../README.pt-BR.md#criar-um-tema)).
 
-Temas não usam este contrato diretamente: cada tema é uma pasta em `modules/themes/` só com dados, e o motor
-(`modules/themes/_engine.sh`) cria as funções do contrato para ele (veja "Criar um tema" no
-[README](../README.pt-BR.md#criar-um-tema)). Arquivos que começam com `_` não são carregados como módulo.
+## module.toml
 
-## Registro
+```toml
+[module]
+name = { en = "JSF checks", pt-BR = "Verificações de JSF" }
+description = { en = "Warnings in the xhtml editor", pt-BR = "Avisos no editor de xhtml" }
+version = 2                       # aumente quando o jar mudar, para o menu oferecer a atualização
+jar = "nbkit-jsf.jar"             # o jar desta pasta
+codename = "nbkit.jsf"            # OpenIDE-Module do jar
+sha256 = "2e95a0dd..."            # sha256 do jar (o src/build.sh atualiza)
+hint = { en = "...", pt-BR = "as regras ligam e desligam em Tools > Options > Editor > JSF" }   # opcional, depois de instalar
+
+[uninstall]                       # opcional: linhas mostradas antes de confirmar a desinstalação
+goes = { en = "the checks module", pt-BR = "o módulo de verificações" }
+stays = { en = "your settings in Tools > Options", pt-BR = "suas opções em Tools > Options" }
+```
+
+O nome da pasta é o id do módulo (`bash nbkit.sh install jsf`): letras minúsculas, números e hífen. Os textos podem ser
+um texto só ou um por idioma. O jar vai para `modules/<codename com hífens>.jar` no userdir, e o `check` procura o
+codename no log do NetBeans. Se o `module.toml` tiver erro, o nbkit ignora o módulo e diz o motivo.
+
+## Módulos em bash (avançado)
+
+Para algo que não seja só um jar, coloque um `.sh` em `modules/`. O nbkit carrega com `source`; ele se registra com:
 
 ```bash
 nbkit_register <id> <prefixo> <categoria> "<nome>" "<descrição>" <versão>
@@ -24,7 +44,7 @@ nbkit_register <id> <prefixo> <categoria> "<nome>" "<descrição>" <versão>
 - **categoria:** `theme` (só um tema fica ativo por vez; instalar outro troca) ou `tool`.
 - **versão:** número inteiro. Quando muda, o menu oferece atualizar.
 
-## Funções obrigatórias
+### Funções obrigatórias
 
 | Função | O que faz |
 |---|---|
@@ -37,7 +57,7 @@ nbkit_register <id> <prefixo> <categoria> "<nome>" "<descrição>" <versão>
 | `<prefixo>_uninstall_summary` | Linhas "Sai / Volta / Fica" mostradas antes de confirmar. |
 | `<prefixo>_check` | Com o NetBeans aberto: imprime `res 0 "..."` ou `res 1 "..."`. Retorna 0 (ok), 1 (reinstalar corrige) ou 2 (não corrige). |
 
-## Funções opcionais
+### Funções opcionais
 
 | Função | O que faz |
 |---|---|
@@ -46,16 +66,14 @@ nbkit_register <id> <prefixo> <categoria> "<nome>" "<descrição>" <versão>
 | `<prefixo>_restore_steps <arquivo>` e `<prefixo>_restore <arquivo>` | Restaura um backup. |
 | `<prefixo>_rollback` | Desfaz algo fora do userdir se a instalação parar no meio. |
 
-## Ajudantes do nbkit
+### Ajudantes do nbkit
 
 `$UD` (userdir), `$C` (`$UD/config`), `tmpdir` (pasta temporária apagada no fim), `ask_yn <pergunta> Y|N`, `bk_date`,
-`version_status`, `log_has_module <nome>` e `log_module_errors <regex>` (para o `check`).
+`version_status`, `file_copy <arquivo> <destino> <sha256>`, `module_xml <codename>`, `log_has_module <nome>` e
+`log_module_errors <regex>` (para o `check`). A versão instalada de cada módulo fica em `$UD/nbkit/<id>.version`.
 
-A versão instalada de cada módulo fica em `$UD/nbkit/<id>.version`, gravada pelo nbkit.
-
-## Textos
+### Textos
 
 Tudo o que aparece no terminal vem de `lang/<idioma>.lang`. Use `t <chave> [valores...]`, que imprime o texto com os `%s`
 preenchidos na ordem (ex.: `step "$(t meu.passo "$nome")"`), e crie a chave em todos os arquivos de `lang/`, com o
-prefixo do módulo (`jsf.`, `theme.`...). Trechos em Python recebem os mesmos arquivos em `NBKIT_LANG_FILES`
-(veja a função `T` no `_engine.sh`).
+prefixo do módulo. Trechos em Python recebem os mesmos arquivos em `NBKIT_LANG_FILES` e leem com o `lib/text.py`.
