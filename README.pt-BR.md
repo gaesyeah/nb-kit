@@ -32,6 +32,7 @@ O CLI mostra o status de cada módulo e só as opções que fazem sentido. Use �
 - **Instalar ou atualizar:** escolha "Todos" ou um módulo.
 - **Reinstalar** e **Desinstalar:** também por módulo.
 - **Conferir se carregou no NetBeans:** confere cada módulo instalado.
+- **Rodar os testes:** só aparece num clone do repositório (veja "Testes").
 - **Backups:** só aparece quando existe algum. Enter restaura, Del apaga, Esc volta, e restaurar e apagar pedem confirmação.
 
 Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File > Exit, então o NetBeans pergunta sobre arquivos não salvos e processos rodando como sempre. No fim, oferece abrir o NetBeans e confere sozinho se tudo carregou. Se algo falhar no meio, ou se você apertar Ctrl+C, tudo volta como estava.
@@ -294,7 +295,17 @@ Roda tudo o que está em `tests/`, e também no GitHub Actions a cada push:
 - **Motor** (`tests/engine.sh`): instala num NetBeans falso (`tests/netbeans/`) e confere que os arquivos são exatamente os esperados (`tests/expected/install.sha1`), que reinstalar mantém as suas personalizações, que o `check` acha um módulo faltando, que desinstalar volta exatamente ao que havia, que uma falha em qualquer passo não muda nada e que arquivos com erro são ignorados com o motivo.
 - **Verificações de JSF** (`tests/jsf.sh`, precisa de JDK 17 ou mais novo): roda o analisador no projeto de exemplo em `src/nbkit-jsf/test/fixture`, cujas páginas marcam onde cada aviso deve aparecer, em inglês e em português.
 
-Uma parte cuja ferramenta não estiver instalada é pulada com aviso. Quando uma mudança num tema altera de propósito os arquivos instalados, `bash tests/engine.sh --update` grava de novo a lista esperada. `bash src/build.sh --test` compila os jars e roda as verificações de JSF.
+O que precisa, além do bash e do Python 3.11:
+
+| Ferramenta | Para | Instalar (Debian, Ubuntu, Pop!_OS) |
+|---|---|---|
+| shellcheck | lint dos arquivos bash | `sudo apt install shellcheck` |
+| pyflakes | lint dos arquivos Python | `sudo apt install python3-pyflakes` |
+| JDK 17 ou mais novo (`javac`, `jar`, `java`) | verificações de JSF | `sudo apt install openjdk-21-jdk-headless` (ou 17) |
+
+As verificações de JSF não precisam de mais nada: as bibliotecas que o projeto de exemplo usa (anotações do Spring e do Jakarta e um componente do PrimeFaces) são versões mínimas em `src/nbkit-jsf/test/libs/`, compiladas pelo próprio teste.
+
+Se faltar alguma ferramenta, o `bash nbkit.sh test` oferece instalar pelo gerenciador de pacotes do sistema (apt, dnf, pacman ou zypper), com o nome certo do pacote em cada um, perguntando antes. Sem terminal para perguntar (como no GitHub Actions), ou se você disser não, aquela parte é pulada com aviso. Quando uma mudança num tema altera de propósito os arquivos instalados, `bash tests/engine.sh --update` grava de novo a lista esperada. `bash src/build.sh --test` compila os jars e roda as verificações de JSF.
 
 Os testes não substituem abrir o NetBeans: as dicas e as cores na tela ainda precisam de uma olhada.
 

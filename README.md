@@ -32,6 +32,7 @@ The CLI shows the status of each module and only the options that make sense. Us
 - **Install or update:** choose "All" or one module.
 - **Reinstall** and **Uninstall:** also per module.
 - **Check that it loaded in NetBeans:** checks each installed module.
+- **Run the tests:** only shows up in a clone of the repository (see "Tests").
 - **Backups:** only shows up when there is one. Enter restores, Del deletes, Esc goes back, and both restore and delete ask for confirmation.
 
 If NetBeans is open, nbkit offers to close it the same way as File > Exit, so NetBeans asks about unsaved files and running processes as usual. At the end, it offers to open NetBeans and checks by itself that everything loaded. If something fails midway, or if you press Ctrl+C, everything goes back to how it was.
@@ -294,7 +295,17 @@ Runs everything in `tests/`, also on GitHub Actions at each push:
 - **Engine** (`tests/engine.sh`): installs into a fake NetBeans (`tests/netbeans/`) and checks that the files are exactly the expected ones (`tests/expected/install.sha1`), that a reinstall keeps your customizations, that `check` finds a missing module, that uninstalling brings back exactly what was there, that a failure at any step changes nothing, and that broken files are skipped with the reason.
 - **JSF checks** (`tests/jsf.sh`, needs a JDK 17 or newer): runs the analyzer on the sample project in `src/nbkit-jsf/test/fixture`, whose pages mark where each warning must show up, in English and in Portuguese.
 
-A part whose tool is missing is skipped with a warning. When a change to a theme alters the installed files on purpose, `bash tests/engine.sh --update` writes the expected list again. `bash src/build.sh --test` builds the jars and runs the JSF checks.
+What you need, besides bash and Python 3.11:
+
+| Tool | For | Install (Debian, Ubuntu, Pop!_OS) |
+|---|---|---|
+| shellcheck | lint of the bash files | `sudo apt install shellcheck` |
+| pyflakes | lint of the Python files | `sudo apt install python3-pyflakes` |
+| JDK 17 or newer (`javac`, `jar`, `java`) | JSF checks | `sudo apt install openjdk-21-jdk-headless` (or 17) |
+
+The JSF checks need nothing else: the libraries the sample project uses (Spring and Jakarta annotations and a PrimeFaces component) are small stubs in `src/nbkit-jsf/test/libs/`, built by the test.
+
+If a tool is missing, `bash nbkit.sh test` offers to install it with the system package manager (apt, dnf, pacman or zypper), with the right package name for each one, asking first. Without a terminal to ask (as on GitHub Actions), or if you say no, that part is skipped with a warning. When a change to a theme alters the installed files on purpose, `bash tests/engine.sh --update` writes the expected list again. `bash src/build.sh --test` builds the jars and runs the JSF checks.
 
 The tests do not replace opening NetBeans: hints and colors on screen still need a look.
 

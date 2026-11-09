@@ -27,51 +27,8 @@ set -- ${ARGS[@]+"${ARGS[@]}"}
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/terminal.sh"
 
-# ---------- yes/no ----------
-# yes/no question; the uppercase letter is the Enter default (Y or N in $2)
-ask_yn() {
-  local a hint; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
-  printf '%s %s ' "$1" "$hint"
-  IFS= read -r a </dev/tty || a=""
-  a="${a,,}"
-  if [ -z "$a" ]; then [ "$2" = Y ]; return; fi
-  case "$a" in s|sim|y|yes) return 0 ;; *) return 1 ;; esac
-}
-
-# ---------- system packages ----------
-# installs a package with the system package manager, asking first (only with a terminal to ask)
-# pkg_install <what> apt:<package> dnf:<package> pacman:<package> zypper:<package>
-pkg_install() {
-  local what="$1" spec pm pkg cmd=() sudo=()
-  shift
-  for spec in "$@"; do
-    pm="${spec%%:*}"; pkg="${spec#*:}"
-    case "$pm" in
-      apt) command -v apt-get >/dev/null 2>&1 && cmd=(apt-get install -y "$pkg") ;;
-      dnf) command -v dnf >/dev/null 2>&1 && cmd=(dnf install -y "$pkg") ;;
-      pacman) command -v pacman >/dev/null 2>&1 && cmd=(pacman -S --needed --noconfirm "$pkg") ;;
-      zypper) command -v zypper >/dev/null 2>&1 && cmd=(zypper --non-interactive install "$pkg") ;;
-    esac
-    [ ${#cmd[@]} -gt 0 ] && break
-  done
-  [ ${#cmd[@]} -gt 0 ] || return 1
-  if [ "$(id -u)" != 0 ]; then command -v sudo >/dev/null 2>&1 || return 1; sudo=(sudo); fi
-  { [ -t 0 ] && [ -t 1 ]; } || return 1
-  ask_yn "$(t cli.ask_install "$what" "${sudo[*]+${sudo[*]} }${cmd[*]}")" Y || return 1
-  echo
-  if [ "${cmd[0]}" = apt-get ]; then
-    info "$(t cli.pkg_updating)"
-    ${sudo[@]+"${sudo[@]}"} apt-get update -qq || true
-  fi
-  info "$(t cli.pkg_installing "$what")"
-  if ${sudo[@]+"${sudo[@]}"} "${cmd[@]}"; then
-    ok "$(t cli.pkg_done "$what")"
-    echo
-  else
-    warn "$(t cli.pkg_failed "$what")"
-    return 1
-  fi
-}
+# shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/packages.sh"
 
 # ---------- Python 3.11 or newer (reads the theme TOML files) ----------
 find_python() {
@@ -763,6 +720,8 @@ if [ $MENU = 1 ]; then
     nbk="$(all_backups | wc -l)"
     if [ "$nbk" -gt 0 ]; then opts+=("$(t cli.menu_backups "$nbk")"); acts+=(backups); fi
     if [ ${#installed[@]} -gt 0 ]; then opts+=("$(t cli.menu_uninstall)"); acts+=(uninstall); fi
+    # only in a clone of the repository (the release zip has no tests/)
+    if [ -f "$NBKIT_DIR/tests/run.sh" ]; then opts+=("$(t cli.menu_test)"); acts+=(test); fi
     opts+=("$(t cli.menu_quit)"); acts+=(quit)
     menu "${opts[@]}"
     [ "$MENU_IDX" -lt 0 ] && { echo; exit 0; }
@@ -771,6 +730,7 @@ if [ $MENU = 1 ]; then
     back() { printf '\e[%dA\r\e[J' "${#opts[@]}"; }
     case "$act" in
       quit) echo; exit 0 ;;
+      test) echo; echo; exec bash "$NBKIT_DIR/tests/run.sh" ;;
       check) echo; echo; do_check ;;
       backups)
         browse_backups

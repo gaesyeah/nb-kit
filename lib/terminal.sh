@@ -57,3 +57,14 @@ step() {
 ok()   { printf '      %s✓%s %s\n' "$G" "$N" "$*"; }
 info() { printf '      %s%s%s\n' "$D" "$*" "$N"; }
 warn() { printf '      %s!%s %s\n' "$Y" "$N" "$*"; }
+
+# ---------- yes/no ----------
+# yes/no question; the uppercase letter is the Enter default (Y or N in $2)
+ask_yn() {
+  local a hint; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
+  printf '%s %s ' "$1" "$hint"
+  IFS= read -r a </dev/tty || a=""
+  a="${a,,}"
+  if [ -z "$a" ]; then [ "$2" = Y ]; return; fi
+  case "$a" in s|sim|y|yes) return 0 ;; *) return 1 ;; esac
+}
