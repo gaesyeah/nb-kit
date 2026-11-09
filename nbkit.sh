@@ -6,13 +6,15 @@
 set -euo pipefail
 # Ctrl+C exits with code 130 (the exit trap uses it to undo a half-done install)
 trap 'exit 130' INT TERM HUP
-NBKIT_VERSION=2
+NBKIT_VERSION=2.0.1
 SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")"
 NBKIT_DIR="$(dirname "$SELF")"
 ME="$(basename "$SELF")"
 
 if [ -t 1 ]; then B=$'\e[1m'; BL=$'\e[1;34m'; G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; D=$'\e[2m'; N=$'\e[0m'
 else B=; BL=; G=; Y=; R=; D=; N=; fi
+# the Python parts of the modules (e.g. check) use the same colors
+export NBKIT_G="$G" NBKIT_R="$R" NBKIT_D="$D" NBKIT_N="$N"
 
 # ---------- language ----------
 # lang/<id>.lang: one "key=value" per line, # for comments. Values are printf formats (%s, \n) and may use
@@ -22,7 +24,7 @@ ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --lang=*) NBKIT_LANG="${1#--lang=}" ;;
-    --lang) NBKIT_LANG="${2:-}"; shift ;;
+    --lang) NBKIT_LANG="${2:-}"; [ $# -gt 1 ] && shift ;;
     *) ARGS+=("$1") ;;
   esac
   shift
@@ -558,7 +560,7 @@ after_change() {
       echo
       exec env NBKIT_TTY=1 bash "$SELF" check "$UD"
     fi
-    t cli.check_later_menu; echo
+    t cli.check_later_menu "$(t cli.menu_check)"; echo
   fi
   exit 0
 }

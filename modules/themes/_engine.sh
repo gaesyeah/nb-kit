@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # nbkit theme engine: everything any theme needs, without a single color.
 # A theme (e.g. one-dark-pro-mix.sh) sources this file, calls theme_register and defines:
 #   <prefix>_config     THEME_* variables (profile, base, look and feel, font, terminal)
@@ -59,7 +60,7 @@ theme_use() {
   for m in $THEME_MIMES; do TARGETS+=("config/Editors/$m/FontsColors/$THEME_BASE"); done
 }
 
-# old names (v28 and the One Dark Pro Mix installer, before nbkit) move to the new ones
+# old names (theme v28 and the One Dark Pro Mix installer, before nbkit) move to the new ones
 theme_migrate() {
   local old
   mkdir -p "$UD/nbkit"
@@ -78,7 +79,7 @@ theme_font_marked() {
   local d="${XDG_DATA_HOME:-$HOME/.local/share}/fonts/$THEME_FONT_DIR"
   [ -n "$THEME_FONT_DIR" ] && { [ -e "$d/.nbkit-installed" ] || [ -e "$d/.onedark-installed" ]; }
 }
-# coloring module of this version and of older ones (nbkit v28: nbkit.cores; old installer: com.onedarkmix.netbeans)
+# coloring module of this version and of older ones (theme v28: nbkit.cores; old installer: com.onedarkmix.netbeans)
 theme_remove_modules() {
   rm -f "$COLORS_JAR" "$COLORS_XML" "$UD/modules/nbkit-cores.jar" "$UD/config/Modules/nbkit-cores.xml" \
     "$UD/modules/com-onedarkmix-netbeans.jar" "$UD/config/Modules/com-onedarkmix-netbeans.xml"
@@ -288,7 +289,7 @@ TYPE_ATTR = 'nbeditor-settings-ColoringType'
 USERFILE = 'org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml'
 
 def die(msg):
-    print(T('cli.error') + ' ' + msg, file=sys.stderr)
+    print(os.environ.get('NBKIT_R', '') + T('cli.error') + os.environ.get('NBKIT_N', '') + ' ' + msg, file=sys.stderr)
     sys.exit(2)
 
 # ---------- 1. Where NetBeans is installed (clusters) ----------
@@ -1372,7 +1373,8 @@ ok = True
 def res(good, msg):
     global ok
     ok = ok and good
-    print('  ' + T('cli.res_ok' if good else 'cli.res_problem').ljust(9) + msg)
+    color = os.environ.get('NBKIT_G' if good else 'NBKIT_R', '')
+    print('  ' + color + T('cli.res_ok' if good else 'cli.res_problem').ljust(9) + os.environ.get('NBKIT_N', '') + msg)
 log = os.path.join(ud, 'var', 'log', 'messages.log')
 jar = os.path.join(ud, 'modules', 'nbkit-colors.jar')
 text = open(log, errors='replace').read()
@@ -1382,7 +1384,7 @@ bad = [l.strip() for l in lines if ('nbkit.colors' in l or 'nbkit/colors' in l)
        and re.search(r'could not|cannot|Exception|SEVERE|disabled|requires', l)]
 listed = any('Turning on modules' in l for l in lines)
 if not listed and not bad:
-    print('  ' + T('cli.res_info').ljust(9) + T('theme.check_not_listed'))
+    print('  ' + os.environ.get('NBKIT_D', '') + T('cli.res_info').ljust(9) + os.environ.get('NBKIT_N', '') + T('theme.check_not_listed'))
 else:
     res(loaded and not bad, T('theme.check_loaded') if loaded else T('theme.check_missing'))
 for b in bad[:10]:

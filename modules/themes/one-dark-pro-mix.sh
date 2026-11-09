@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # One Dark Pro Mix theme for nbkit (loaded by nbkit.sh with source).
 # Data only: what is the same for every theme (profile, backup, font, coloring module,
 # keeping your customizations, check) lives in the engine, _engine.sh. See "Creating a theme" in the README.

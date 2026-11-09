@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # JSF checks for nbkit (loaded by nbkit.sh with source).
 # Installs the nbkit.jsf module in NetBeans: warnings in the xhtml editor (EL, ids, forms, templates...),
 # with the same colors as the Java warnings. Each rule toggles in Tools > Options > Editor > JSF.
@@ -1840,7 +1841,7 @@ jsf_check() {
     return 0
   fi
   res 1 "$(t jsf.check_missing)"
-  [ -n "$errs" ] && printf '           %s\n' "$errs"
+  [ -n "$errs" ] && printf '%s\n' "$errs" | sed 's/^/           /'
   if grep -qE 'requires|Java' <<<"$errs"; then return 2; fi
   return 1
 }
