@@ -58,8 +58,19 @@ pkg_install() {
   if [ "$(id -u)" != 0 ]; then command -v sudo >/dev/null 2>&1 || return 1; sudo=(sudo); fi
   { [ -t 0 ] && [ -t 1 ]; } || return 1
   ask_yn "$(t cli.ask_install "$what" "${sudo[*]+${sudo[*]} }${cmd[*]}")" Y || return 1
-  if [ "${cmd[0]}" = apt-get ]; then ${sudo[@]+"${sudo[@]}"} apt-get update -qq || true; fi
-  ${sudo[@]+"${sudo[@]}"} "${cmd[@]}"
+  echo
+  if [ "${cmd[0]}" = apt-get ]; then
+    info "$(t cli.pkg_updating)"
+    ${sudo[@]+"${sudo[@]}"} apt-get update -qq || true
+  fi
+  info "$(t cli.pkg_installing "$what")"
+  if ${sudo[@]+"${sudo[@]}"} "${cmd[@]}"; then
+    ok "$(t cli.pkg_done "$what")"
+    echo
+  else
+    warn "$(t cli.pkg_failed "$what")"
+    return 1
+  fi
 }
 
 # ---------- Python 3.11 or newer (reads the theme TOML files) ----------
@@ -79,6 +90,8 @@ if [ -z "$NBKIT_PY" ]; then
     NBKIT_PY="$(find_python || true)"
   fi
   [ -n "$NBKIT_PY" ] || die "$(t cli.python_manual)"
+  info "$(t cli.python_using "$NBKIT_PY")"
+  echo
 fi
 export NBKIT_PY
 # the Python parts import lib/text.py (texts of lang/); no __pycache__ inside the nbkit folder

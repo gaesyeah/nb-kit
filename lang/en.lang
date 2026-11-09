@@ -93,6 +93,11 @@ cli.nothing_installed=Nothing installed.
 cli.ask_install=Install %s now? It will run: %s
 cli.python_old=nbkit needs Python 3.11 or newer (found: %s).
 cli.python_manual=install Python 3.11 or newer with your system package manager and run again.
+cli.pkg_updating=updating the system package list...
+cli.pkg_installing=installing %s (the output below comes from the package manager)...
+cli.pkg_done=%s installed
+cli.pkg_failed=could not install %s (see the package manager message above).
+cli.python_using=using %s
 cli.res_warn=warning
 cli.java_too_old=nbkit modules need Java 17 or newer, and NetBeans runs on %s. Point netbeans_jdkhome in netbeans.conf to a newer Java.
 
