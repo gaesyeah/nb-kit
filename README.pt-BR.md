@@ -5,6 +5,12 @@
 
 # nbkit
 
+<p align="center">
+  <a href="https://github.com/gaesyeah/nb-kit/releases/latest/download/nbkit.zip"><img alt="Baixar nbkit.zip" src="https://img.shields.io/badge/Baixar-nbkit.zip-2F81F7?style=for-the-badge&logo=github&logoColor=white"></a>
+  <a href="https://github.com/gaesyeah/nb-kit/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/gaesyeah/nb-kit?style=for-the-badge&color=30363D"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/gaesyeah/nb-kit?style=for-the-badge&color=30363D"></a>
+</p>
+
 Kit de módulos para o **Apache NetBeans** no Linux, instalado por um CLI no terminal. Hoje tem dois módulos:
 
 - **Tema One Dark Pro Mix:** as cores do tema do VS Code, com o visual FlatLaf Dark e a fonte JetBrains Mono.
@@ -14,7 +20,7 @@ Cada módulo instala e desinstala separado.
 
 ## Instalação
 
-Baixe a pasta `nbkit` inteira e rode:
+Baixe o [`nbkit.zip`](https://github.com/gaesyeah/nb-kit/releases/latest/download/nbkit.zip) da última versão, descompacte e rode:
 
 ```bash
 bash nbkit/nbkit.sh

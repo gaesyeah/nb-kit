@@ -5,6 +5,12 @@
 
 # nbkit
 
+<p align="center">
+  <a href="https://github.com/gaesyeah/nb-kit/releases/latest/download/nbkit.zip"><img alt="Download nbkit.zip" src="https://img.shields.io/badge/Download-nbkit.zip-2F81F7?style=for-the-badge&logo=github&logoColor=white"></a>
+  <a href="https://github.com/gaesyeah/nb-kit/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/gaesyeah/nb-kit?style=for-the-badge&color=30363D"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/gaesyeah/nb-kit?style=for-the-badge&color=30363D"></a>
+</p>
+
 A kit of modules for **Apache NetBeans** on Linux, installed by a terminal CLI. It has two modules today:
 
 - **One Dark Pro Mix theme:** the colors of the VS Code theme, with the FlatLaf Dark look and feel and the JetBrains Mono font.
@@ -14,7 +20,7 @@ Each module installs and uninstalls on its own.
 
 ## Installation
 
-Download the whole `nbkit` folder and run:
+Download [`nbkit.zip`](https://github.com/gaesyeah/nb-kit/releases/latest/download/nbkit.zip) from the latest release, unzip it and run:
 
 ```bash
 bash nbkit/nbkit.sh
