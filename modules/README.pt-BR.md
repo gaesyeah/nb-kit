@@ -9,9 +9,9 @@ Cada arquivo `.sh` em `modules/` (ou em `modules/themes/`, para temas) é carreg
 O menu, o status, o "Todos", o progresso `[n/N]`, o ponto de restauração e a conferência já funcionam
 para qualquer módulo que siga o contrato abaixo.
 
-Para temas, use o motor (`modules/themes/_engine.sh`): `theme_register` cria todas as funções do contrato.
-O tema só define as cores (veja "Criar um tema" no [README](../README.pt-BR.md#criar-um-tema)). Arquivos que começam com `_` não são carregados
-como módulo.
+Temas não usam este contrato diretamente: cada tema é uma pasta em `modules/themes/` só com dados, e o motor
+(`modules/themes/_engine.sh`) cria as funções do contrato para ele (veja "Criar um tema" no
+[README](../README.pt-BR.md#criar-um-tema)). Arquivos que começam com `_` não são carregados como módulo.
 
 ## Registro
 

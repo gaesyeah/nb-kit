@@ -9,9 +9,9 @@ Each `.sh` file in `modules/` (or in `modules/themes/`, for themes) is loaded by
 The menu, the status, "All", the `[n/N]` progress, the restore point and the check already work
 for any module that follows the contract below.
 
-For themes, use the engine (`modules/themes/_engine.sh`): `theme_register` creates every function of the contract.
-The theme only defines the colors (see "Creating a theme" in the [README](../README.md#creating-a-theme)). Files starting
-with `_` are not loaded as modules.
+Themes do not use this contract directly: each theme is a folder in `modules/themes/` with only data, and the engine
+(`modules/themes/_engine.sh`) creates the contract functions for it (see "Creating a theme" in the
+[README](../README.md#creating-a-theme)). Files starting with `_` are not loaded as modules.
 
 ## Registration
 

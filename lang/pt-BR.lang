@@ -10,7 +10,6 @@ cli.no_modules_dir=pasta modules/ não encontrada ao lado de %s. Baixe a pasta n
 cli.no_modules=nenhum módulo em %s.
 cli.repeated_command=comando repetido: %s
 cli.unknown_arg=Argumento desconhecido: %s
-cli.no_python=python3 não encontrado.
 cli.yn_yes=[S/n]
 cli.yn_no=[s/N]
 cli.menu_hint=↑↓ navegar   Enter escolher   Esc sair
@@ -91,6 +90,11 @@ cli.menu_uninstall=Desinstalar
 cli.menu_quit=Sair
 cli.ask_uninstall=Desinstalar?
 cli.nothing_installed=Nada instalado.
+cli.ask_install=Instalar %s agora? Vou rodar: %s
+cli.python_old=O nbkit precisa do Python 3.11 ou mais novo (encontrado: %s).
+cli.python_manual=instale o Python 3.11 ou mais novo pelo gerenciador de pacotes do sistema e rode de novo.
+cli.res_warn=aviso
+cli.java_too_old=os módulos do nbkit precisam de Java 17 ou mais novo, e o NetBeans roda com o %s. Aponte o netbeans_jdkhome do netbeans.conf para um Java mais novo.
 
 # ---------- Verificações de JSF (modules/jsf.sh) ----------
 jsf.name=Verificações de JSF
@@ -188,6 +192,18 @@ theme.check_profile=perfil do editor: %s
 theme.check_laf=visual: %s
 theme.check_default=(padrão do NetBeans)
 
-# ---------- tema One Dark Pro Mix (modules/themes/one-dark-pro-mix.sh) ----------
-odpm.description=Cores do One Dark Pro Mix (VS Code), FlatLaf Dark e JetBrains Mono
-odpm.font_source=repositório oficial da JetBrains
+# ---------- arquivos dos temas (theme.toml, colors.toml) ----------
+theme.colors_failed=não consegui ler as cores de %s.
+theme.invalid=Aviso: tema "%s" ignorado: %s
+theme.error_at=%s (em %s, linha %s)
+theme.toml_syntax=erro de sintaxe no TOML: %s
+theme.color_expected=faltou uma cor #rrggbb depois de "%s"
+theme.color_twice=duas cores de texto ("%s"); a cor de fundo vai depois de "on"
+theme.token_expected=faltou o nome de um token depois de "%s"
+theme.unknown_word=palavra desconhecida: "%s"
+theme.not_text=o valor precisa ser um texto entre aspas
+theme.not_table="%s" não é uma tabela de cores válida
+theme.bad_id=o nome da pasta só pode ter letras minúsculas, números e hífen
+theme.missing_key=falta "%s" no theme.toml
+theme.bad_value=valor inválido para "%s" no theme.toml
+theme.missing_file=falta o arquivo %s

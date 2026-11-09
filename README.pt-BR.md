@@ -59,10 +59,10 @@ Para adicionar um idioma:
 
 ## Requisitos
 
-- Linux com bash 4 ou mais novo, e `python3`.
+- Linux com bash 4 ou mais novo, e Python 3.11 ou mais novo. Se faltar, o nbkit oferece instalar pelo gerenciador de pacotes do sistema (apt, dnf, pacman ou zypper), ao lado do Python que você já tem.
 - Apache NetBeans, testado na versão 31. Funciona com instalação normal, Flatpak ou Snap.
-- NetBeans rodando com Java 17 ou mais novo.
-- `curl` ou `wget`, só se a JetBrains Mono precisar ser baixada.
+- NetBeans rodando com Java 17 ou mais novo. O `check` avisa se for mais antigo.
+- `curl` ou `wget`, só se a JetBrains Mono precisar ser baixada. Sem nenhum dos dois, o nbkit oferece instalar o `curl`.
 
 ## Tema One Dark Pro Mix
 
@@ -82,7 +82,7 @@ Para adicionar um idioma:
 
 ## Criar um tema
 
-Tudo o que o One Dark Pro Mix tem além das cores fica no motor de temas, em `modules/themes/_engine.sh`. Um tema novo só descreve as cores. O motor já cuida de:
+Um tema é uma pasta em `modules/themes/` com três arquivos de dados, sem código. O nbkit acha a pasta sozinho e o tema aparece no menu. Todo o resto fica com o motor de temas (`modules/themes/_engine.sh`):
 
 - criar o perfil de cores como cópia do perfil base da sua versão do NetBeans, sem mexer no original;
 - fazer backup, restaurar, desinstalar e voltar ao visual e ao perfil de antes;
@@ -93,69 +93,94 @@ Tudo o que o One Dark Pro Mix tem além das cores fica no motor de temas, em `mo
 - desfazer tudo com Ctrl+C;
 - conferir com o NetBeans aberto (`check`).
 
-Crie `modules/themes/<id>.sh`. O nbkit carrega o arquivo sozinho e o tema aparece no menu.
-
-```bash
-source "$(dirname "${BASH_SOURCE[0]}")/_engine.sh"
-theme_register my-theme mt "My Theme" "Descrição curta" 1
-
-mt_config() {
-  THEME_PROFILE="My Theme"                  # nome do perfil em Tools > Options > Fonts & Colors
-  THEME_TERMINAL_SELECTION=-12499634        # opcional: cor de seleção do terminal (ARGB como inteiro)
-  THEME_FONT_NAME="JetBrains Mono"          # opcional: fonte do editor
-  THEME_FONT_DIR="JetBrainsMono"            # pasta em ~/.local/share/fonts
-  THEME_FONT_URLS=("https://.../Regular.ttf" "https://.../Bold.ttf")
-  THEME_FONT_LICENSE="https://.../OFL.txt"
-}
-
-# interface (FlatLaf): conteúdo do arquivo de propriedades do visual
-mt_ui() {
-  cat <<'EOF'
-nb.preferred.color.profile=My Theme
-@background=#1e1e1e
-@foreground=#d4d4d4
-EOF
-}
-
-# editor
-mt_colors() {
-  colors_tokens <<'EOF'
-    <fontcolor name="default" foreColor="ffd4d4d4" bgColor="ff1e1e1e"/>
-    <fontcolor name="comment" foreColor="ff6a9955"/>
-EOF
-  colors_highlights <<'EOF'
-    <fontcolor name="selection" bgColor="ff264f78"/>
-EOF
-  colors_annotations <<'EOF'
-EOF
-  colors_language text/x-java <<'EOF'
-    <fontcolor name="method-declaration" foreColor="ffdcdcaa"/>
-EOF
-  colors_extras text/javascript <<'EOF'
-    <fontcolor name="nbkit-call" foreColor="ffdcdcaa"/>
-EOF
-}
+```
+modules/themes/meu-tema/
+├── theme.toml      nome, versão, fonte, terminal
+├── ui.properties   cores da interface (FlatLaf)
+└── colors.toml     cores do editor
 ```
 
-O que cada parte faz:
+O nome da pasta é o id do tema (`bash nbkit.sh install meu-tema`): letras minúsculas, números e hífen.
 
-- **`theme_register <id> <prefixo> "<nome>" "<descrição>" <versão>`:** registra o tema no menu e liga as funções do nbkit ao motor. Aumente a versão quando mudar as cores, para o menu oferecer a atualização. Para a descrição sair no idioma do terminal, crie uma chave nos arquivos de `lang/` e passe `"$(t <chave>)"`, como o One Dark Pro Mix faz.
-- **`<prefixo>_config`:** só `THEME_PROFILE` é obrigatório. Os padrões são:
-  - base `FlatLafDark` (`THEME_BASE`, com `THEME_BASE_NAME` e `THEME_BASE_PROFILE` para as mensagens e para a desinstalação);
-  - visual `com.formdev.flatlaf.FlatDarkLaf` (`THEME_LAF`), com o arquivo `FlatDarkLaf.properties` (`THEME_LAF_FILE`).
+### theme.toml
 
-  Sem `THEME_FONT_NAME`, a fonte não é alterada. Sem `THEME_TERMINAL_SELECTION`, o terminal não é alterado.
-- **`<prefixo>_ui`:** chaves do FlatLaf (`@background`, `Component.focusColor`...). A linha `nb.preferred.color.profile=<perfil>` faz o NetBeans manter o perfil do tema ao trocar de visual. O motor põe a marca do tema na primeira linha e mescla as chaves que a pessoa já tinha.
-- **`<prefixo>_colors`:** linhas `<fontcolor .../>` do NetBeans, com cores em `ffRRGGBB`.
-  - `colors_tokens` vale para todas as linguagens (`default`, `comment`, `keyword`, `string`, `error`, `warning`...).
-  - `colors_highlights` cobre seleção, linha atual, busca, números de linha...
-  - `colors_annotations` são os sublinhados que os módulos usam.
-  - `colors_language <mime>` são os tokens de uma linguagem.
-  - `colors_extras <mime>` são as categorias do módulo de coloração.
+```toml
+[theme]
+name = "Meu Tema"
+version = 1                       # aumente quando mudar as cores, para o menu oferecer a atualização
+profile = "Meu Tema"              # opcional: nome do perfil em Tools > Options > Fonts & Colors (padrão: name)
+description = { en = "Short description", pt-BR = "Descrição curta" }
 
-  Uma cor que o tema não define fica como no perfil base. Para descobrir o nome de um token, mude a cor dele em Tools > Options > Fonts & Colors e veja o arquivo gravado em `~/.netbeans/<versão>/config/Editors/<mime>/FontsColors/`.
+[font]                            # opcional: sem ela, a fonte não é alterada
+name = "JetBrains Mono"
+dir = "JetBrainsMono"             # pasta em ~/.local/share/fonts
+source = "repositório oficial da JetBrains"
+urls = ["https://.../Regular.ttf", "https://.../Bold.ttf"]
+license = "https://.../OFL.txt"
 
-Categorias do módulo de coloração, por linguagem (em `colors_extras`):
+[terminal]                        # opcional: sem ela, o terminal não é alterado
+selection = "#41454e"
+
+[base]                            # opcional: perfil e visual em que o tema se baseia
+folder = "FlatLafDark"            # estes são os padrões
+name = "FlatLaf Dark"
+profile = "FlatLaf Dark"
+laf = "com.formdev.flatlaf.FlatDarkLaf"
+laf_file = "FlatDarkLaf.properties"
+```
+
+Textos como `description` e `source` podem ser um texto só ou um por idioma, como acima.
+
+### ui.properties
+
+Chaves do FlatLaf (`@background`, `Component.focusColor`...), no mesmo formato do arquivo do próprio FlatLaf. A linha `nb.preferred.color.profile=<perfil>` faz o NetBeans manter o perfil do tema ao trocar de visual. O motor põe a marca do tema na primeira linha e mescla as chaves que a pessoa já tinha.
+
+```properties
+nb.preferred.color.profile=Meu Tema
+@background=#1e1e1e
+@foreground=#d4d4d4
+```
+
+### colors.toml
+
+```toml
+[all]                             # todas as linguagens
+default = "#d4d4d4 on #1e1e1e"
+comment = "#6a9955 italic"
+keyword = "#569cd6"
+error   = "on #3a2a2a wave #f14c4c"
+
+[highlights]                      # seleção, linha atual, busca, números de linha...
+selection = "on #264f78"
+
+[annotations]                     # sublinhados de erro e aviso dos módulos
+
+["text/x-java"]                   # uma linguagem, pelo tipo mime
+method-declaration = "#dcdcaa bold"
+
+["text/javascript".extra]         # nomes que a linguagem não declara, como as categorias do módulo de coloração
+nbkit-call = "#dcdcaa"
+```
+
+Cada valor é um texto com, em qualquer ordem:
+
+| Parte | Significado |
+|---|---|
+| `#rrggbb` | cor do texto |
+| `on #rrggbb` | fundo |
+| `bold`, `italic`, `bold italic`, `plain` | estilo da fonte (`plain` tira o negrito ou itálico da base) |
+| `underline #rrggbb`, `wave #rrggbb`, `strike #rrggbb` | sublinhado, sublinhado ondulado, tachado |
+| `inherits <token>` | pega o que não foi definido de outro token |
+
+Uma cor que o tema não define fica como no perfil base. Para descobrir o nome de um token, mude a cor dele em Tools > Options > Fonts & Colors e veja o arquivo gravado em `~/.netbeans/<versão>/config/Editors/<mime>/FontsColors/`. Nomes com ponto vão entre aspas (`"markup.bold" = "#e5c07b bold"`).
+
+Se um arquivo tiver erro, o nbkit ignora aquele tema e diz o arquivo, a linha e o que está errado:
+
+```
+Aviso: tema "meu-tema" ignorado: palavra desconhecida: "itallic" (em all / comment, linha 3)
+```
+
+Categorias do módulo de coloração, por linguagem (em `["<mime>".extra]`):
 
 | Linguagem | Categorias |
 |---|---|
@@ -168,7 +193,7 @@ Categorias do módulo de coloração, por linguagem (em `colors_extras`):
 
 Os colchetes são `nbkit-bracket1`, `nbkit-bracket2` e `nbkit-bracket3`, um por nível, e `nbkit-bracket-unexpected` para o colchete sem par.
 
-O `modules/themes/one-dark-pro-mix.sh` é um exemplo completo.
+A `modules/themes/one-dark-pro-mix/` é um exemplo completo.
 
 ## Verificações de JSF
 
@@ -227,7 +252,7 @@ nbkit/
 │   ├── README.md                como criar um módulo
 │   ├── themes/
 │   │   ├── _engine.sh           motor de temas (veja "Criar um tema")
-│   │   └── one-dark-pro-mix.sh  só as cores do tema
+│   │   └── one-dark-pro-mix/    só dados: theme.toml, ui.properties, colors.toml
 │   └── jsf.sh
 └── src/                         código Java dos módulos do NetBeans
     ├── nbkit-core/              fechar o NetBeans pelo terminal

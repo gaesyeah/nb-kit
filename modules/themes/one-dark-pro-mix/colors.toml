@@ -1,0 +1,388 @@
+# One Dark Pro Mix: editor colors.
+# Tables: [all] (every language), [highlights], [annotations], ["<mime>"] (one language) and
+# ["<mime>".extra] (names that language does not declare, such as the nbkit-* categories of the coloring module).
+# Each value: "#rrggbb [on #rrggbb] [bold|italic|bold italic|plain] [underline|wave|strike #rrggbb] [inherits <token>]"
+
+# general tokens (all languages)
+[all]
+default                = "#abb2bf on #282c34"
+comment                = "#7f848e"
+keyword                = "#c678dd"
+string                 = "#98c379"
+char                   = "#98c379"
+number                 = "#d19a66"
+operator               = "#56b6c2"
+separator              = "#abb2bf"
+identifier             = "#e06c75"
+field                  = "#e06c75"
+method                 = "#61afef bold"
+markup-element         = "#e06c75"
+markup-attribute       = "#d19a66"
+markup-attribute-value = "#98c379"
+url                    = "#61afef underline #61afef"
+whitespace             = "#40444b"
+mark-occurrences       = "on #474d59"
+error                  = "on #372e34 wave #c24038"
+warning                = "on #393739 wave #d19a66"
+
+# highlights: selection, current line, search...
+[highlights]
+caret-color-insert-mode                    = "#528bff"
+caret-color-overwrite-mode                 = "#528bff"
+selection                                  = "on #404859"
+highlight-caret-row                        = "on #2c313c"
+highlight-search                           = "on #45484f"
+line-number                                = "#495162 on #282c34"
+indent-guide-lines                         = "#3b4048"
+text-limit-line-color                      = "#3c4049"
+nbeditor-bracesMatching-match              = "on #515a6b"
+nbeditor-bracesMatching-match-multichar    = "on #515a6b"
+nbeditor-bracesMatching-mismatch           = ""
+synchronized-text-blocks-ext               = "on #393e49"
+synchronized-text-blocks-ext-slave         = "on #393e49"
+nbeditor-bracesMatching-mismatch-multichar = ""
+hyperlinks                                 = "#61afef underline #61afef"
+block-search                               = "on #2f3339"
+inc-search                                 = "on #554941"
+code-folding                               = "#808080 on #3a3a3a"
+code-folding-bar                           = "#c5c5c5"
+code-folding-border                        = "#c5c5c5"
+coverage-covered                           = "on #203d49"
+coverage-uncovered                         = "on #53232a"
+
+# annotations: error and warning underlines
+[annotations]
+org-netbeans-modules-cnd-cpp-parser_annotation_err            = "wave #c24038"
+org-netbeans-modules-web-core-syntax-JspParserErrorAnnotation = "wave #c24038"
+PHPError                                                      = "wave #c24038"
+PHPNotice                                                     = "wave #d19a66"
+PHPWarning                                                    = "wave #d19a66"
+CurrentPC                                                     = "on #53562a"
+CurrentPCLinePart                                             = "on #53562a"
+CallSite                                                      = "on #415849"
+CurrentExpression                                             = "on #53562a"
+CurrentExpressionLine                                         = "on #53562a"
+CurrentExpressionLine_BP                                      = "on #53562a"
+CurrentExpressionLine_CBP                                     = "on #53562a"
+CurrentExpressionLine_DBP                                     = "on #53562a"
+CurrentExpressionLine_DCBP                                    = "on #53562a"
+Dbx_PC                                                        = "on #53562a"
+debugger-PC_BP                                                = "on #53562a"
+debugger-PC_BP_broken                                         = "on #53562a"
+debugger-PC_BP_stroke                                         = "on #53562a"
+debugger-PC_CBP                                               = "on #53562a"
+debugger-PC_CBP_broken                                        = "on #53562a"
+debugger-PC_CBP_stroke                                        = "on #53562a"
+debugger-PC_DBP                                               = "on #53562a"
+debugger-PC_DBP_stroke                                        = "on #53562a"
+debugger-PC_DCBP                                              = "on #53562a"
+debugger-PC_DCBP_stroke                                       = "on #53562a"
+debugger-PC_mixedBP                                           = "on #53562a"
+debugger-PC_mixedBP_broken                                    = "on #53562a"
+debugger-PC_multi_BPCBP                                       = "on #53562a"
+debugger-PC_multi_BPCBP_broken                                = "on #53562a"
+debugger-PC_multi_DBPCBP                                      = "on #53562a"
+
+["text/css"]
+at_rule_symbol     = "#c678dd"
+identifiers        = "#d19a66"
+mod-method         = "#d19a66"
+mod-custom1        = "#abb2bf"
+mod-custom2        = "#56b6c2 italic"
+mod-custom3        = "#abb2bf italic"
+mod-class          = "#56b6c2 italic"
+mod-constructor    = "#abb2bf bold"
+mod-local-variable = "#e06c75"
+mod-private        = "#61afef bold"
+
+["text/css".extra]
+keywords                 = "#c678dd"
+errors                   = "#ffffff"
+IMPORTANT_SYM            = "#c678dd bold"
+CP_EQ                    = "#56b6c2"
+CP_NOT_EQ                = "#56b6c2"
+VARIABLE                 = "#e06c75"
+SASS_VAR                 = "#e06c75"
+LESS_AND                 = "#e06c75"
+STAR                     = "#e06c75"
+GREATER                  = "#abb2bf"
+TILDE                    = "#abb2bf"
+PLUS                     = "#abb2bf"
+INCLUDES                 = "#abb2bf"
+DASHMATCH                = "#abb2bf"
+BEGINS                   = "#abb2bf"
+ENDS                     = "#abb2bf"
+CONTAINS                 = "#abb2bf"
+nbkit-unit               = "#e06c75"
+nbkit-function           = "#56b6c2"
+nbkit-tag                = "#e06c75"
+nbkit-id                 = "#61afef"
+nbkit-bracket1           = "#d19a66"
+nbkit-bracket2           = "#c678dd"
+nbkit-bracket3           = "#56b6c2"
+nbkit-bracket-unexpected = "#d41719"
+nbkit-attribute          = "#d19a66"
+nbkit-string             = "#98c379"
+nbkit-plain              = "#abb2bf"
+nbkit-url-parameter      = "#e06c75"
+
+["text/html"]
+character  = "#e06c75 plain"
+mod-class  = "wave #c24038"
+el-content = "#abb2bf inherits default"
+
+["text/javascript"]
+COMMENT_HTML    = "#7f848e bold"
+COMMENT_KEYWORD = "#c678dd bold"
+keyword         = "#c678dd plain"
+mod-method      = "#61afef bold"
+mod-regexp      = "#e06c75"
+mod-unused      = "wave #d19a66"
+
+["text/javascript".extra]
+KEYWORD_TRUE             = "#d19a66 plain"
+KEYWORD_FALSE            = "#d19a66 plain"
+KEYWORD_NULL             = "#d19a66 plain"
+KEYWORD_THIS             = "#e5c07b plain"
+KEYWORD_SUPER            = "#e5c07b plain"
+nbkit-call               = "#61afef bold"
+nbkit-object             = "#e5c07b"
+nbkit-type               = "#e5c07b"
+nbkit-constant           = "#d19a66"
+nbkit-library            = "#e5c07b"
+nbkit-readonly           = "#e5c07b"
+nbkit-library-function   = "#56b6c2"
+nbkit-bracket1           = "#d19a66"
+nbkit-bracket2           = "#c678dd"
+nbkit-bracket3           = "#56b6c2"
+nbkit-bracket-unexpected = "#d41719"
+
+["text/textmate"]
+mod-class                     = "#e5c07b"
+mod-class-declaration         = "#e5c07b"
+mod-enum                      = "#e5c07b"
+mod-enum-declaration          = "#e5c07b"
+mod-struct                    = "#e5c07b"
+mod-struct-declaration        = "#e5c07b"
+mod-typeAlias                 = "#e5c07b"
+mod-typeAlias-declaration     = "#e5c07b"
+mod-typeParameter             = "#e5c07b"
+mod-typeParameter-declaration = "#e5c07b"
+mod-enumMember                = "#56b6c2"
+mod-enumMember-declaration    = "#56b6c2"
+mod-macro                     = "#d19a66"
+mod-macro-declaration         = "#d19a66"
+mod-namespace                 = "#a9b7c6"
+mod-namespace-declaration     = "#a9b7c6"
+mod-package                   = "#a9b7c6"
+mod-package-declaration       = "#a9b7c6"
+"constant.other"              = "#d19a66"
+"support.function"            = "#56b6c2"
+"markup.heading"              = "#e06c75 bold"
+"markup.bold"                 = "#d19a66 bold"
+"markup.italic"               = "#c678dd italic"
+
+["text/x-apache-conf"]
+variable = "#a9b7c6"
+
+["text/x-diff"]
+added    = "#98c379"
+removed  = "#e06c75"
+filename = "#61afef bold italic"
+
+["text/x-el"]
+identifier     = "#e06c75"
+keywords       = "#c678dd plain"
+tag-lib-prefix = "#e5c07b plain inherits default"
+
+["text/x-el".extra]
+TRUE_KEYWORD             = "#d19a66 plain"
+FALSE_KEYWORD            = "#d19a66 plain"
+NULL_KEYWORD             = "#d19a66 plain"
+nbkit-call               = "#61afef bold"
+nbkit-object             = "#e5c07b"
+nbkit-library            = "#e5c07b"
+nbkit-bracket1           = "#d19a66"
+nbkit-bracket2           = "#c678dd"
+nbkit-bracket3           = "#56b6c2"
+nbkit-bracket-unexpected = "#d41719"
+
+["text/x-env"]
+key = "#a9b7c6"
+
+["text/x-java"]
+literal                         = "#d19a66"
+string-escape                   = "#56b6c2"
+character-escape                = "#56b6c2 bold"
+javadoc-tag                     = "#c678dd bold"
+javadoc-identifier              = "#7f848e"
+html-tag                        = "#7f848e italic"
+mod-class                       = "#e5c07b"
+mod-class-declaration           = "#e5c07b bold"
+mod-interface                   = "#e5c07b"
+mod-interface-declaration       = "#e5c07b bold"
+mod-enum                        = "#e5c07b"
+mod-enum-declaration            = "#e5c07b bold"
+mod-record-declaration          = "#e5c07b bold"
+mod-annotation-type             = "#e5c07b"
+mod-annotation-type-declaration = "#e5c07b bold"
+mod-constructor                 = "#e5c07b"
+mod-constructor-declaration     = "#61afef bold"
+mod-method                      = "#61afef bold"
+mod-method-declaration          = "#61afef bold"
+mod-field                       = "#e06c75"
+mod-field-declaration           = "#e06c75"
+mod-local-variable              = "#e06c75"
+mod-local-variable-declaration  = "#e06c75"
+mod-parameter                   = "#e06c75"
+mod-parameter-declaration       = "#e06c75"
+string-escape-invalid           = "wave #c24038"
+mod-record                      = "#e5c07b"
+mod-unused                      = ""
+
+["text/x-jflex"]
+directive_value = "#a9b7c6 bold"
+
+["text/x-json"]
+COMMENT_HTML    = "#7f848e bold"
+COMMENT_KEYWORD = "#c678dd bold"
+mod-class       = "#e5c07b bold"
+mod-method      = "#61afef bold"
+mod-regexp      = "#e06c75"
+mod-unused      = "wave #d19a66"
+
+["text/x-json".extra]
+KEYWORD_TRUE             = "#d19a66 plain"
+KEYWORD_FALSE            = "#d19a66 plain"
+KEYWORD_NULL             = "#d19a66 plain"
+nbkit-bracket1           = "#d19a66"
+nbkit-bracket2           = "#c678dd"
+nbkit-bracket3           = "#56b6c2"
+nbkit-bracket-unexpected = "#d41719"
+
+["text/x-jsp"]
+attribute-value     = "#98c379"
+comment             = "#7f848e"
+endtag              = "#e06c75 bold"
+tag-directive       = "#c678dd bold"
+error               = "#ffffff bold"
+expression-language = "inherits default"
+scriptlet           = "inherits default"
+scriptlet-delimiter = "inherits default"
+
+["text/x-yaml"]
+RUBYCOMMENT = "inherits comment"
+
+["text/x-markdown"]
+header        = "#e06c75 bold"
+header2       = "#e06c75"
+header3       = "#e06c75"
+header4       = "#e06c75"
+header5       = "#e06c75"
+header6       = "#e06c75"
+bulletlist    = "#e5c07b"
+orderedlist   = "#e5c07b"
+emph          = "#c678dd italic"
+strong        = "#d19a66 bold"
+strikethrough = ""
+
+["text/x-nbs"]
+identifier = "#a9b7c6"
+
+["text/x-neon"]
+literal = "#a9b7c6"
+
+["text/x-oql"]
+clazz = "#a9b7c6 italic"
+
+["text/x-php5"]
+mod-method     = "#61afef bold"
+phpopenclose   = "#be5046 bold"
+variable       = "#e06c75"
+mod-custom1    = "#a9b7c6"
+keyword        = "#c678dd plain"
+mod-unused     = "wave #d19a66"
+mod-deprecated = "strike #c3c3c3"
+
+["text/x-properties"]
+properties-equal-sign = "#abb2bf"
+
+["text/x-repl"]
+command        = "#a9b7c6 bold"
+command-option = "#a9b7c6 bold"
+prompt         = "#a9b7c6 bold"
+
+["text/x-sql"]
+sql-identifier = "#abb2bf"
+
+["text/x-tag"]
+attribute-value     = "#98c379"
+comment             = "#7f848e bold"
+endtag              = "#e06c75 bold"
+tag-directive       = "#c678dd bold"
+error               = "#ffffff bold"
+expression-language = "inherits default"
+scriptlet           = "inherits default"
+scriptlet-delimiter = "inherits default"
+
+["text/x-terraform+x-hcl"]
+mod-field = "#9876aa"
+
+["text/x-tfvars+x-hcl"]
+mod-field = "#9876aa"
+
+["text/x-toml"]
+mod-global    = "#a9b7c6 bold"
+string-escape = "#56b6c2"
+table-mark    = "#a9b7c6 bold"
+
+["text/x-tpl"]
+error  = "wave #c24038"
+smarty = "inherits default"
+
+["text/xml"]
+xml-doctype   = "#c678dd"
+xml-operator  = "#abb2bf"
+xml-value     = "#98c379"
+xml-pi-start  = "#abb2bf"
+xml-pi-end    = "#abb2bf"
+xml-pi-target = "#e06c75"
+
+["text/xml-external-parsed-entity"]
+xml-doctype       = "#c678dd bold"
+xml-value         = "#98c379"
+xml-pi-start      = "#abb2bf bold"
+xml-pi-end        = "#abb2bf bold"
+xml-pi-target     = "#e06c75 bold"
+xml-cdata-section = "#98c379"
+
+["text/xhtml"]
+expression-language = "inherits default"
+
+["text/x-java".extra]
+nbkit-bracket1           = "#d19a66"
+nbkit-bracket2           = "#c678dd"
+nbkit-bracket3           = "#56b6c2"
+nbkit-bracket-unexpected = "#d41719"
+
+["text/html".extra]
+nbkit-plain     = "#abb2bf"
+nbkit-doctype   = "#e06c75"
+nbkit-attribute = "#d19a66"
+nbkit-string    = "#98c379"
+
+["text/xml".extra]
+nbkit-plain        = "#abb2bf"
+nbkit-attribute    = "#d19a66"
+nbkit-string       = "#98c379"
+nbkit-keyword      = "#c678dd"
+nbkit-documentroot = "#e5c07b"
+nbkit-doctype      = "#e06c75"
+
+["text/xml-external-parsed-entity".extra]
+nbkit-plain        = "#abb2bf"
+nbkit-attribute    = "#d19a66"
+nbkit-string       = "#98c379"
+nbkit-keyword      = "#c678dd"
+nbkit-documentroot = "#e5c07b"
+nbkit-doctype      = "#e06c75"

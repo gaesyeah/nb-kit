@@ -6,7 +6,7 @@
 set -euo pipefail
 # Ctrl+C exits with code 130 (the exit trap uses it to undo a half-done install)
 trap 'exit 130' INT TERM HUP
-NBKIT_VERSION=2.0.1
+NBKIT_VERSION=2.1.0
 SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")"
 NBKIT_DIR="$(dirname "$SELF")"
 ME="$(basename "$SELF")"
@@ -73,6 +73,61 @@ ok()   { printf '      %s✓%s %s\n' "$G" "$N" "$*"; }
 info() { printf '      %s%s%s\n' "$D" "$*" "$N"; }
 warn() { printf '      %s!%s %s\n' "$Y" "$N" "$*"; }
 
+# ---------- yes/no ----------
+# yes/no question; the uppercase letter is the Enter default (Y or N in $2)
+ask_yn() {
+  local a hint; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
+  printf '%s %s ' "$1" "$hint"
+  IFS= read -r a </dev/tty || a=""
+  a="${a,,}"
+  if [ -z "$a" ]; then [ "$2" = Y ]; return; fi
+  case "$a" in s|sim|y|yes) return 0 ;; *) return 1 ;; esac
+}
+
+# ---------- system packages ----------
+# installs a package with the system package manager, asking first (only with a terminal to ask)
+# pkg_install <what> apt:<package> dnf:<package> pacman:<package> zypper:<package>
+pkg_install() {
+  local what="$1" spec pm pkg cmd=() sudo=()
+  shift
+  for spec in "$@"; do
+    pm="${spec%%:*}"; pkg="${spec#*:}"
+    case "$pm" in
+      apt) command -v apt-get >/dev/null 2>&1 && cmd=(apt-get install -y "$pkg") ;;
+      dnf) command -v dnf >/dev/null 2>&1 && cmd=(dnf install -y "$pkg") ;;
+      pacman) command -v pacman >/dev/null 2>&1 && cmd=(pacman -S --needed --noconfirm "$pkg") ;;
+      zypper) command -v zypper >/dev/null 2>&1 && cmd=(zypper --non-interactive install "$pkg") ;;
+    esac
+    [ ${#cmd[@]} -gt 0 ] && break
+  done
+  [ ${#cmd[@]} -gt 0 ] || return 1
+  if [ "$(id -u)" != 0 ]; then command -v sudo >/dev/null 2>&1 || return 1; sudo=(sudo); fi
+  { [ -t 0 ] && [ -t 1 ]; } || return 1
+  ask_yn "$(t cli.ask_install "$what" "${sudo[*]+${sudo[*]} }${cmd[*]}")" Y || return 1
+  if [ "${cmd[0]}" = apt-get ]; then ${sudo[@]+"${sudo[@]}"} apt-get update -qq || true; fi
+  ${sudo[@]+"${sudo[@]}"} "${cmd[@]}"
+}
+
+# ---------- Python 3.11 or newer (reads the theme TOML files) ----------
+find_python() {
+  local c
+  for c in python3 python3.14 python3.13 python3.12 python3.11; do
+    if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
+      command -v "$c"; return 0
+    fi
+  done
+  return 1
+}
+NBKIT_PY="$(find_python || true)"
+if [ -z "$NBKIT_PY" ]; then
+  t cli.python_old "$(python3 --version 2>/dev/null || echo "-")"; echo
+  if pkg_install "Python 3.11" apt:python3.11 dnf:python3.11 pacman:python zypper:python311; then
+    NBKIT_PY="$(find_python || true)"
+  fi
+  [ -n "$NBKIT_PY" ] || die "$(t cli.python_manual)"
+fi
+export NBKIT_PY
+
 # ---------- module registry ----------
 # nbkit_register <id> <function prefix> <category: theme|tool> <name> <description> <version>
 MODS=()
@@ -107,12 +162,12 @@ usage() {
 }
 
 # ---------- loads the modules (themes first) ----------
-declare -A LOADED=()
 [ -d "$NBKIT_DIR/modules" ] || die "$(t cli.no_modules_dir "$ME")"
-for f in "$NBKIT_DIR"/modules/themes/*.sh "$NBKIT_DIR"/modules/*.sh "$NBKIT_DIR"/modules/*/*.sh; do
-  case "${f##*/}" in _*) continue ;; esac   # _engine.sh etc.: loaded by the modules themselves
-  case "$f" in "$NBKIT_DIR"/modules/themes/*) [ -n "${LOADED[$f]:-}" ] && continue ;; esac
-  LOADED[$f]=1
+# the theme engine registers every folder in modules/themes/
+# shellcheck disable=SC1091
+[ -f "$NBKIT_DIR/modules/themes/_engine.sh" ] && source "$NBKIT_DIR/modules/themes/_engine.sh"
+for f in "$NBKIT_DIR"/modules/*.sh "$NBKIT_DIR"/modules/*/*.sh; do
+  case "${f##*/}" in _*) continue ;; esac   # _engine.sh: already loaded above
   [ -f "$f" ] || continue
   # shellcheck disable=SC1090
   source "$f"
@@ -138,19 +193,8 @@ if [ -t 0 ] && [ -t 1 ]; then
   if [ $# -eq 0 ]; then MENU=1; INTERACTIVE=1; elif [ "${NBKIT_TTY:-}" = 1 ]; then INTERACTIVE=1; fi
 fi
 [ -n "$ACTION" ] || ACTION=install
-command -v python3 >/dev/null || die "$(t cli.no_python)"
 
 # ---------- terminal ----------
-# yes/no question; the uppercase letter is the Enter default (Y or N in $2)
-ask_yn() {
-  local a hint; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
-  printf '%s %s ' "$1" "$hint"
-  IFS= read -r a </dev/tty || a=""
-  a="${a,,}"
-  if [ -z "$a" ]; then [ "$2" = Y ]; return; fi
-  case "$a" in s|sim|y|yes) return 0 ;; *) return 1 ;; esac
-}
-
 # arrow key menu; result in MENU_IDX (-1 = left with Esc or q). MENU_HINT changes the legend.
 menu() {
   local -a o=("$@"); local n=$# i=${MENU_START:-0} j k rest
@@ -595,6 +639,9 @@ do_check() {
   done
   local j; j="$(sed -n 's/^ *Java; VM; Vendor *= *\([^;]*\).*/\1/p' "$log" | tail -1)"
   [ -n "$j" ] && printf '  %s%-9s%s%s\n' "$D" "$(t cli.res_info)" "$N" "$(t cli.nb_java "$j")"
+  if [[ "${j%%.*}" =~ ^[0-9]+$ ]] && [ "${j%%.*}" -lt 17 ]; then
+    printf '  %s%-9s%s%s\n' "$Y" "$(t cli.res_warn)" "$N" "$(t cli.java_too_old "$j")"
+  fi
   echo
   if [ $worst = 0 ]; then echo "${G}$(t cli.all_good)${N}"; exit 0; fi
   t cli.problems_above; echo

@@ -1,0 +1,34 @@
+# One Dark Pro Mix theme for nbkit: the VS Code One Dark Pro theme, Mix variant.
+# Editor colors are in colors.toml and the UI (FlatLaf) keys in ui.properties.
+
+[theme]
+name = "One Dark Pro Mix"
+# raise it when the colors change, so the menu offers the update
+version = 29
+# color profile created in Tools > Options > Fonts & Colors
+profile = "One Dark Pro Mix"
+description = { en = "One Dark Pro Mix colors (VS Code), FlatLaf Dark and JetBrains Mono", pt-BR = "Cores do One Dark Pro Mix (VS Code), FlatLaf Dark e JetBrains Mono" }
+
+# base profile and look and feel: FlatLaf Dark, the engine default (a [base] table changes it)
+
+[font]
+name = "JetBrains Mono"
+# folder in ~/.local/share/fonts
+dir = "JetBrainsMono"
+source = { en = "official JetBrains repository", pt-BR = "repositório oficial da JetBrains" }
+urls = [
+  "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/fonts/ttf/JetBrainsMono-Regular.ttf",
+  "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/fonts/ttf/JetBrainsMono-Bold.ttf",
+  "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/fonts/ttf/JetBrainsMono-Italic.ttf",
+  "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/fonts/ttf/JetBrainsMono-BoldItalic.ttf",
+]
+license = "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/OFL.txt"
+
+[terminal]
+# terminal.selectionBackground of the Mix (#abb2bf30 over #282c34)
+selection = "#41454e"
+
+[legacy]
+# installs made by the old installer (netbeans-onedark.sh), before nbkit
+version_file = "onedark-version"
+module = "com-onedarkmix-netbeans.jar"

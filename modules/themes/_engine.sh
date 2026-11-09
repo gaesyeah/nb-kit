@@ -1,22 +1,22 @@
 # shellcheck shell=bash
 # nbkit theme engine: everything any theme needs, without a single color.
-# A theme (e.g. one-dark-pro-mix.sh) sources this file, calls theme_register and defines:
-#   <prefix>_config     THEME_* variables (profile, base, look and feel, font, terminal)
-#   <prefix>_ui         content of the FlatLaf properties file (UI colors)
-#   <prefix>_colors     editor colors: colors_tokens, colors_highlights, colors_annotations,
-#                       colors_language <mime> and colors_extras <mime> (categories of the coloring module)
-# Optional: <prefix>_legacy_version (version installed by an old installer, to offer the update).
-# See the "Creating a theme" section of the README.
+# Each theme is a folder in modules/themes/ with only data, no code:
+#   theme.toml      name, version, profile, font, terminal selection color
+#   ui.properties   FlatLaf keys (UI colors), copied as they are
+#   colors.toml     editor colors
+# nbkit.sh loads this file; it registers every theme folder it finds. See "Creating a theme" in the README.
 
 [ -n "${NBKIT_THEME_ENGINE:-}" ] && return 0
 NBKIT_THEME_ENGINE=1
 
 # ---------- registration ----------
-# theme_register <id> <prefix> "<name>" "<description>" <version>
+# theme_register <id> <prefix> "<name>" "<description>" <version> <folder>
 # creates the nbkit contract functions (<prefix>_install etc.) pointing to the engine
+declare -A THEME_DIRS=()
 theme_register() {
   local id="$1" p="$2" f
   nbkit_register "$id" "$p" theme "$3" "$4" "$5"
+  THEME_DIRS[$id]="$6"
   for f in status paths uninstall_summary rollback backups backup_desc install_steps uninstall_steps \
            restore_steps install uninstall restore check; do
     eval "${p}_$f() { theme_use $id $p; theme_$f \"\$@\"; }"
@@ -42,7 +42,7 @@ theme_defaults() {
 }
 
 theme_use() {
-  THEME_ID="$1"; THEME_P="$2"
+  THEME_ID="$1"; THEME_P="$2"; THEME_DIR="${THEME_DIRS[$1]}"
   theme_defaults
   "${2}_config"
   COLORS_JAR="$UD/modules/nbkit-colors.jar"
@@ -181,7 +181,7 @@ theme_restore_backup() {
 
 # current look and feel and profile: keeps them (select) or brings them back (restore)
 theme_select_state() {
-  python3 - "$UD" "$1" "$2" "$3" <<'PY'
+  "$NBKIT_PY" - "$UD" "$1" "$2" "$3" <<'PY'
 import sys, os, json, re, xml.dom.minidom as M
 ud, mode, laf, profile = sys.argv[1:5]
 attrs = os.path.join(ud, 'config', '.nbattrs')
@@ -243,7 +243,7 @@ PY
 
 # editor font configured today (to tell on uninstall)
 theme_current_font() {
-  python3 - "$1" <<'PY' 2>/dev/null || true
+  "$NBKIT_PY" - "$1" <<'PY' 2>/dev/null || true
 import sys, xml.dom.minidom as M
 for e in M.parse(sys.argv[1]).getElementsByTagName('fontcolor'):
     f = e.getElementsByTagName('font')
@@ -254,7 +254,7 @@ PY
 
 # builds the profile (check mode: only validates the NetBeans installation)
 theme_builder() {
-  python3 - "$@" <<'PY'
+  "$NBKIT_PY" - "$@" <<'PY'
 import sys, os, re, json, glob, zipfile
 import xml.dom.minidom as M
 
@@ -626,30 +626,164 @@ if font:
 PY
 }
 
-# ---------- colors API (used in <prefix>_colors) ----------
-COLORS_HDR='<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" "https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">'
+# ---------- colors (colors.toml -> NetBeans color files) ----------
 COLORS_PREFIX="org-netbeans-modules-editor-settings-CustomFontsColors"
+theme_colors() {
+  "$NBKIT_PY" - "$THEME_DIR" "$FC" "$EC" "$THEME_BASE" "$COLORS_PREFIX" <<'PY'
+import os, sys, re, tomllib
 
-colors_file() { { echo "$COLORS_HDR"; echo "<fontscolors>"; cat; echo "</fontscolors>"; } > "$1"; }
-# general editor colors (valid for all languages)
-colors_tokens() { mkdir -p "$FC"; colors_file "$FC/$COLORS_PREFIX-tokenColorings.xml"; }
-# highlights: selection, current line, search, line numbers...
-colors_highlights() { mkdir -p "$FC"; colors_file "$FC/$COLORS_PREFIX-highlights.xml"; }
-# annotations: error and warning underlines of each module
-colors_annotations() { mkdir -p "$FC"; colors_file "$FC/$COLORS_PREFIX-annotations.xml"; }
-# tokens of one language: colors_language text/css <<'EOF' ... EOF
-colors_language() {
-  local dir="$EC/Editors/$1/FontsColors/$THEME_BASE"
-  mkdir -p "$dir"
-  colors_file "$dir/$COLORS_PREFIX-tokenColorings.xml"
-}
-# categories no NetBeans module defines (the nbkit-* ones of the coloring module):
-# NetBeans only accepts them in the Defaults folder
-colors_extras() {
-  local dir="$EC/Editors/$1/FontsColors/$THEME_BASE/Defaults"
-  mkdir -p "$dir"
-  colors_file "$dir/nbkit-theme-tokenColorings.xml"
+_TEXTS = None
+def T(key, *args):
+    """Text of the key in lang/<language>.lang (nbkit passes the files in NBKIT_LANG_FILES, one per line)."""
+    global _TEXTS
+    if _TEXTS is None:
+        _TEXTS = {}
+        for path in os.environ.get('NBKIT_LANG_FILES', '').split('\n'):
+            if path and os.path.exists(path):
+                for line in open(path, encoding='utf-8'):
+                    line = line.rstrip('\n')
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        _TEXTS[k] = v
+    text = _TEXTS.get(key, key).replace('\\n', '\n')
+    return text % args if args else text.replace('%%', '%')
+
+# ---- colors.toml -> NetBeans <fontcolor> ----
+
+COLOR = re.compile(r'#([0-9a-fA-F]{6})$')
+STYLES = {'plain': 'plain', 'bold': 'bold', 'italic': 'italic'}
+ORDER = ('default', 'foreColor', 'bgColor', 'underline', 'strikeThrough', 'waveUnderlined')
+FIXED = ('all', 'highlights', 'annotations')
+
+
+class ThemeError(Exception):
+    """(key of the text in lang/, (values...), place or None, line or None)"""
+    def __init__(self, key, values=(), place=None, line=None):
+        super().__init__(key, values, place, line)
+
+
+def parse_value(value):
+    """'#61afef on #282c34 bold wave #c24038 inherits comment' -> (attributes, style)"""
+    words = value.split()
+    attrs, style, i = {}, None, 0
+
+    def color(j, after):
+        if j >= len(words) or not COLOR.match(words[j]):
+            raise ThemeError('theme.color_expected', (after,))
+        return 'ff' + words[j][1:].lower()
+
+    while i < len(words):
+        w = words[i]
+        if COLOR.match(w):
+            if 'foreColor' in attrs:
+                raise ThemeError('theme.color_twice', (w,))
+            attrs['foreColor'] = color(i, w)
+            i += 1
+        elif w == 'on':
+            attrs['bgColor'] = color(i + 1, w)
+            i += 2
+        elif w in ('underline', 'wave', 'strike'):
+            key = {'underline': 'underline', 'wave': 'waveUnderlined', 'strike': 'strikeThrough'}[w]
+            attrs[key] = color(i + 1, w)
+            i += 2
+        elif w == 'bold' and i + 1 < len(words) and words[i + 1] == 'italic':
+            style = 'bold+italic'
+            i += 2
+        elif w in STYLES:
+            style = STYLES[w]
+            i += 1
+        elif w == 'inherits':
+            if i + 1 >= len(words):
+                raise ThemeError('theme.token_expected', (w,))
+            attrs['default'] = words[i + 1]
+            i += 2
+        else:
+            raise ThemeError('theme.unknown_word', (w,))
+    return attrs, style
+
+
+def to_xml(name, attrs, style):
+    a = ''.join(f' {k}="{attrs[k]}"' for k in ORDER if k in attrs)
+    if style:
+        return f'<fontcolor name="{name}"{a}><font style="{style}"/></fontcolor>'
+    return f'<fontcolor name="{name}"{a}/>'
+
+
+def key_lines(path):
+    """(table, key) -> line number, to point at the error"""
+    lines, table = {}, ''
+    for n, l in enumerate(open(path, encoding='utf-8'), 1):
+        h = re.match(r'\s*\[\s*(.+?)\s*\]\s*(#.*)?$', l)
+        if h:
+            table = '.'.join(p.strip().strip('"') for p in re.findall(r'"[^"]*"|[^.]+', h.group(1)))
+            continue
+        m = re.match(r'\s*("([^"]+)"|[A-Za-z0-9_-]+)\s*=', l)
+        if m:
+            lines.setdefault((table, m.group(2) or m.group(1)), n)
+    return lines
+
+
+def read_colors(path):
+    """reads colors.toml: list of (place, [(name, xml)]); place = all | highlights | annotations | <mime> | <mime> extra"""
+    try:
+        with open(path, 'rb') as f:
+            data = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise ThemeError('theme.toml_syntax', (str(e),))
+    lines = key_lines(path)
+    out = []
+
+    def items(place, table, prefix):
+        got = []
+        for name, value in table.items():
+            if isinstance(value, dict):
+                continue
+            where = lines.get((prefix, name), '?')
+            if not isinstance(value, str):
+                raise ThemeError('theme.not_text', (), f'{place} / {name}', where)
+            try:
+                attrs, style = parse_value(value)
+            except ThemeError as e:
+                raise ThemeError(e.args[0], e.args[1], f'{place} / {name}', where)
+            got.append((name, to_xml(name, attrs, style)))
+        out.append((place, got))
+
+    for key, table in data.items():
+        if not isinstance(table, dict):
+            raise ThemeError('theme.not_table', (key,), None, lines.get(('', key)))
+        items(key, table, key)
+        for sub, value in table.items():
+            if isinstance(value, dict):
+                if sub != 'extra' or key in FIXED:
+                    raise ThemeError('theme.not_table', (f'{key}.{sub}',))
+                items(f'{key} extra', value, f'{key}.extra')
+    return out
+
+# ---- writes the colors of colors.toml as NetBeans color files (in STAGE) ----
+THEME_DIR, FC, EC, BASE, PREFIX = sys.argv[1:6]
+HDR = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+       '<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" '
+       '"https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">\n')
+try:
+    places = read_colors(os.path.join(THEME_DIR, 'colors.toml'))
+except ThemeError as e:
+    key, values, place, line = e.args
+    text = T(key, *values)
+    print(T('theme.error_at', text, place, line) if place else text, file=sys.stderr)
+    sys.exit(1)
+for place, items in places:
+    if place in ('all', 'highlights', 'annotations'):
+        kind = {'all': 'tokenColorings', 'highlights': 'highlights', 'annotations': 'annotations'}[place]
+        path = os.path.join(FC, f'{PREFIX}-{kind}.xml')
+    elif place.endswith(' extra'):
+        # names NetBeans does not declare for the language: only accepted in the Defaults folder
+        path = os.path.join(EC, 'Editors', place[:-6], 'FontsColors', BASE, 'Defaults', 'nbkit-theme-tokenColorings.xml')
+    else:
+        path = os.path.join(EC, 'Editors', place, 'FontsColors', BASE, f'{PREFIX}-tokenColorings.xml')
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(HDR + '<fontcolors>\n' + ''.join(f'    {x}\n' for _, x in items) + '</fontcolors>\n')
+PY
 }
 
 # ---------- font ----------
@@ -680,6 +814,9 @@ theme_font() {
     NBKIT_THEME_FONT="$THEME_FONT_NAME"
     info "$(t theme.font_present)"
   elif [ ${#THEME_FONT_URLS[@]} -gt 0 ]; then
+    if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+      pkg_install curl apt:curl dnf:curl pacman:curl zypper:curl || true
+    fi
     if [ -n "$THEME_FONT_SOURCE" ]; then info "$(t theme.font_downloading_from "$THEME_FONT_SOURCE" "$dir")"
     else info "$(t theme.font_downloading "$dir")"; fi
     tmp="$(mktemp -d)"
@@ -724,7 +861,7 @@ theme_install() {
 
   step "$(t theme.step_base "$THEME_BASE_NAME")"
   # font you used in the base profile (goes to the new profile)
-  FONTJSON="$(python3 - "$C/Editors/FontsColors/$THEME_BASE/$COLORS_PREFIX-tokenColorings.xml" <<'PY' 2>/dev/null || true
+  FONTJSON="$("$NBKIT_PY" - "$C/Editors/FontsColors/$THEME_BASE/$COLORS_PREFIX-tokenColorings.xml" <<'PY' 2>/dev/null || true
 import sys, json, xml.dom.minidom as M
 for e in M.parse(sys.argv[1]).getElementsByTagName('fontcolor'):
     f = e.getElementsByTagName('font')
@@ -752,9 +889,9 @@ PY
   # the profile is rebuilt on each install; your tweaks (outside Defaults) stay
   find "$C/Editors" -depth -type d -path "*/FontsColors/$THEME_PROFILE/Defaults" -exec rm -rf {} + 2>/dev/null || true
   mkdir -p "$(dirname "$UD/$LAFT")"
-  { echo "# nbkit theme: $THEME_PROFILE"; "${THEME_P}_ui"; } > "$UD/$LAFT"
+  { echo "# nbkit theme: $THEME_PROFILE"; cat "$THEME_DIR/ui.properties"; } > "$UD/$LAFT"
   mkdir -p "$FC"
-  "${THEME_P}_colors"
+  theme_colors || die "$(t theme.colors_failed "$THEME_DIR/colors.toml")"
   # NetBeans identifies the type of each color file by this attribute
   cat > "$FC/.nbattrs" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1089,7 +1226,7 @@ EOF
   # Keeps: editor font, entries the theme does not define, your tweaks to theme entries
   # and your keys in the UI file.
   {
-  python3 - "$UD" "$OLD" "$LAFT" <<'PY'
+  "$NBKIT_PY" - "$UD" "$OLD" "$LAFT" <<'PY'
 import sys, os, json, re
 import xml.dom.minidom as M
 
@@ -1351,7 +1488,7 @@ theme_restore() {
 theme_check() {
   local rc=0 stage; stage="$(tmpdir)"
   theme_builder "$UD" "$stage" "$THEME_PROFILE" "" check >/dev/null 2>&1 || true
-  python3 - "$UD" <<'PY' || rc=$?
+  "$NBKIT_PY" - "$UD" <<'PY' || rc=$?
 import sys, os, re, xml.dom.minidom as M
 _TEXTS = None
 def T(key, *args):
@@ -1412,3 +1549,222 @@ sys.exit(0 if ok else (1 if fixable else 2))
 PY
   return $rc
 }
+
+# ---------- registers every theme folder ----------
+theme_load_all() {
+  "$NBKIT_PY" - "$1" <<'PY'
+import os, sys, re, tomllib
+
+_TEXTS = None
+def T(key, *args):
+    """Text of the key in lang/<language>.lang (nbkit passes the files in NBKIT_LANG_FILES, one per line)."""
+    global _TEXTS
+    if _TEXTS is None:
+        _TEXTS = {}
+        for path in os.environ.get('NBKIT_LANG_FILES', '').split('\n'):
+            if path and os.path.exists(path):
+                for line in open(path, encoding='utf-8'):
+                    line = line.rstrip('\n')
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        _TEXTS[k] = v
+    text = _TEXTS.get(key, key).replace('\\n', '\n')
+    return text % args if args else text.replace('%%', '%')
+
+# ---- colors.toml -> NetBeans <fontcolor> ----
+
+COLOR = re.compile(r'#([0-9a-fA-F]{6})$')
+STYLES = {'plain': 'plain', 'bold': 'bold', 'italic': 'italic'}
+ORDER = ('default', 'foreColor', 'bgColor', 'underline', 'strikeThrough', 'waveUnderlined')
+FIXED = ('all', 'highlights', 'annotations')
+
+
+class ThemeError(Exception):
+    """(key of the text in lang/, (values...), place or None, line or None)"""
+    def __init__(self, key, values=(), place=None, line=None):
+        super().__init__(key, values, place, line)
+
+
+def parse_value(value):
+    """'#61afef on #282c34 bold wave #c24038 inherits comment' -> (attributes, style)"""
+    words = value.split()
+    attrs, style, i = {}, None, 0
+
+    def color(j, after):
+        if j >= len(words) or not COLOR.match(words[j]):
+            raise ThemeError('theme.color_expected', (after,))
+        return 'ff' + words[j][1:].lower()
+
+    while i < len(words):
+        w = words[i]
+        if COLOR.match(w):
+            if 'foreColor' in attrs:
+                raise ThemeError('theme.color_twice', (w,))
+            attrs['foreColor'] = color(i, w)
+            i += 1
+        elif w == 'on':
+            attrs['bgColor'] = color(i + 1, w)
+            i += 2
+        elif w in ('underline', 'wave', 'strike'):
+            key = {'underline': 'underline', 'wave': 'waveUnderlined', 'strike': 'strikeThrough'}[w]
+            attrs[key] = color(i + 1, w)
+            i += 2
+        elif w == 'bold' and i + 1 < len(words) and words[i + 1] == 'italic':
+            style = 'bold+italic'
+            i += 2
+        elif w in STYLES:
+            style = STYLES[w]
+            i += 1
+        elif w == 'inherits':
+            if i + 1 >= len(words):
+                raise ThemeError('theme.token_expected', (w,))
+            attrs['default'] = words[i + 1]
+            i += 2
+        else:
+            raise ThemeError('theme.unknown_word', (w,))
+    return attrs, style
+
+
+def to_xml(name, attrs, style):
+    a = ''.join(f' {k}="{attrs[k]}"' for k in ORDER if k in attrs)
+    if style:
+        return f'<fontcolor name="{name}"{a}><font style="{style}"/></fontcolor>'
+    return f'<fontcolor name="{name}"{a}/>'
+
+
+def key_lines(path):
+    """(table, key) -> line number, to point at the error"""
+    lines, table = {}, ''
+    for n, l in enumerate(open(path, encoding='utf-8'), 1):
+        h = re.match(r'\s*\[\s*(.+?)\s*\]\s*(#.*)?$', l)
+        if h:
+            table = '.'.join(p.strip().strip('"') for p in re.findall(r'"[^"]*"|[^.]+', h.group(1)))
+            continue
+        m = re.match(r'\s*("([^"]+)"|[A-Za-z0-9_-]+)\s*=', l)
+        if m:
+            lines.setdefault((table, m.group(2) or m.group(1)), n)
+    return lines
+
+
+def read_colors(path):
+    """reads colors.toml: list of (place, [(name, xml)]); place = all | highlights | annotations | <mime> | <mime> extra"""
+    try:
+        with open(path, 'rb') as f:
+            data = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise ThemeError('theme.toml_syntax', (str(e),))
+    lines = key_lines(path)
+    out = []
+
+    def items(place, table, prefix):
+        got = []
+        for name, value in table.items():
+            if isinstance(value, dict):
+                continue
+            where = lines.get((prefix, name), '?')
+            if not isinstance(value, str):
+                raise ThemeError('theme.not_text', (), f'{place} / {name}', where)
+            try:
+                attrs, style = parse_value(value)
+            except ThemeError as e:
+                raise ThemeError(e.args[0], e.args[1], f'{place} / {name}', where)
+            got.append((name, to_xml(name, attrs, style)))
+        out.append((place, got))
+
+    for key, table in data.items():
+        if not isinstance(table, dict):
+            raise ThemeError('theme.not_table', (key,), None, lines.get(('', key)))
+        items(key, table, key)
+        for sub, value in table.items():
+            if isinstance(value, dict):
+                if sub != 'extra' or key in FIXED:
+                    raise ThemeError('theme.not_table', (f'{key}.{sub}',))
+                items(f'{key} extra', value, f'{key}.extra')
+    return out
+
+# ---- reads modules/themes/<id>/theme.toml and prints the bash that registers each theme ----
+import glob, shlex
+
+def say(text):
+    """bash that prints a warning in the terminal"""
+    print(f'printf "%s\\n" {shlex.quote(text)} >&2')
+
+def message(e):
+    key, values, place, line = e.args
+    text = T(key, *values)
+    return T('theme.error_at', text, place, line) if place else text
+
+LANG = os.environ.get('NBKIT_LANG', 'en')
+
+def text(value):
+    """plain text, or a table by language: { en = "...", pt-BR = "..." }"""
+    if isinstance(value, dict):
+        return value.get(LANG) or value.get(LANG.split('-')[0]) or value.get('en') or next(iter(value.values()), '')
+    return value
+
+def need(table, key, kind, where):
+    value = table.get(key)
+    if value is None:
+        raise ThemeError('theme.missing_key', (where + key,))
+    if not isinstance(value, kind) or isinstance(value, bool):
+        raise ThemeError('theme.bad_value', (where + key,))
+    return value
+
+q = shlex.quote
+for path in sorted(glob.glob(os.path.join(sys.argv[1], '*', 'theme.toml'))):
+    folder = os.path.dirname(path)
+    tid = os.path.basename(folder)
+    try:
+        if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', tid):
+            raise ThemeError('theme.bad_id')
+        try:
+            with open(path, 'rb') as f:
+                data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as e:
+            raise ThemeError('theme.toml_syntax', (str(e),), 'theme.toml', '?')
+        for name in ('ui.properties', 'colors.toml'):
+            if not os.path.isfile(os.path.join(folder, name)):
+                raise ThemeError('theme.missing_file', (name,))
+        th = data.get('theme', {})
+        name = need(th, 'name', str, 'theme.')
+        version = need(th, 'version', int, 'theme.')
+        profile = th.get('profile', name)
+        desc = text(th.get('description', ''))
+        conf = [f'THEME_PROFILE={q(profile)}']
+        base = data.get('base', {})
+        for key, var in (('folder', 'THEME_BASE'), ('name', 'THEME_BASE_NAME'), ('profile', 'THEME_BASE_PROFILE'),
+                         ('laf', 'THEME_LAF'), ('laf_file', 'THEME_LAF_FILE')):
+            if key in base:
+                conf.append(f'{var}={q(need(base, key, str, "base."))}')
+        font = data.get('font', {})
+        if font:
+            fname = need(font, 'name', str, 'font.')
+            urls = font.get('urls', [])
+            if not isinstance(urls, list) or not all(isinstance(u, str) for u in urls):
+                raise ThemeError('theme.bad_value', ('font.urls',))
+            conf += [f'THEME_FONT_NAME={q(fname)}',
+                     f'THEME_FONT_DIR={q(font.get("dir", fname.replace(" ", "")))}',
+                     f'THEME_FONT_SOURCE={q(text(font.get("source", "")))}',
+                     'THEME_FONT_URLS=(' + ' '.join(q(u) for u in urls) + ')',
+                     f'THEME_FONT_LICENSE={q(font.get("license", ""))}']
+        sel = data.get('terminal', {}).get('selection')
+        if sel is not None:
+            if not isinstance(sel, str) or not COLOR.match(sel):
+                raise ThemeError('theme.bad_value', ('terminal.selection',))
+            argb = int('ff' + sel[1:], 16)
+            conf.append(f'THEME_TERMINAL_SELECTION={argb - (1 << 32)}')     # as NetBeans saves it (signed int)
+        read_colors(os.path.join(folder, 'colors.toml'))                     # validates now, not in the middle of an install
+    except ThemeError as e:
+        say(T('theme.invalid', tid, message(e)))
+        continue
+    p = 'th_' + tid.replace('-', '_')
+    print(f'theme_register {q(tid)} {p} {q(name)} {q(desc)} {version} {q(folder)}')
+    print(f'{p}_config() {{\n  ' + '\n  '.join(conf) + '\n}')
+    legacy = data.get('legacy', {})
+    if legacy:
+        vf, mod = q(legacy.get('version_file', '')), q(legacy.get('module', ''))
+        print(f'{p}_legacy_version() {{\n  if [ -n {vf} ] && [ -f "$UD"/{vf} ]; then cat "$UD"/{vf}\n'
+              f'  elif [ -n {mod} ] && [ -e "$UD/modules/"{mod} ]; then echo "?"\n  fi\n}}')
+PY
+}
+eval "$(theme_load_all "$(dirname "${BASH_SOURCE[0]}")")"

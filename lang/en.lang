@@ -10,7 +10,6 @@ cli.no_modules_dir=modules/ folder not found next to %s. Download the whole nbki
 cli.no_modules=no module in %s.
 cli.repeated_command=repeated command: %s
 cli.unknown_arg=Unknown argument: %s
-cli.no_python=python3 not found.
 cli.yn_yes=[Y/n]
 cli.yn_no=[y/N]
 cli.menu_hint=↑↓ move   Enter choose   Esc quit
@@ -91,6 +90,11 @@ cli.menu_uninstall=Uninstall
 cli.menu_quit=Quit
 cli.ask_uninstall=Uninstall?
 cli.nothing_installed=Nothing installed.
+cli.ask_install=Install %s now? It will run: %s
+cli.python_old=nbkit needs Python 3.11 or newer (found: %s).
+cli.python_manual=install Python 3.11 or newer with your system package manager and run again.
+cli.res_warn=warning
+cli.java_too_old=nbkit modules need Java 17 or newer, and NetBeans runs on %s. Point netbeans_jdkhome in netbeans.conf to a newer Java.
 
 # ---------- JSF checks (modules/jsf.sh) ----------
 jsf.name=JSF checks
@@ -188,6 +192,18 @@ theme.check_profile=editor profile: %s
 theme.check_laf=look and feel: %s
 theme.check_default=(NetBeans default)
 
-# ---------- One Dark Pro Mix theme (modules/themes/one-dark-pro-mix.sh) ----------
-odpm.description=One Dark Pro Mix colors (VS Code), FlatLaf Dark and JetBrains Mono
-odpm.font_source=official JetBrains repository
+# ---------- theme files (theme.toml, colors.toml) ----------
+theme.colors_failed=could not read the colors in %s.
+theme.invalid=Warning: theme "%s" skipped: %s
+theme.error_at=%s (in %s, line %s)
+theme.toml_syntax=TOML syntax error: %s
+theme.color_expected=expected a #rrggbb color after "%s"
+theme.color_twice=two text colors ("%s"); the background color goes after "on"
+theme.token_expected=expected a token name after "%s"
+theme.unknown_word=unknown word: "%s"
+theme.not_text=the value must be a quoted string
+theme.not_table="%s" is not a valid color table
+theme.bad_id=the folder name may only have lowercase letters, digits and hyphens
+theme.missing_key="%s" is missing in theme.toml
+theme.bad_value=invalid value for "%s" in theme.toml
+theme.missing_file=file %s is missing
