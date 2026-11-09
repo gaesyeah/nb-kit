@@ -1,0 +1,47 @@
+<ui:composition template="/WEB-INF/templates/main.xhtml" xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:ui="jakarta.faces.facelets" xmlns:c="jakarta.tags.core" xmlns:p="http://primefaces.org/ui" xmlns:comp="jakarta.faces.composite/comp">
+  <ui:param name="title" value="Customers"/>
+  <ui:param name="notUsed" value="x"/><!--W:unused-->
+  <h:outputText value="lost"/><!--E:tpl.define-->
+  <ui:define name="content">
+    <h:outputText value="#{customerVM.title} #{msg['hello']} #{reportService.name} #{defaultCustomer.name} #{freshBean}"/>
+    <h:outputText value="#{sweetPotato}"/><!--E:el.unknown-->
+    <h:outputText value="#{customerVM.titl}"/><!--E:el.member-->
+    <h:outputText value="#{customerVM.customer.namee}"/><!--E:el.member-->
+    <h:outputText value="#{customerVM.map.anyKey} #{customerVM.items.size()} #{customerVM.format('a')}"/>
+    <h:outputText value="#{customerVM.save}"/><!--E:el.kind-->
+    <p:commandButton value="x" action="#{customerVM.title}"/><!--E:el.kind-->
+    <p:commandButton value="x" action="#{customerVM.delete(customerVM.customer)}" update="table msgs @form"/>
+    <p:commandButton value="x" update="@from"/><!--E:id.keyword-->
+    <p:commandButton value="x" update="tablee"/><!--E:id.missing-->
+    <p:commandButton value="x" update="panel"/><!--W:id.rendered-->
+    <h:panelGroup id="panel" rendered="#{customerVM.canEdit}"/>
+    <h:inputText value="#{customerVM.customer.name}"/>
+    <h:inputText value="#{customerVM.customer.code}"/><!--E:el.readonly-->
+    <h:inputText value="#{customerVM.format('a')}"/><!--E:el.readonly-->
+    <h:outputText rendered="#{customerVM.customer.status eq 'ACTIVEE'}" value="a"/><!--E:el.enum-->
+    <h:outputText rendered="#{customerVM.customer.status eq 'ACTIVE' and customerVM.customer.active}" value="a"/>
+    <p:dataTable id="table" var="row" value="#{customerVM.items}" rowKey="#{row.name}" varStatus="st"><!--W:unused-->
+      <p:ajax event="rowSelect" listener="#{customerVM.save}"/>
+      <p:ajax event="rowSelecte"/><!--E:ajax.event-->
+      <p:column><h:outputText value="#{row.name}"/></p:column>
+      <c:if test="#{row.name != null}"><h:outputText value="a"/></c:if><!--E:jstl.iteration-->
+      <ui:include src="/pages/fragment.xhtml"><ui:param name="item" value="#{row}"/><ui:param name="outerLabel" value="x"/><ui:param name="leftover" value="1"/></ui:include><!--W:unused-->
+    </p:dataTable>
+    <h:outputText value="#{row.name}"/><!--E:el.scope-->
+    <c:forEach items="#{customerVM.items}" var="x"><h:inputText id="repeated" value="#{x.name}"/></c:forEach><!--E:id.duplicate-->
+    <h:outputText id="dup" value="1"/>
+    <h:outputText id="dup" value="2"/><!--E:id.duplicate-->
+    <h:outputText id="1invalid" value="2"/><!--E:id.invalid-->
+    <h:inputText value="#{customerVM.customer.name}" required="true"><f:ajax event="blurr"/></h:inputText><!--E:ajax.event-->
+    <comp:field label="a"><f:ajax event="changed"/></comp:field>
+    <c:set var="local" value="1"/>
+    <h:outputText value="#{local}"/>
+    <c:set var="noUse" value="1"/><!--W:unused-->
+    <h:outputText value="#{items.stream().filter(x -> x.active).map((a, b) -> a).toList()}"/><!--E:el.unknown W:unused-->
+    <h:outputText value="${customerVM.title}" escape="false"/><!--W:el.immediate W:sec.escape-->
+    <ui:include src="/pages/missing.xhtml"/><!--E:tpl.path-->
+    <button onclick="PF('dlgx').show()">a</button><!--W:js.widgetvar-->
+    <p:dialog widgetVar="dlg"/>
+  </ui:define>
+  <ui:define name="footerr"><h:outputText value="x"/></ui:define><!--E:tpl.define-->
+</ui:composition>

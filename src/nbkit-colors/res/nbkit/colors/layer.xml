@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE filesystem PUBLIC "-//NetBeans//DTD Filesystem 1.2//EN" "http://www.netbeans.org/dtds/filesystem-1_2.dtd">
+<filesystem>
+    <folder name="Editors">
+        <folder name="text">
+            <folder name="xml">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="xml-external-parsed-entity">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="x-java">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="x-json">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="javascript">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="css">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="x-el">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="html">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="xhtml">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="scss">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="less">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="x-jsp">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+            <folder name="x-tag">
+                <file name="nbkit-colors-PatternsFactory.instance"/>
+            </folder>
+        </folder>
+    </folder>
+</filesystem>

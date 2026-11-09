@@ -32,8 +32,19 @@ Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File 
 | `bash nbkit.sh uninstall [módulo...] [userdir]` | Remove (sem módulo: todos os instalados) |
 | `bash nbkit.sh check [userdir]` | Com o NetBeans aberto, confere se tudo carregou |
 | `bash nbkit.sh --help` | Ajuda e lista de módulos |
+| `--lang pt-BR` ou `--lang en` | Junto com qualquer comando, troca o idioma |
 
 Os ids dos módulos são `one-dark-pro-mix` e `jsf`. O userdir padrão é o NetBeans mais novo em `~/.netbeans/`; se houver mais de um, o menu pergunta qual usar.
+
+## Idiomas
+
+O terminal fala português ou inglês, conforme o idioma do sistema (`LANG`): português quando ele começa com `pt`, inglês nos outros casos. Para escolher, use `--lang pt-BR` ou `--lang en`, ou a variável `NBKIT_LANG`.
+
+Dentro do NetBeans, as dicas do JSF e a tela de Options seguem o idioma em que o NetBeans roda, que vem do sistema ou do `--locale` no `netbeans.conf`.
+
+Para adicionar um idioma:
+- **Terminal:** copie `lang/en.lang` para `lang/<idioma>.lang` (ex.: `es.lang`) e traduza os valores. O `pt-BR.lang` é a referência: uma chave que faltar sai em português.
+- **NetBeans:** crie `Bundle_<idioma>.properties` ao lado do `Bundle.properties` de cada módulo em `src/` e gere o jar de novo.
 
 ## Requisitos
 
@@ -60,56 +71,56 @@ Os ids dos módulos são `one-dark-pro-mix` e `jsf`. O userdir padrão é o NetB
 
 ## Criar um tema
 
-Tudo o que o One Dark Pro Mix tem além das cores fica no motor de temas, em `modulos/temas/_motor.sh`. Um tema novo só descreve as cores. O motor já cuida de:
+Tudo o que o One Dark Pro Mix tem além das cores fica no motor de temas, em `modules/themes/_engine.sh`. Um tema novo só descreve as cores. O motor já cuida de:
 
 - criar o perfil de cores como cópia do perfil base da sua versão do NetBeans, sem mexer no original;
 - fazer backup, restaurar, desinstalar e voltar ao visual e ao perfil de antes;
 - preservar as personalizações de quem usa;
 - instalar a fonte se ela faltar, e removê-la depois só se foi o nbkit que instalou;
-- instalar o módulo de coloração (`nbkit-cores.jar`): chamadas, objetos, constantes, unidades, funções, colchetes por nível, DOCTYPE...;
+- instalar o módulo de coloração (`nbkit-colors.jar`): chamadas, objetos, constantes, unidades, funções, colchetes por nível, DOCTYPE...;
 - aplicar a cor de seleção do terminal;
 - desfazer tudo com Ctrl+C;
 - conferir com o NetBeans aberto (`check`).
 
-Crie `modulos/temas/<id>.sh`. O nbkit carrega o arquivo sozinho e o tema aparece no menu.
+Crie `modules/themes/<id>.sh`. O nbkit carrega o arquivo sozinho e o tema aparece no menu.
 
 ```bash
-source "$(dirname "${BASH_SOURCE[0]}")/_motor.sh"
-tema_registrar meu-tema mt "Meu Tema" "Descrição curta" 1
+source "$(dirname "${BASH_SOURCE[0]}")/_engine.sh"
+theme_register my-theme mt "My Theme" "Descrição curta" 1
 
 mt_config() {
-  TEMA_PERFIL="Meu Tema"                    # nome do perfil em Tools > Options > Fonts & Colors
-  TEMA_TERMINAL_SELECAO=-12499634           # opcional: cor de seleção do terminal (ARGB como inteiro)
-  TEMA_FONTE_NOME="JetBrains Mono"          # opcional: fonte do editor
-  TEMA_FONTE_PASTA="JetBrainsMono"          # pasta em ~/.local/share/fonts
-  TEMA_FONTE_URLS=("https://.../Regular.ttf" "https://.../Bold.ttf")
-  TEMA_FONTE_LICENCA="https://.../OFL.txt"
+  THEME_PROFILE="My Theme"                  # nome do perfil em Tools > Options > Fonts & Colors
+  THEME_TERMINAL_SELECTION=-12499634        # opcional: cor de seleção do terminal (ARGB como inteiro)
+  THEME_FONT_NAME="JetBrains Mono"          # opcional: fonte do editor
+  THEME_FONT_DIR="JetBrainsMono"            # pasta em ~/.local/share/fonts
+  THEME_FONT_URLS=("https://.../Regular.ttf" "https://.../Bold.ttf")
+  THEME_FONT_LICENSE="https://.../OFL.txt"
 }
 
 # interface (FlatLaf): conteúdo do arquivo de propriedades do visual
-mt_interface() {
+mt_ui() {
   cat <<'EOF'
-nb.preferred.color.profile=Meu Tema
+nb.preferred.color.profile=My Theme
 @background=#1e1e1e
 @foreground=#d4d4d4
 EOF
 }
 
 # editor
-mt_cores() {
-  cores_tokens <<'EOF'
+mt_colors() {
+  colors_tokens <<'EOF'
     <fontcolor name="default" foreColor="ffd4d4d4" bgColor="ff1e1e1e"/>
     <fontcolor name="comment" foreColor="ff6a9955"/>
 EOF
-  cores_destaques <<'EOF'
+  colors_highlights <<'EOF'
     <fontcolor name="selection" bgColor="ff264f78"/>
 EOF
-  cores_anotacoes <<'EOF'
+  colors_annotations <<'EOF'
 EOF
-  cores_linguagem text/x-java <<'EOF'
+  colors_language text/x-java <<'EOF'
     <fontcolor name="method-declaration" foreColor="ffdcdcaa"/>
 EOF
-  cores_extras text/javascript <<'EOF'
+  colors_extras text/javascript <<'EOF'
     <fontcolor name="nbkit-call" foreColor="ffdcdcaa"/>
 EOF
 }
@@ -117,23 +128,23 @@ EOF
 
 O que cada parte faz:
 
-- **`tema_registrar <id> <prefixo> "<nome>" "<descrição>" <versão>`:** registra o tema no menu e liga as funções do nbkit ao motor. Aumente a versão quando mudar as cores, para o menu oferecer a atualização.
-- **`<prefixo>_config`:** só `TEMA_PERFIL` é obrigatório. Os padrões são:
-  - base `FlatLafDark` (`TEMA_BASE`, com `TEMA_BASE_NOME` e `TEMA_BASE_PERFIL` para as mensagens e para a desinstalação);
-  - visual `com.formdev.flatlaf.FlatDarkLaf` (`TEMA_LAF`), com o arquivo `FlatDarkLaf.properties` (`TEMA_LAF_ARQ`).
+- **`theme_register <id> <prefixo> "<nome>" "<descrição>" <versão>`:** registra o tema no menu e liga as funções do nbkit ao motor. Aumente a versão quando mudar as cores, para o menu oferecer a atualização. Para a descrição sair no idioma do terminal, crie uma chave nos arquivos de `lang/` e passe `"$(t <chave>)"`, como o One Dark Pro Mix faz.
+- **`<prefixo>_config`:** só `THEME_PROFILE` é obrigatório. Os padrões são:
+  - base `FlatLafDark` (`THEME_BASE`, com `THEME_BASE_NAME` e `THEME_BASE_PROFILE` para as mensagens e para a desinstalação);
+  - visual `com.formdev.flatlaf.FlatDarkLaf` (`THEME_LAF`), com o arquivo `FlatDarkLaf.properties` (`THEME_LAF_FILE`).
 
-  Sem `TEMA_FONTE_NOME`, a fonte não é alterada. Sem `TEMA_TERMINAL_SELECAO`, o terminal não é alterado.
-- **`<prefixo>_interface`:** chaves do FlatLaf (`@background`, `Component.focusColor`...). A linha `nb.preferred.color.profile=<perfil>` faz o NetBeans manter o perfil do tema ao trocar de visual. O motor põe a marca do tema na primeira linha e mescla as chaves que a pessoa já tinha.
-- **`<prefixo>_cores`:** linhas `<fontcolor .../>` do NetBeans, com cores em `ffRRGGBB`.
-  - `cores_tokens` vale para todas as linguagens (`default`, `comment`, `keyword`, `string`, `error`, `warning`...).
-  - `cores_destaques` cobre seleção, linha atual, busca, números de linha...
-  - `cores_anotacoes` são os sublinhados que os módulos usam.
-  - `cores_linguagem <mime>` são os tokens de uma linguagem.
-  - `cores_extras <mime>` são as categorias do módulo de coloração.
+  Sem `THEME_FONT_NAME`, a fonte não é alterada. Sem `THEME_TERMINAL_SELECTION`, o terminal não é alterado.
+- **`<prefixo>_ui`:** chaves do FlatLaf (`@background`, `Component.focusColor`...). A linha `nb.preferred.color.profile=<perfil>` faz o NetBeans manter o perfil do tema ao trocar de visual. O motor põe a marca do tema na primeira linha e mescla as chaves que a pessoa já tinha.
+- **`<prefixo>_colors`:** linhas `<fontcolor .../>` do NetBeans, com cores em `ffRRGGBB`.
+  - `colors_tokens` vale para todas as linguagens (`default`, `comment`, `keyword`, `string`, `error`, `warning`...).
+  - `colors_highlights` cobre seleção, linha atual, busca, números de linha...
+  - `colors_annotations` são os sublinhados que os módulos usam.
+  - `colors_language <mime>` são os tokens de uma linguagem.
+  - `colors_extras <mime>` são as categorias do módulo de coloração.
 
   Uma cor que o tema não define fica como no perfil base. Para descobrir o nome de um token, mude a cor dele em Tools > Options > Fonts & Colors e veja o arquivo gravado em `~/.netbeans/<versão>/config/Editors/<mime>/FontsColors/`.
 
-Categorias do módulo de coloração, por linguagem (em `cores_extras`):
+Categorias do módulo de coloração, por linguagem (em `colors_extras`):
 
 | Linguagem | Categorias |
 |---|---|
@@ -146,7 +157,7 @@ Categorias do módulo de coloração, por linguagem (em `cores_extras`):
 
 Os colchetes são `nbkit-bracket1`, `nbkit-bracket2` e `nbkit-bracket3`, um por nível, e `nbkit-bracket-unexpected` para o colchete sem par.
 
-O `modulos/temas/one-dark-pro-mix.sh` é um exemplo completo.
+O `modules/themes/one-dark-pro-mix.sh` é um exemplo completo.
 
 ## Verificações de JSF
 
@@ -154,7 +165,7 @@ O NetBeans checa tags, atributos e a sintaxe do EL, mas não pega erros que só 
 - **Vermelho:** quebra com certeza.
 - **Amarelo:** provável erro, ou depende de algo fora do arquivo.
 
-Cada regra liga e desliga em **Tools > Options > Editor > JSF**.
+Cada regra liga e desliga em **Tools > Options > Editor > JSF**. As mensagens saem em português ou inglês, conforme o idioma do NetBeans.
 
 - **EL:**
   - nome que não existe;
@@ -198,16 +209,22 @@ Os beans (Spring `@Component` e derivados, `@Bean`, CDI `@Named`, `@ManagedBean`
 ```
 nbkit/
 ├── nbkit.sh                     CLI
-├── modulos/
-│   ├── LEIAME.md                como criar um módulo
-│   ├── temas/
-│   │   ├── _motor.sh            motor de temas (veja "Criar um tema")
+├── lang/
+│   ├── pt-BR.lang               textos do terminal em português (referência)
+│   └── en.lang                  textos do terminal em inglês
+├── modules/
+│   ├── README.md                como criar um módulo
+│   ├── themes/
+│   │   ├── _engine.sh           motor de temas (veja "Criar um tema")
 │   │   └── one-dark-pro-mix.sh  só as cores do tema
 │   └── jsf.sh
-└── fontes/                      código Java dos módulos do NetBeans
+└── src/                         código Java dos módulos do NetBeans
+    ├── nbkit-core/              fechar o NetBeans pelo terminal
+    ├── nbkit-colors/            coloração por padrão de texto (usado pelos temas)
+    └── nbkit-jsf/               verificações de JSF, com o teste em test/
 ```
 
-Para adicionar um módulo, basta colocar um `.sh` em `modulos/` seguindo o [contrato](modulos/LEIAME.md).
+Para adicionar um módulo, basta colocar um `.sh` em `modules/` seguindo o [contrato](modules/README.md).
 
 ## Problemas
 

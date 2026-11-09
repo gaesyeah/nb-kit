@@ -1,93 +1,133 @@
 #!/usr/bin/env bash
-# nbkit: kit de módulos para o Apache NetBeans no Linux (temas e verificações).
-# Este arquivo é o CLI: menu, status, progresso, fechar/abrir o NetBeans, backups e ponto de restauração.
-# Cada módulo fica em modulos/ (temas em modulos/temas/) e é carregado com source. Veja modulos/LEIAME.md.
+# nbkit: kit of modules for Apache NetBeans on Linux (themes and checks).
+# This file is the CLI: menu, status, progress, closing/opening NetBeans, backups and restore point.
+# Each module lives in modules/ (themes in modules/themes/) and is loaded with source. See modules/README.md.
+# Everything shown in the terminal comes from lang/<language>.lang (see "t" below).
 set -euo pipefail
-# Ctrl+C sai com código 130 (o trap de saída usa isso para desfazer uma instalação pela metade)
+# Ctrl+C exits with code 130 (the exit trap uses it to undo a half-done install)
 trap 'exit 130' INT TERM HUP
-NBKIT_VERSION=1
+NBKIT_VERSION=2
 SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")"
 NBKIT_DIR="$(dirname "$SELF")"
 ME="$(basename "$SELF")"
 
 if [ -t 1 ]; then B=$'\e[1m'; BL=$'\e[1;34m'; G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; D=$'\e[2m'; N=$'\e[0m'
 else B=; BL=; G=; Y=; R=; D=; N=; fi
-die() { echo "${R}Erro:${N} $*" >&2; exit 1; }
+
+# ---------- language ----------
+# lang/<id>.lang: one "key=value" per line, # for comments. Values are printf formats (%s, \n) and may use
+# {B} {N} {D} {G} {Y} {R} {BL} for bold, normal, dim and colors. pt-BR is the reference: missing keys come from it.
+[ -f "$NBKIT_DIR/lang/pt-BR.lang" ] || { echo "nbkit: lang/ folder not found next to $ME. Download the whole nbkit folder." >&2; exit 1; }
+ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --lang=*) NBKIT_LANG="${1#--lang=}" ;;
+    --lang) NBKIT_LANG="${2:-}"; shift ;;
+    *) ARGS+=("$1") ;;
+  esac
+  shift
+done
+set -- ${ARGS[@]+"${ARGS[@]}"}
+# language: --lang, NBKIT_LANG or the system one (LC_ALL, LC_MESSAGES, LANG); without a file for it, English
+lang_pick() {
+  local want="${NBKIT_LANG:-}" l c
+  if [ -z "$want" ]; then
+    l="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"; l="${l%%.*}"; l="${l%%@*}"
+    case "$l" in pt*) want=pt-BR ;; ''|C|POSIX) want=en ;; *) want="${l/_/-}" ;; esac
+  fi
+  for c in "$want" "${want%%-*}" en; do
+    if [ -f "$NBKIT_DIR/lang/$c.lang" ]; then echo "$c"; return 0; fi
+  done
+  echo pt-BR
+}
+declare -A L=()
+lang_load() {
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|'#'*) continue ;; esac
+    L["${line%%=*}"]="${line#*=}"
+  done < "$1"
+}
+NBKIT_LANG="$(lang_pick)"
+export NBKIT_LANG
+lang_load "$NBKIT_DIR/lang/pt-BR.lang"
+[ "$NBKIT_LANG" = pt-BR ] || lang_load "$NBKIT_DIR/lang/$NBKIT_LANG.lang"
+# the Python parts of the modules read the same files
+NBKIT_LANG_FILES="$NBKIT_DIR/lang/pt-BR.lang"$'\n'"$NBKIT_DIR/lang/$NBKIT_LANG.lang"
+export NBKIT_LANG_FILES
+# t <key> [args...]: prints the text of the key, filling %s with the args
+t() {
+  local f="${L[$1]-$1}"; shift
+  f="${f//\{BL\}/$BL}"; f="${f//\{B\}/$B}"; f="${f//\{N\}/$N}"; f="${f//\{D\}/$D}"
+  f="${f//\{G\}/$G}"; f="${f//\{Y\}/$Y}"; f="${f//\{R\}/$R}"
+  # shellcheck disable=SC2059
+  printf -- "$f" "$@"
+}
+
+die() { echo "${R}$(t cli.error)${N} $*" >&2; exit 1; }
 STEP=0; TOTAL=0
 step() { STEP=$((STEP + 1)); printf '%s[%d/%d]%s %s\n' "$BL" "$STEP" "$TOTAL" "$N" "$*"; }
 ok()   { printf '      %s✓%s %s\n' "$G" "$N" "$*"; }
 info() { printf '      %s%s%s\n' "$D" "$*" "$N"; }
 warn() { printf '      %s!%s %s\n' "$Y" "$N" "$*"; }
 
-# ---------- registro de módulos ----------
-# nbkit_registrar <id> <prefixo das funções> <categoria: tema|ferramenta> <nome> <descrição> <versão>
+# ---------- module registry ----------
+# nbkit_register <id> <function prefix> <category: theme|tool> <name> <description> <version>
 MODS=()
 declare -A MOD_FN=() MOD_CAT=() MOD_NAME=() MOD_DESC=() MOD_VER=()
-nbkit_registrar() {
+nbkit_register() {
   MODS+=("$1"); MOD_FN[$1]="$2"; MOD_CAT[$1]="$3"; MOD_NAME[$1]="$4"; MOD_DESC[$1]="$5"; MOD_VER[$1]="$6"
 }
-# chama <prefixo>_<função> do módulo; devolve 0 sem fazer nada se o módulo não tiver a função
+# calls <prefix>_<function> of the module; returns 0 doing nothing if the module does not have it
 mod_call() {
   local id="$1" fn="${MOD_FN[$1]}_$2"; shift 2
   if declare -F "$fn" >/dev/null; then "$fn" "$@"; fi
 }
 mod_has() { declare -F "${MOD_FN[$1]}_$2" >/dev/null; }
-mod_status() { mod_call "$1" status; }  # nao | ok | antiga:<v> | nova:<v>
-# compara a versão instalada (arquivo nbkit/<id>.version, ou a antiga passada em $2) com a deste nbkit
+mod_status() { mod_call "$1" status; }  # no | ok | old:<v> | new:<v>
+# compares the installed version (file nbkit/<id>.version, or the legacy one given in $2) with this nbkit's
 version_status() {
   local v; v="$(cat "$(mod_version_file "$1")" 2>/dev/null || echo "${2:-}")"
-  if [ -z "$v" ]; then echo "antiga:?"
+  if [ -z "$v" ]; then echo "old:?"
   elif [ "$v" = "${MOD_VER[$1]}" ]; then echo ok
-  elif [[ "$v" =~ ^[0-9]+$ ]] && [ "$v" -gt "${MOD_VER[$1]}" ]; then echo "nova:$v"
-  else echo "antiga:$v"; fi
+  elif [[ "$v" =~ ^[0-9]+$ ]] && [ "$v" -gt "${MOD_VER[$1]}" ]; then echo "new:$v"
+  else echo "old:$v"; fi
 }
-mod_installed() { [ "$(mod_status "$1")" != nao ]; }
+mod_installed() { [ "$(mod_status "$1")" != no ]; }
 mod_label() {
   local id="$1"
-  if [ "${MOD_CAT[$id]}" = tema ]; then echo "Tema ${MOD_NAME[$id]}"; else echo "${MOD_NAME[$id]}"; fi
+  if [ "${MOD_CAT[$id]}" = theme ]; then t cli.theme_label "${MOD_NAME[$id]}"; echo; else echo "${MOD_NAME[$id]}"; fi
 }
 
 usage() {
   local ids; ids="$(printf '%s ' "${MODS[@]}")"
-  cat <<EOF
-nbkit v$NBKIT_VERSION: módulos para o NetBeans
-
-Uso:
-  bash $ME                                menu: mostra o status e o que dá pra fazer
-  bash $ME install [módulo...] [userdir]  instala ou atualiza (sem módulo: todos)
-  bash $ME uninstall [módulo...] [userdir] remove (sem módulo: todos os instalados)
-  bash $ME check [userdir]                depois de abrir o NetBeans: confere se tudo carregou
-  bash $ME --help                         esta ajuda
-
-Módulos: ${ids% }
-Se a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash $ME
-EOF
+  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
 }
 
-# ---------- carrega os módulos (temas primeiro) ----------
+# ---------- loads the modules (themes first) ----------
 declare -A LOADED=()
-[ -d "$NBKIT_DIR/modulos" ] || die "pasta modulos/ não encontrada ao lado de $ME. Baixe a pasta nbkit inteira."
-for f in "$NBKIT_DIR"/modulos/temas/*.sh "$NBKIT_DIR"/modulos/*.sh "$NBKIT_DIR"/modulos/*/*.sh; do
-  case "${f##*/}" in _*) continue ;; esac   # _motor.sh etc.: carregados pelos próprios módulos
-  case "$f" in "$NBKIT_DIR"/modulos/temas/*) [ -n "${LOADED[$f]:-}" ] && continue ;; esac
+[ -d "$NBKIT_DIR/modules" ] || die "$(t cli.no_modules_dir "$ME")"
+for f in "$NBKIT_DIR"/modules/themes/*.sh "$NBKIT_DIR"/modules/*.sh "$NBKIT_DIR"/modules/*/*.sh; do
+  case "${f##*/}" in _*) continue ;; esac   # _engine.sh etc.: loaded by the modules themselves
+  case "$f" in "$NBKIT_DIR"/modules/themes/*) [ -n "${LOADED[$f]:-}" ] && continue ;; esac
   LOADED[$f]=1
   [ -f "$f" ] || continue
   # shellcheck disable=SC1090
   source "$f"
 done
-[ ${#MODS[@]} -gt 0 ] || die "nenhum módulo em $NBKIT_DIR/modulos."
+[ ${#MODS[@]} -gt 0 ] || die "$(t cli.no_modules "$NBKIT_DIR/modules")"
 
-# ---------- argumentos ----------
+# ---------- arguments ----------
 ACTION=""; UD=""; SEL=()
 for a in "$@"; do
   case "$a" in
     -h|--help|help) usage; exit 0 ;;
-    install|uninstall|check) [ -z "$ACTION" ] && ACTION="$a" || die "comando repetido: $a" ;;
-    todos|all) SEL=("${MODS[@]}") ;;
+    install|uninstall|check) [ -z "$ACTION" ] && ACTION="$a" || die "$(t cli.repeated_command "$a")" ;;
+    all|todos) SEL=("${MODS[@]}") ;;
     *)
       if [ -n "${MOD_FN[$a]:-}" ]; then SEL+=("$a")
       elif [ -d "$a" ]; then UD="$(readlink -f "$a")"
-      else echo "Argumento desconhecido: $a" >&2; echo >&2; usage >&2; exit 1; fi ;;
+      else t cli.unknown_arg "$a" >&2; echo >&2; echo >&2; usage >&2; exit 1; fi ;;
   esac
 done
 
@@ -96,20 +136,20 @@ if [ -t 0 ] && [ -t 1 ]; then
   if [ $# -eq 0 ]; then MENU=1; INTERACTIVE=1; elif [ "${NBKIT_TTY:-}" = 1 ]; then INTERACTIVE=1; fi
 fi
 [ -n "$ACTION" ] || ACTION=install
-command -v python3 >/dev/null || die "python3 não encontrado."
+command -v python3 >/dev/null || die "$(t cli.no_python)"
 
 # ---------- terminal ----------
-# pergunta s/n; a letra maiúscula é o padrão do Enter
+# yes/no question; the uppercase letter is the Enter default (Y or N in $2)
 ask_yn() {
-  local a hint="[s/N]"; [ "$2" = S ] && hint="[S/n]"
+  local a hint; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
   printf '%s %s ' "$1" "$hint"
   IFS= read -r a </dev/tty || a=""
   a="${a,,}"
-  if [ -z "$a" ]; then [ "$2" = S ]; return; fi
+  if [ -z "$a" ]; then [ "$2" = Y ]; return; fi
   case "$a" in s|sim|y|yes) return 0 ;; *) return 1 ;; esac
 }
 
-# menu com setas; resultado em MENU_IDX (-1 = saiu com Esc ou q). MENU_HINT troca a legenda.
+# arrow key menu; result in MENU_IDX (-1 = left with Esc or q). MENU_HINT changes the legend.
 menu() {
   local -a o=("$@"); local n=$# i=${MENU_START:-0} j k rest
   [ "$i" -lt "$n" ] || i=0
@@ -119,7 +159,7 @@ menu() {
       if [ $j -eq $i ]; then printf '\r\e[K  %s> %s%s\n' "$BL$B" "${o[j]}" "$N"
       else printf '\r\e[K    %s\n' "${o[j]}"; fi
     done
-    printf '\r\e[K  %s%s%s' "$D" "${MENU_HINT:-↑↓ navegar   Enter escolher   Esc sair}" "$N"
+    printf '\r\e[K  %s%s%s' "$D" "${MENU_HINT:-$(t cli.menu_hint)}" "$N"
     IFS= read -rsn1 k </dev/tty || k=q
     if [ "$k" = $'\e' ]; then
       rest=""; IFS= read -rsn2 -t 0.05 rest </dev/tty || true
@@ -137,12 +177,12 @@ menu() {
   MENU_IDX=$i
 }
 
-# spinner até a condição ser verdadeira; qualquer tecla cancela (retorna 1)
+# spinner until the condition is true; any key cancels (returns 1)
 spin_until() {
-  local sp='|/-\' i=0 k
+  local sp='|/-\' i=0 k cancel; cancel="$(t cli.enter_cancels)"
   printf '\e[?25l'; trap 'printf "\r\e[K\e[?25h"; exit 130' INT
   while ! "$2"; do
-    printf '\r\e[K  %s%s%s %s  %s(Enter cancela)%s' "$Y" "${sp:i%4:1}" "$N" "$1" "$D" "$N"; i=$((i + 1))
+    printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$1" "$D" "$cancel" "$N"; i=$((i + 1))
     if IFS= read -rsn1 -t 0.25 k </dev/tty; then
       IFS= read -rsn5 -t 0.05 k </dev/tty || true
       printf '\r\e[K\e[?25h'; trap 'exit 130' INT; return 1
@@ -167,12 +207,12 @@ if [ -z "$UD" ]; then
   mapfile -t UDS < <(list_userdirs)
   if [ $MENU = 1 ] && [ ${#UDS[@]} -gt 1 ]; then
     header
-    echo "Achei mais de um NetBeans. Em qual deles?"
+    t cli.which_userdir; echo
     echo
     labels=()
     for d in "${UDS[@]}"; do
       l="NetBeans ${d##*/}   ${d/#$HOME/\~}"
-      [ -e "$d/modules/nbkit-core.jar" ] || [ -e "$d/modules/com-onedarkmix-netbeans.jar" ] && l="$l   (nbkit instalado)"
+      [ -e "$d/modules/nbkit-core.jar" ] || [ -e "$d/modules/com-onedarkmix-netbeans.jar" ] && l="$l   $(t cli.userdir_has_nbkit)"
       labels+=("$l")
     done
     menu "${labels[@]}"
@@ -183,14 +223,14 @@ if [ -z "$UD" ]; then
     UD="${UDS[0]:-}"
   fi
 fi
-[ -n "$UD" ] || die "userdir não encontrado. Veja em Help > About (User directory) e passe como argumento."
-[ -d "$UD/config" ] || die "'$UD' não parece um userdir do NetBeans (sem pasta config/). Abra o NetBeans uma vez antes."
+[ -n "$UD" ] || die "$(t cli.no_userdir)"
+[ -d "$UD/config" ] || die "$(t cli.not_userdir "$UD")"
 C="$UD/config"
 STATEDIR="$UD/nbkit"
 mod_version_file() { echo "$STATEDIR/$1.version"; }
 
-# ---------- NetBeans aberto/fechado ----------
-# processos do NetBeans que usam este userdir (o launcher passa --userdir para o java)
+# ---------- NetBeans open/closed ----------
+# NetBeans processes using this userdir (the launcher passes --userdir to java)
 nb_pids() {
   local p
   for p in $(pgrep -f 'org.netbeans.Main' 2>/dev/null || true); do
@@ -206,13 +246,13 @@ nb_running() {
 nb_closed() { ! nb_running; }
 CORE_JAR="$UD/modules/nbkit-core.jar"
 CORE_XML="$C/Modules/nbkit-core.xml"
-# o log desta sessão já listou os módulos ligados (e é mais novo que a instalação)
+# the log of this session already listed the enabled modules (and is newer than the install)
 nb_loaded() {
   local l="$UD/var/log/messages.log"
   [ -e "$l" ] && [ "$l" -nt "$CORE_JAR" ] && grep -q 'Turning on modules' "$l"
 }
 
-# como abrir o NetBeans que usou este userdir por último (comando em LAUNCH)
+# how to open the NetBeans that last used this userdir (command in LAUNCH)
 find_launcher() {
   local f inst=""
   LAUNCH=()
@@ -230,15 +270,15 @@ find_launcher() {
   fi
   if [ ${#LAUNCH[@]} -eq 0 ] && command -v netbeans >/dev/null 2>&1; then LAUNCH=("$(command -v netbeans)"); fi
   [ ${#LAUNCH[@]} -gt 0 ] || return 1
-  # o launcher sozinho escolhe o java do sistema, que pode ser antigo demais (o atalho do menu pode usar outro);
-  # usa o mesmo Java com que o NetBeans rodou da última vez. Flatpak e Snap já trazem o próprio Java.
+  # the launcher alone picks the system java, which may be too old (the menu shortcut may use another one);
+  # use the same Java NetBeans ran with last time. Flatpak and Snap bring their own Java.
   case "${LAUNCH[0]}" in flatpak|/snap/*) ;; *)
     local jdk; jdk="$(nb_java_home)"
     if [ -n "$jdk" ]; then LAUNCH+=(--jdkhome "$jdk"); fi ;;
   esac
   return 0
 }
-# Java do NetBeans: o do processo aberto (guardado em NB_JDK) ou o "Java Home" do log da última execução
+# NetBeans Java: the one of the open process (kept in NB_JDK) or the "Java Home" of the last run's log
 NB_JDK=""
 remember_java() {
   local p j
@@ -260,13 +300,13 @@ nb_java_home() {
 }
 open_netbeans() {
   (cd "$HOME" && setsid "${LAUNCH[@]}" >/dev/null 2>&1 </dev/null &)
-  ok "abrindo o NetBeans"
+  ok "$(t cli.opening_netbeans)"
 }
 
-# pede para o NetBeans fechar como no File > Exit: ele mesmo pergunta sobre arquivos não salvos e processos rodando.
-# 1) opção --nbkit-close do módulo base (ou --onedark-close das versões antigas do tema), pelo launcher;
-# 2) wmctrl, se existir: fecha a janela principal como o X da janela;
-# 3) sem nenhum dos dois: pede para você fechar.
+# asks NetBeans to close as in File > Exit: it asks about unsaved files and running processes itself.
+# 1) the --nbkit-close option of the base module (or --onedark-close of old theme versions), through the launcher;
+# 2) wmctrl, if present: closes the main window like the window's X;
+# 3) with neither: asks you to close it.
 close_option() {
   if grep -aqs 'nbkit/core/CloseOption' "$CORE_JAR"; then echo --nbkit-close
   elif grep -aqs 'onedarkmix/netbeans/CloseOption' "$UD/modules/com-onedarkmix-netbeans.jar"; then echo --onedark-close
@@ -292,73 +332,82 @@ close_netbeans() {
     for id in $(nb_windows); do wmctrl -i -c "$id" && how=wm; done
   fi
   if [ -n "$how" ]; then
-    info "pedi para o NetBeans fechar (como no File > Exit)"
-    info "se ele perguntar sobre arquivos não salvos ou processos rodando, responda lá"
-    spin_until "Esperando o NetBeans fechar" nb_closed
+    info "$(t cli.asked_to_close)"
+    info "$(t cli.answer_there)"
+    spin_until "$(t cli.waiting_close)" nb_closed
   else
-    info "não consegui pedir para ele fechar sozinho"
-    spin_until "Feche o NetBeans para continuar" nb_closed
+    info "$(t cli.could_not_ask)"
+    spin_until "$(t cli.close_to_continue)" nb_closed
   fi
 }
-# garante o NetBeans fechado antes de mexer em arquivos
+# makes sure NetBeans is closed before touching files
 ensure_closed() {
   nb_running || return 0
   remember_java
-  [ $INTERACTIVE = 1 ] || die "o NetBeans parece estar aberto. Feche e rode de novo."
+  [ $INTERACTIVE = 1 ] || die "$(t cli.nb_open_die)"
   if can_close; then
-    if [ "${NBKIT_CLOSE:-}" != 1 ] && ! ask_yn "O NetBeans está aberto. Fechar ele agora para continuar?" S; then
-      echo "Nada foi alterado."; exit 0
+    if [ "${NBKIT_CLOSE:-}" != 1 ] && ! ask_yn "$(t cli.ask_close)" Y; then
+      t cli.nothing_changed; echo; exit 0
     fi
-    close_netbeans || { echo "Cancelado. Nada foi alterado."; exit 0; }
+    close_netbeans || { t cli.cancelled; echo; exit 0; }
   else
-    spin_until "O NetBeans está aberto. Feche ele para continuar" nb_closed || { echo "Cancelado. Nada foi alterado."; exit 0; }
+    spin_until "$(t cli.nb_open_close_it)" nb_closed || { t cli.cancelled; echo; exit 0; }
   fi
-  ok "NetBeans fechado"
+  ok "$(t cli.nb_closed)"
   echo
 }
 
-# ---------- módulo base (nbkit.core): só a opção de fechar o NetBeans pelo terminal ----------
+# ---------- base module (nbkit.core): only the option to close NetBeans from the terminal ----------
 core_install() {
   mkdir -p "$UD/modules" "$C/Modules"
   base64 -d > "$CORE_JAR" <<'B64'
-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
-LmNsYXNzUEsFBgAAAAAHAAcA3QEAAPQFAAAAAA==
+UEsDBAoAAAgAAPOFaV0AAAAAAAAAAAAAAAAJAAQATUVUQS1JTkYv/soAAFBLAwQUAAgICADzhWld
+AAAAAAAAAAAAAAAAFAAAAE1FVEEtSU5GL01BTklGRVNULk1GZZC7TsNAEEV7S/6HKUFix143CBcu
+QlIkIqJA0K93J9EIM7vaR6Tk65EDQoCrke499xSzN8IHSlm9UUzspQeNbV09B5LteqP23pWJepDx
+nTNaH+l/p14CWT6wNZm9/NboBfrkrZn4wnJUqyLuR9zM4uYrwhB9oJiZ0mK/Myej1hRIHIllSj3M
+EQyg7xfw9/mL+3hEoTySkYQfVyJhInE+5NR0MECHdQXt3ZX0gYQdYck8YWEY4GF+zmMkk8mp1bmH
+TmOLukMNN69jkVxu66quPgFQSwcI64jueNEAAABWAQAAUEsDBAoAAAgAABV/aV0AAAAAAAAAAAAA
+AAASAAAATUVUQS1JTkYvc2VydmljZXMvUEsDBBQACAgIABV/aV0AAAAAAAAAAAAAAAA7AAAATUVU
+QS1JTkYvc2VydmljZXMvb3JnLm5ldGJlYW5zLnNwaS5zZW5kb3B0cy5PcHRpb25Qcm9jZXNzb3LL
+S8rOLNFLzi9K1XPOyS9O9S8oyczP4wIAUEsHCDcR4nQZAAAAFwAAAFBLAwQKAAAIAAAVf2ldAAAA
+AAAAAAAAAAAABgAAAG5ia2l0L1BLAwQKAAAIAADvhWldAAAAAAAAAAAAAAAACwAAAG5ia2l0L2Nv
+cmUvUEsDBBQACAgIAO+FaV0AAAAAAAAAAAAAAAAcAAAAbmJraXQvY29yZS9CdW5kbGUucHJvcGVy
+dGllc12NMQrCQBBF+5xiwCYB9wKCjSSFhbHwBJvNj7u4OxN2JujxBS0E6/d4b0c8PZJRkIoDGV6m
+pFGeTIlphJ3gWakd+J6Txj3NWPyWrWuuK/jcD+4i85bhRl9w/KT+yS1KNddDQ02rJeGvRpNXUBuy
+KPR3WqoUsggy1JLY5655A1BLBwjzPV5ZfgAAAKMAAABQSwMEFAAICAgA74VpXQAAAAAAAAAAAAAA
+AB8AAABuYmtpdC9jb3JlL0J1bmRsZV9wdC5wcm9wZXJ0aWVzXc2xCsIwEIfxvU9x4NIOeQGhS6mD
+g3XoE8T0rw0muXB3AR9fEAdx/uD7HajcntEosOBIhpexUmY18RsrFaYFNsEXpb6yWHs06NBdK8p5
+PrkLby3BLT5j/Iz+y7qzmJuhQWK1yGWcvII2/rr9HWH3Qj9ORWIySI7Fp6F7A1BLBwieIF6bfAAA
+AKIAAABQSwMEFAAICAgAFX9pXQAAAAAAAAAAAAAAABwAAABuYmtpdC9jb3JlL0Nsb3NlT3B0aW9u
+LmNsYXNznZXfVtxUGMV/hwEyZEIZ/ttKAYHqTG2botaqoWg7UFubKW0HudCrTDgMKeFkVnJC5VF8
+C1vXUuyFD+DymWxXMrMEoUL18uTbe3/7+3NO/vjr5e/ALb416aFg0GvRR7+gGsUtW0ndlJ5K7KQd
+2IlUm1FbJ/ZaWweRehRHvkySKBb0LwUq0MuCQqW6MUCRAQPTooQlmFDNnUDbfhRLuxZGieywBX01
+d62xKphzz8rkmJxjyKBsMcyIYPypt+fZqQ5CuxaFofQzUCIYSALVCqXO1Ocrbo4KPdWy15pPpa+d
+qntIbEjtlBhj3GDCYpJ3BIOH0brXFpT8SGkvUMkDuS8Yf5PgdyPABYt3mRIU4lQJJirVI8AnqVJe
+M5SOyTQzBrMW7zEnGM0h3jNtr+5JpR+nMpWCUqD2oh3pelrGgsnKm4SqGyYLXDJ43+IDKoKprH1R
+W6pgU9pusCX9fT+UdU95rUzFbEm9Ire8NNSC2UrVPQ3uZNqXLT7MNqBX/hBog6uC2bMmVIBXr4pc
+F5TycV/1s0mbXOEji4/5RDD0LNDbUapvx610VyotuFmpHamvoeNAtZzq2csg6K1Fm1Iw5AZKPkx3
+mzJez1rTqbWDSgTDlePzFgw0gpbydBpLwY3j8aWzcy87AqPdWXzBYuUUxqrac9x/bJRT3RAMNrTn
+79S9dtfy9n/TeAuP35/s6nKeuhx6u81Nb6Hrf+G6oLjkh92razaiNPbl3SBzVT5yU69lcoLynSjS
+iY69dl3q7WgzKdM/1M9dkyJfW3yZn+6bfMMDA9eizkPB3KGVzmrbbu6hLrW35fk6ivcFpd2jpz+P
+bn2X1Ml4z1OboUwW3CjaSdvOyTL/jbi+35b/L9hJeTq3ejJa88KwEWjpCKz7Ssm4FnpJIhODx4JL
+b1WeQUMwfTpU0N8Bs0iRHkBwIXt1gT5E9o4juAFcRCCyr5d/RTzPgZ9CHoZhernJZ/Tk0Jku1HiB
+ccDgT8fAk3wO9PAFvTgsdUnL2b8DGL/yAuM3Rnv4kdJLzsMBF5/nhEziXA6awmKaMWa5BRQQY13N
+5bKZ7VHX80yej8zF/C9Uj7uepshXf4Pn8/KhNHJtxD5g8WeM44RRCtzO89yhBlgI7lFghVVWWANM
+BI94wjrnXwNQSwcIWdkr3VkDAAAXBwAAUEsBAgoACgAACAAA84VpXQAAAAAAAAAAAAAAAAkABAAA
+AAAAAAAAAAAAAAAAAE1FVEEtSU5GL/7KAABQSwECFAAUAAgICADzhWld64jueNEAAABWAQAAFAAA
+AAAAAAAAAAAAAAArAAAATUVUQS1JTkYvTUFOSUZFU1QuTUZQSwECCgAKAAAIAAAVf2ldAAAAAAAA
+AAAAAAAAEgAAAAAAAAAAAAAAAAA+AQAATUVUQS1JTkYvc2VydmljZXMvUEsBAhQAFAAICAgAFX9p
+XTcR4nQZAAAAFwAAADsAAAAAAAAAAAAAAAAAbgEAAE1FVEEtSU5GL3NlcnZpY2VzL29yZy5uZXRi
+ZWFucy5zcGkuc2VuZG9wdHMuT3B0aW9uUHJvY2Vzc29yUEsBAgoACgAACAAAFX9pXQAAAAAAAAAA
+AAAAAAYAAAAAAAAAAAAAAAAA8AEAAG5ia2l0L1BLAQIKAAoAAAgAAO+FaV0AAAAAAAAAAAAAAAAL
+AAAAAAAAAAAAAAAAABQCAABuYmtpdC9jb3JlL1BLAQIUABQACAgIAO+FaV3zPV5ZfgAAAKMAAAAc
+AAAAAAAAAAAAAAAAAD0CAABuYmtpdC9jb3JlL0J1bmRsZS5wcm9wZXJ0aWVzUEsBAhQAFAAICAgA
+74VpXZ4gXpt8AAAAogAAAB8AAAAAAAAAAAAAAAAABQMAAG5ia2l0L2NvcmUvQnVuZGxlX3B0LnBy
+b3BlcnRpZXNQSwECFAAUAAgICAAVf2ldWdkr3VkDAAAXBwAAHAAAAAAAAAAAAAAAAADOAwAAbmJr
+aXQvY29yZS9DbG9zZU9wdGlvbi5jbGFzc1BLBQYAAAAACQAJAHQCAABxBwAAAAA=
 B64
-  echo "13ab07f1072413fac2cf36c8d30d60c01dece3df85c90445b25c2ca88cdb3adb  $CORE_JAR" | sha256sum -c --quiet - || die "o módulo base foi corrompido ao copiar o nbkit."
+  echo "23856a2edf8013c5cce21aa490e729ece45ff475846df5592796b64916872d01  $CORE_JAR" | sha256sum -c --quiet - || die "$(t cli.core_corrupt)"
   cat > "$CORE_XML" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE module PUBLIC "-//NetBeans//DTD Module Status 1.0//EN" "http://www.netbeans.org/dtds/module-status-1_0.dtd">
@@ -378,26 +427,26 @@ core_uninstall() {
   touch "$UD/.lastModified"
 }
 
-# ---------- ponto de restauração ----------
+# ---------- restore point ----------
 CLEAN=(); SNAP=""; SNAP_OK=0; DONE=0; SNAPPATHS=()
 on_exit() {
   local rc=$? p
   if [ "$SNAP_OK" = 1 ] && [ "$DONE" != 1 ]; then
     [ -t 1 ] && printf '\e[?25h'
     echo
-    if [ $rc = 130 ]; then echo "${Y}Interrompido.${N} Voltando tudo como estava..."
-    else echo "${R}Parou com erro${N} (código $rc). Voltando tudo como estava..."; fi
+    if [ $rc = 130 ]; then t cli.interrupted; echo
+    else t cli.stopped_error "$rc"; echo; fi
     for p in "${SNAPPATHS[@]}"; do rm -rf "${UD:?}/$p"; done
     tar -xf "$SNAP" -C "$UD" 2>/dev/null || true
     mod_rollback_extra
     touch "$UD/.lastModified"
-    echo "${G}✓${N} nada foi alterado no NetBeans."
+    t cli.nothing_changed_nb; echo
   fi
   [ ${#CLEAN[@]} -gt 0 ] && rm -rf "${CLEAN[@]}"
   return 0
 }
 trap on_exit EXIT
-# desfaz o que fica fora do userdir (ex.: backup recém-criado); cada módulo pode ter <prefixo>_rollback
+# undoes what lives outside the userdir (e.g. a backup just created); each module may have <prefix>_rollback
 mod_rollback_extra() {
   local id
   for id in "${MODS[@]}"; do mod_call "$id" rollback || true; done
@@ -406,7 +455,7 @@ snapshot() {
   local id p have=()
   SNAPPATHS=(nbkit modules/nbkit-core.jar config/Modules/nbkit-core.xml)
   for id in "$@"; do
-    while IFS= read -r p; do [ -n "$p" ] && SNAPPATHS+=("$p"); done < <(mod_call "$id" caminhos)
+    while IFS= read -r p; do [ -n "$p" ] && SNAPPATHS+=("$p"); done < <(mod_call "$id" paths)
   done
   SNAP="$(mktemp)"; CLEAN+=("$SNAP")
   for p in "${SNAPPATHS[@]}"; do [ -e "$UD/$p" ] && have+=("$p"); done
@@ -414,153 +463,160 @@ snapshot() {
   SNAP_OK=1
 }
 
-# ---------- instalar / desinstalar / conferir ----------
+# ---------- install / uninstall / check ----------
 tmpdir() { local d; d="$(mktemp -d)"; CLEAN+=("$d"); echo "$d"; }
+labels_of() { local id; for id in "$@"; do printf '%s; ' "$(mod_label "$id")"; done | sed 's/; $//'; }
+userdir_line() { echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"; }
 
 do_install() {
   local id other conflicts=() total=1
-  # tema: só um ativo por vez; instalar um tema remove o outro
+  # theme: only one active at a time; installing a theme removes the other
   for id in "$@"; do
-    if [ "${MOD_CAT[$id]}" = tema ]; then
+    if [ "${MOD_CAT[$id]}" = theme ]; then
       for other in "${MODS[@]}"; do
-        if [ "$other" != "$id" ] && [ "${MOD_CAT[$other]}" = tema ] && mod_installed "$other"; then conflicts+=("$other"); fi
+        if [ "$other" != "$id" ] && [ "${MOD_CAT[$other]}" = theme ] && mod_installed "$other"; then conflicts+=("$other"); fi
       done
     fi
   done
-  for id in "${conflicts[@]}"; do total=$((total + $(mod_call "$id" passos_desinstalar))); done
-  for id in "$@"; do total=$((total + $(mod_call "$id" passos_instalar))); done
-  if [ $HEADER = 0 ]; then header; echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"; echo; fi
+  for id in "${conflicts[@]}"; do total=$((total + $(mod_call "$id" uninstall_steps))); done
+  for id in "$@"; do total=$((total + $(mod_call "$id" install_steps))); done
+  if [ $HEADER = 0 ]; then header; userdir_line; echo; fi
   ensure_closed
   snapshot "$@" "${conflicts[@]}"
   TOTAL=$total
   for id in "${conflicts[@]}"; do
-    info "trocando de tema: removendo $(mod_label "$id")"
-    mod_call "$id" desinstalar
+    info "$(t cli.switching_theme "$(mod_label "$id")")"
+    mod_call "$id" uninstall
     rm -f "$(mod_version_file "$id")"
   done
   for id in "$@"; do
-    mod_call "$id" instalar
+    mod_call "$id" install
     mkdir -p "$STATEDIR"
     echo "${MOD_VER[$id]}" > "$(mod_version_file "$id")"
   done
-  step "Módulo base do nbkit"
+  step "$(t cli.step_core)"
   core_install
-  ok "pronto (permite fechar o NetBeans pelo terminal)"
+  ok "$(t cli.core_ready)"
   DONE=1
   echo
-  echo "${G}${B}Instalado:${N} $(for id in "$@"; do printf '%s; ' "$(mod_label "$id")"; done | sed 's/; $//')"
+  t cli.installed "$(labels_of "$@")"; echo
   after_change install
 }
 
 do_uninstall() {
-  local id total=0 remaining=0
-  for id in "$@"; do total=$((total + $(mod_call "$id" passos_desinstalar))); done
+  local id total=0 remaining=0 q
+  for id in "$@"; do total=$((total + $(mod_call "$id" uninstall_steps))); done
   for id in "${MODS[@]}"; do
     if mod_installed "$id" && [[ " $* " != *" $id "* ]]; then remaining=1; fi
   done
   [ $remaining = 1 ] || total=$((total + 1))
-  if [ $HEADER = 0 ]; then header; echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"; echo; fi
+  if [ $HEADER = 0 ]; then header; userdir_line; echo; fi
   ensure_closed
   snapshot "$@"
   TOTAL=$total
   for id in "$@"; do
-    mod_call "$id" desinstalar
+    mod_call "$id" uninstall
     rm -f "$(mod_version_file "$id")"
   done
   if [ $remaining = 0 ]; then
-    step "Módulo base do nbkit"
+    step "$(t cli.step_core)"
     core_uninstall
-    ok "removido (nenhum módulo ficou instalado)"
+    ok "$(t cli.core_removed)"
   fi
   DONE=1
   echo
-  echo "${G}${B}Removido:${N} $(for id in "$@"; do printf '%s; ' "$(mod_label "$id")"; done | sed 's/; $//')"
-  # backups que o módulo guardou: pergunta se apaga
+  t cli.removed "$(labels_of "$@")"; echo
+  # backups the module kept: asks whether to delete them
   if [ $INTERACTIVE = 1 ]; then
     for id in "$@"; do
       mod_has "$id" backups || continue
       mapfile -t BKS < <(mod_call "$id" backups)
       [ ${#BKS[@]} -gt 0 ] || continue
       echo
-      if [ ${#BKS[@]} = 1 ]; then q="1 arquivo"; else q="${#BKS[@]} arquivos"; fi
-      if ask_yn "Apagar também os backups de $(mod_label "$id") ($q no userdir)?" N; then
-        rm -f "${BKS[@]}"; ok "backups apagados"
+      if [ ${#BKS[@]} = 1 ]; then q="$(t cli.one_file)"; else q="$(t cli.n_files "${#BKS[@]}")"; fi
+      if ask_yn "$(t cli.ask_delete_backups "$(mod_label "$id")" "$q")" N; then
+        rm -f "${BKS[@]}"; ok "$(t cli.backups_deleted)"
       fi
     done
   fi
   after_change uninstall
 }
 
-# depois de instalar/desinstalar: abrir o NetBeans e, na instalação, conferir sozinho
+# after install/uninstall: open NetBeans and, after an install, check by itself
 after_change() {
   if [ $INTERACTIVE != 1 ]; then
-    if [ "$1" = install ]; then echo "Depois de abrir o NetBeans, confira com: bash $ME check"; else echo "Abra o NetBeans."; fi
+    if [ "$1" = install ]; then t cli.check_later "$ME"; else t cli.open_nb; fi
+    echo
     exit 0
   fi
   echo
-  if find_launcher && ask_yn "Abrir o NetBeans agora?" S; then open_netbeans; fi
+  if find_launcher && ask_yn "$(t cli.ask_open)" Y; then open_netbeans; fi
   if [ "$1" = install ]; then
-    if spin_until "Esperando o NetBeans abrir para conferir se tudo carregou" nb_running \
-       && spin_until "NetBeans abrindo, esperando carregar os módulos" nb_loaded; then
+    if spin_until "$(t cli.waiting_open)" nb_running \
+       && spin_until "$(t cli.waiting_modules)" nb_loaded; then
       sleep 2
       echo
       exec env NBKIT_TTY=1 bash "$SELF" check "$UD"
     fi
-    echo "Ok. Para conferir depois, rode o nbkit de novo e escolha \"Conferir\"."
+    t cli.check_later_menu; echo
   fi
   exit 0
 }
 
-# imprime "  ok/PROBLEMA ..."; módulos retornam 0 ok, 1 corrigível reinstalando, 2 não corrigível
+# prints "  ok/PROBLEM ..."; modules return 0 ok, 1 fixable by reinstalling, 2 not fixable
 res() {
-  if [ "$1" = 0 ]; then printf '  %sok%s       %s\n' "$G" "$N" "$2"; else printf '  %sPROBLEMA%s %s\n' "$R" "$N" "$2"; fi
+  if [ "$1" = 0 ]; then printf '  %s%-9s%s%s\n' "$G" "$(t cli.res_ok)" "$N" "$2"
+  else printf '  %s%-9s%s%s\n' "$R" "$(t cli.res_problem)" "$N" "$2"; fi
 }
 log_has_module() { grep -qE "^\s+$1 \[" "$UD/var/log/messages.log" 2>/dev/null; }
 log_module_errors() { grep -E "$1" "$UD/var/log/messages.log" 2>/dev/null | grep -E 'could not|cannot|Exception|SEVERE|disabled|requires' | head -5 || true; }
 
 do_check() {
-  local id rc worst=0 fix=() log="$UD/var/log/messages.log"
+  local id rc worst=0 fix=() log="$UD/var/log/messages.log" out
   header
-  echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"
+  userdir_line
   echo
   local any=0
   for id in "${MODS[@]}"; do mod_installed "$id" && any=1; done
-  [ $any = 1 ] || { echo "Nenhum módulo do nbkit instalado neste userdir."; exit 3; }
+  [ $any = 1 ] || { t cli.nothing_installed_here; echo; exit 3; }
   if [ ! -e "$log" ] || { [ -e "$CORE_JAR" ] && [ ! "$log" -nt "$CORE_JAR" ]; }; then
-    echo "Abra o NetBeans depois da instalação e rode o check de novo."; exit 3
+    t cli.open_then_check; echo; exit 3
   fi
-  echo "${B}Conferindo no NetBeans${N}"
+  echo "${B}$(t cli.checking)${N}"
   for id in "${MODS[@]}"; do
     mod_installed "$id" || continue
     echo "  ${B}$(mod_label "$id")${N}"
-    rc=0; out="$(mod_call "$id" conferir 2>&1)" || rc=$?
-    [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/  /' 
+    rc=0; out="$(mod_call "$id" check 2>&1)" || rc=$?
+    [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/  /'
     if [ $rc = 1 ]; then fix+=("$id"); fi
     [ $rc -gt $worst ] && worst=$rc
   done
   local j; j="$(sed -n 's/^ *Java; VM; Vendor *= *\([^;]*\).*/\1/p' "$log" | tail -1)"
-  [ -n "$j" ] && printf '  %sinfo%s     Java do NetBeans: %s\n' "$D" "$N" "$j"
+  [ -n "$j" ] && printf '  %s%-9s%s%s\n' "$D" "$(t cli.res_info)" "$N" "$(t cli.nb_java "$j")"
   echo
-  if [ $worst = 0 ]; then echo "${G}Tudo certo.${N}"; exit 0; fi
-  echo "Há problemas acima."
+  if [ $worst = 0 ]; then echo "${G}$(t cli.all_good)${N}"; exit 0; fi
+  t cli.problems_above; echo
   if [ ${#fix[@]} -gt 0 ] && [ $INTERACTIVE = 1 ]; then
     echo
-    if ask_yn "Reinstalar para corrigir?" S; then echo; exec env NBKIT_TTY=1 NBKIT_CLOSE=1 bash "$SELF" install "${fix[@]}" "$UD"; fi
+    if ask_yn "$(t cli.ask_reinstall)" Y; then echo; exec env NBKIT_TTY=1 NBKIT_CLOSE=1 bash "$SELF" install "${fix[@]}" "$UD"; fi
   else
-    echo "Se precisar, mande essa saída."
+    t cli.send_output; echo
   fi
   exit "$worst"
 }
 
-# ---------- backups (módulos que guardam o estado de antes: <prefixo>_backups) ----------
+# ---------- backups (modules that keep the previous state: <prefix>_backups) ----------
 bk_date() {
   local b; b="$(basename "$1" .tar.gz)"; b="${b##*-backup-}"
   if [[ "$b" =~ ^([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})$ ]]; then
-    echo "${BASH_REMATCH[3]}/${BASH_REMATCH[2]}/${BASH_REMATCH[1]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}"
+    local f="${L[cli.date_format]}"
+    f="${f//\{year\}/${BASH_REMATCH[1]}}"; f="${f//\{month\}/${BASH_REMATCH[2]}}"; f="${f//\{day\}/${BASH_REMATCH[3]}}"
+    f="${f//\{hour\}/${BASH_REMATCH[4]}}"; f="${f//\{minute\}/${BASH_REMATCH[5]}}"
+    echo "$f"
   else echo "$b"; fi
 }
 bk_size() { local b; b=$(stat -c %s "$1" 2>/dev/null || echo 0); echo "$(( (b + 1023) / 1024 )) KB"; }
-# todos os backups: "id<TAB>arquivo", do mais antigo para o mais novo dentro de cada módulo
+# all backups: "id<TAB>file", from the oldest to the newest inside each module
 all_backups() {
   local id f
   for id in "${MODS[@]}"; do
@@ -569,7 +625,7 @@ all_backups() {
   done
   return 0
 }
-# navega pelos backups: Enter restaura, Del apaga, Esc volta. Restaurar confirmado fica em RESTORE_ID/RESTORE_BK
+# browses the backups: Enter restores, Del deletes, Esc goes back. A confirmed restore goes to RESTORE_ID/RESTORE_BK
 browse_backups() {
   local -a rows; local i=0 n j k rest line id f first mods
   RESTORE_BK=""; RESTORE_ID=""
@@ -582,18 +638,18 @@ browse_backups() {
     mods="$(printf '%s\n' "${rows[@]}" | cut -f1 | sort -u | wc -l)"
     printf '\e[H\e[2J\e[?25l'
     echo "${B}nbkit${N} ${D}v$NBKIT_VERSION${N}"
-    echo "  ${B}Backups${N}  ${D}${UD/#$HOME/\~}${N}"
+    echo "  ${B}$(t cli.backups_title)${N}  ${D}${UD/#$HOME/\~}${N}"
     echo
     for ((j = 0; j < n; j++)); do
       id="${rows[j]%%$'\t'*}"; f="${rows[j]#*$'\t'}"
       line="$(bk_date "$f")   $(printf '%6s' "$(bk_size "$f")")   $(mod_call "$id" backup_desc "$f")"
       [ "$mods" -gt 1 ] && line="$(mod_label "$id"): $line"
       first="$(mod_call "$id" backups | head -1)"
-      [ "$f" = "$first" ] && line="$line   ${D}(original, usado ao desinstalar)${N}"
+      [ "$f" = "$first" ] && line="$line   ${D}$(t cli.backup_original)${N}"
       if [ $j -eq $i ]; then printf '  %s> %s%s\n' "$BL$B" "$line" "$N"; else printf '    %s\n' "$line"; fi
     done
     echo
-    printf '  %s↑↓ navegar   Enter restaurar   Del apagar   Esc voltar%s' "$D" "$N"
+    printf '  %s%s%s' "$D" "$(t cli.backups_hint)" "$N"
     IFS= read -rsn1 k </dev/tty || k=q
     if [ "$k" = $'\e' ]; then
       rest=""; IFS= read -rsn2 -t 0.05 rest </dev/tty || true
@@ -613,82 +669,82 @@ browse_backups() {
       del)
         printf '\e[?25h\n\n'
         if [ "$(mod_call "$id" backups | wc -l)" = 1 ] && mod_installed "$id"; then
-          echo "  ${Y}É o único backup.${N} Sem ele, desinstalar $(mod_label "$id") não tem como voltar o que você tinha antes."
+          t cli.only_backup "$(mod_label "$id")"; echo
           echo
         fi
-        if ask_yn "Apagar o backup de $(bk_date "$f")?" N; then
-          rm -f "$f"; ok "backup apagado"; sleep 0.8
+        if ask_yn "$(t cli.ask_delete_backup "$(bk_date "$f")")" N; then
+          rm -f "$f"; ok "$(t cli.backup_deleted)"; sleep 0.8
         fi ;;
       '')
         printf '\e[?25h\n\n'
-        echo "  Volta como estava em $(bk_date "$f"): $(mod_call "$id" backup_desc "$f")."
+        t cli.restore_back_to "$(bk_date "$f")" "$(mod_call "$id" backup_desc "$f")"; echo
         if mod_installed "$id"; then
-          echo "  Antes disso, $(mod_label "$id") é desinstalado."
+          t cli.restore_uninstalls_first "$(mod_label "$id")"; echo
         else
-          echo "  O que você tem hoje nessas configurações vira um backup novo, então dá pra desfazer."
+          t cli.restore_makes_backup; echo
         fi
         echo
-        if ask_yn "Restaurar este backup?" N; then RESTORE_BK="$f"; RESTORE_ID="$id"; break; fi ;;
+        if ask_yn "$(t cli.ask_restore)" N; then RESTORE_BK="$f"; RESTORE_ID="$id"; break; fi ;;
     esac
   done
   printf '\e[?25h\e[?1049l'; trap 'exit 130' INT
 }
 do_restore() {
   local id="$1" f="$2" total
-  total="$(mod_call "$id" passos_restaurar "$f")"
-  if [ $HEADER = 0 ]; then header; echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"; echo; fi
+  total="$(mod_call "$id" restore_steps "$f")"
+  if [ $HEADER = 0 ]; then header; userdir_line; echo; fi
   ensure_closed
   snapshot "$id"
   TOTAL=$total
-  mod_call "$id" restaurar "$f"
+  mod_call "$id" restore "$f"
   mod_installed "$id" || rm -f "$(mod_version_file "$id")"
   local any=0 m
   for m in "${MODS[@]}"; do mod_installed "$m" && any=1; done
   [ $any = 1 ] || core_uninstall
   DONE=1
   echo
-  echo "${G}${B}Restaurado.${N}"
+  echo "${G}${B}$(t cli.restored)${N}"
   after_change restore
 }
 
-# ---------- status e menu ----------
+# ---------- status and menu ----------
 status_line() {
   local id="$1" s v
   s="$(mod_status "$id")"; v="${MOD_VER[$id]}"
   case "$s" in
-    ok) printf '%s● instalado%s %s(v%s)%s' "$G" "$N" "$D" "$v" "$N" ;;
-    antiga:\?) printf '%s● instalado (versão anterior), atualização disponível (v%s)%s' "$Y" "$v" "$N" ;;
-    antiga:*) printf '%s● instalado (v%s), atualização disponível (v%s)%s' "$Y" "${s#antiga:}" "$v" "$N" ;;
-    nova:*) printf '%s● instalado (v%s, mais nova que esta)%s' "$Y" "${s#nova:}" "$N" ;;
-    *) printf '○ não instalado' ;;
+    ok) t cli.status_ok "$v" ;;
+    old:\?) t cli.status_old_unknown "$v" ;;
+    old:*) t cli.status_old "${s#old:}" "$v" ;;
+    new:*) t cli.status_new "${s#new:}" ;;
+    *) t cli.status_no ;;
   esac
 }
-# submenu de módulos: "Todos" + cada um. Resultado em PICK (lista de ids); vazio = voltou com Esc
+# module submenu: "All" + each one. Result in PICK (list of ids); empty = went back with Esc
 pick_modules() {
   local title="$1"; shift
   local ids=("$@") opts=() id
   PICK=()
   if [ ${#ids[@]} = 1 ]; then PICK=("${ids[0]}"); return 0; fi
-  opts=("Todos")
+  opts=("$(t cli.all)")
   for id in "${ids[@]}"; do opts+=("$(mod_label "$id")"); done
   echo "  ${B}$title${N}"
-  MENU_START=0 MENU_HINT="↑↓ navegar   Enter escolher   Esc voltar" menu "${opts[@]}"
+  MENU_START=0 MENU_HINT="$(t cli.submenu_hint)" menu "${opts[@]}"
   if [ "$MENU_IDX" -lt 0 ]; then
     printf '\e[%dA\r\e[J' "$(( ${#opts[@]} + 1 ))"
     return 0
   fi
   if [ "$MENU_IDX" = 0 ]; then PICK=("${ids[@]}"); else PICK=("${ids[$((MENU_IDX - 1))]}"); fi
-  # tema: com "Todos", instala só o primeiro tema da lista (um tema ativo por vez)
-  local out=() tema=""
+  # theme: with "All", installs only the first theme of the list (one active theme at a time)
+  local out=() theme=""
   for id in "${PICK[@]}"; do
-    if [ "${MOD_CAT[$id]}" = tema ]; then [ -z "$tema" ] && { tema="$id"; out+=("$id"); }; else out+=("$id"); fi
+    if [ "${MOD_CAT[$id]}" = theme ]; then [ -z "$theme" ] && { theme="$id"; out+=("$id"); }; else out+=("$id"); fi
   done
   PICK=("${out[@]}")
 }
 
 if [ $MENU = 1 ]; then
   header
-  echo "  ${D}userdir${N}  ${UD/#$HOME/\~}"
+  userdir_line
   w=0
   for id in "${MODS[@]}"; do l="$(mod_label "$id")"; [ ${#l} -gt $w ] && w=${#l}; done
   for id in "${MODS[@]}"; do
@@ -701,23 +757,23 @@ if [ $MENU = 1 ]; then
     pending=(); current=(); installed=()
     for id in "${MODS[@]}"; do
       case "$(mod_status "$id")" in
-        ok|nova:*) current+=("$id"); installed+=("$id") ;;
-        antiga:*) pending+=("$id"); installed+=("$id") ;;
+        ok|new:*) current+=("$id"); installed+=("$id") ;;
+        old:*) pending+=("$id"); installed+=("$id") ;;
         *) pending+=("$id") ;;
       esac
     done
     opts=(); acts=()
     if [ ${#pending[@]} -gt 0 ]; then
-      if [ ${#installed[@]} = 0 ]; then opts+=("Instalar"); else opts+=("Instalar ou atualizar"); fi; acts+=(install)
+      if [ ${#installed[@]} = 0 ]; then opts+=("$(t cli.menu_install)"); else opts+=("$(t cli.menu_install_update)"); fi; acts+=(install)
     fi
-    if [ ${#current[@]} -gt 0 ]; then opts+=("Reinstalar"); acts+=(reinstall); fi
+    if [ ${#current[@]} -gt 0 ]; then opts+=("$(t cli.menu_reinstall)"); acts+=(reinstall); fi
     if [ ${#installed[@]} -gt 0 ] && [ -e "$UD/var/log/messages.log" ] && [ -e "$CORE_JAR" ] && [ "$UD/var/log/messages.log" -nt "$CORE_JAR" ]; then
-      opts+=("Conferir se carregou no NetBeans"); acts+=(check)
+      opts+=("$(t cli.menu_check)"); acts+=(check)
     fi
     nbk="$(all_backups | wc -l)"
-    if [ "$nbk" -gt 0 ]; then opts+=("Backups ($nbk)"); acts+=(backups); fi
-    if [ ${#installed[@]} -gt 0 ]; then opts+=("Desinstalar"); acts+=(uninstall); fi
-    opts+=("Sair"); acts+=(quit)
+    if [ "$nbk" -gt 0 ]; then opts+=("$(t cli.menu_backups "$nbk")"); acts+=(backups); fi
+    if [ ${#installed[@]} -gt 0 ]; then opts+=("$(t cli.menu_uninstall)"); acts+=(uninstall); fi
+    opts+=("$(t cli.menu_quit)"); acts+=(quit)
     menu "${opts[@]}"
     [ "$MENU_IDX" -lt 0 ] && { echo; exit 0; }
     act="${acts[$MENU_IDX]}"
@@ -731,9 +787,9 @@ if [ $MENU = 1 ]; then
         if [ -n "$RESTORE_BK" ]; then echo; echo; do_restore "$RESTORE_ID" "$RESTORE_BK"; fi
         back; continue ;;
       install|reinstall|uninstall)
-        if [ "$act" = install ]; then list=("${pending[@]}"); title="Instalar"
-        elif [ "$act" = reinstall ]; then list=("${current[@]}"); title="Reinstalar"
-        else list=("${installed[@]}"); title="Desinstalar"; fi
+        if [ "$act" = install ]; then list=("${pending[@]}"); title="$(t cli.menu_install)"
+        elif [ "$act" = reinstall ]; then list=("${current[@]}"); title="$(t cli.menu_reinstall)"
+        else list=("${installed[@]}"); title="$(t cli.menu_uninstall)"; fi
         back
         pick_modules "$title" "${list[@]}"
         if [ ${#PICK[@]} = 0 ]; then continue; fi
@@ -741,10 +797,10 @@ if [ $MENU = 1 ]; then
         if [ "$act" = uninstall ]; then
           for id in "${PICK[@]}"; do
             echo "  ${B}$(mod_label "$id")${N}"
-            mod_call "$id" resumo_desinstalar
+            mod_call "$id" uninstall_summary
           done
           echo
-          ask_yn "Desinstalar?" N || { echo "Nada foi alterado."; exit 0; }
+          ask_yn "$(t cli.ask_uninstall)" N || { t cli.nothing_changed; echo; exit 0; }
           echo
           do_uninstall "${PICK[@]}"
         else
@@ -754,19 +810,19 @@ if [ $MENU = 1 ]; then
   done
 fi
 
-# ---------- sem menu (argumentos) ----------
+# ---------- without the menu (arguments) ----------
 case "$ACTION" in
   check) do_check ;;
   install)
     [ ${#SEL[@]} -gt 0 ] || SEL=("${MODS[@]}")
-    # um tema por vez
-    sel2=(); tema=""
+    # one theme at a time
+    sel2=(); theme=""
     for id in "${SEL[@]}"; do
-      if [ "${MOD_CAT[$id]}" = tema ]; then [ -z "$tema" ] && { tema="$id"; sel2+=("$id"); }; else sel2+=("$id"); fi
+      if [ "${MOD_CAT[$id]}" = theme ]; then [ -z "$theme" ] && { theme="$id"; sel2+=("$id"); }; else sel2+=("$id"); fi
     done
     do_install "${sel2[@]}" ;;
   uninstall)
     if [ ${#SEL[@]} = 0 ]; then for id in "${MODS[@]}"; do mod_installed "$id" && SEL+=("$id"); done; fi
-    [ ${#SEL[@]} -gt 0 ] || { echo "Nada instalado."; exit 0; }
+    [ ${#SEL[@]} -gt 0 ] || { t cli.nothing_installed; echo; exit 0; }
     do_uninstall "${SEL[@]}" ;;
 esac

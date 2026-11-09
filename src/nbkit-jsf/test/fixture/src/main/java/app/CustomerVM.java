@@ -1,0 +1,14 @@
+package app;
+import org.springframework.stereotype.Component;
+@Component
+public class CustomerVM {
+  private Customer customer = new Customer();
+  public Customer getCustomer() { return customer; }
+  public java.util.List<Customer> getItems() { return null; }
+  public java.util.Map<String,String> getMap() { return null; }
+  public String save() { return null; }
+  public void delete(Customer c) { }
+  public String getTitle() { return ""; }
+  public boolean isCanEdit() { return true; }
+  public String format(String s) { return s; }
+}

@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+OpenIDE-Module: nbkit.core
+OpenIDE-Module-Specification-Version: 1.1
+OpenIDE-Module-Localizing-Bundle: nbkit/core/Bundle.properties
+OpenIDE-Module-Java-Dependencies: Java > 17
+OpenIDE-Module-Module-Dependencies: org.netbeans.modules.sendopts/2 > 2.0, org.openide.util.ui > 9.0

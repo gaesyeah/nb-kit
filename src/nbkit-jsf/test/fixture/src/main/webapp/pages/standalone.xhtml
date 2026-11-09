@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui">
+<h:head><h:outputStylesheet name="css/none.css"/><h:outputStylesheet library="primefaces" name="theme.css"/></h:head><!--E:res.missing-->
+<h:body>
+  <f:viewParam name="id" value="#{customerVM.title}"/><!--E:meta.viewparam-->
+  <!-- #{customerVM.save()} --><!--W:comment.el-->
+  <ui:remove><h:outputText value="#{removedDoesNotCount}"/></ui:remove>
+  <p>Text&nbsp;here &amp; ok &#160;</p><!--E:xml.entity-->
+  <p:commandButton value="outside" action="#{customerVM.save}"/><!--E:form.outside-->
+  <p:commandButton value="js" type="button" onclick="PF('dlg').show()"/>
+  <h:inputText value="#{customerVM.customer.name}"/><!--W:form.outside-->
+  <h:form id="a">
+    <h:commandButton value="nav" action="customers"/>
+    <h:commandButton value="nav2" action="notThere?faces-redirect=true"/><!--E:nav.missing-->
+    <h:commandButton value="nav3" action="home"/>
+    <h:form id="b"/><!--E:form.nested-->
+    <p:dialog widgetVar="dlg" appendTo="@(body)">
+      <p:commandButton value="in the dialog" action="#{customerVM.save}"/><!--E:form.dialog-->
+    </p:dialog>
+    <p:fileUpload mode="simple" value="#{customerVM.title}"/><!--W:form.upload-->
+  </h:form>
+</h:body>
+</html>

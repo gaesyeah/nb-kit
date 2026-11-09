@@ -1,0 +1,6 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui">
+  <h:outputText value="#{item.name} #{outerLabel}"/>
+  <h:outputText value="#{fromNowhere}"/><!--E:el.unknown-->
+  <p:commandButton value="ok" action="#{customerVM.save}" update="table"/>
+  <h:form id="inner"/><!--E:form.nested-->
+</ui:composition>
