@@ -45,8 +45,8 @@ class Lang(unittest.TestCase):
             if '/tests/' not in p:
                 with open(p, encoding='utf-8') as f:
                     code += f.read()
-        used = set(re.findall(r'\bt ((?:cli|theme|mod|build|test)\.[a-z_]+)', code))
-        used |= set(re.findall(r"""['"]((?:cli|theme|mod|build|test)\.[a-z_]+)['"]""", code))
+        used = set(re.findall(r'\bt ((?:cli|theme|mod|build|test|gui)\.[a-z_]+)', code))
+        used |= set(re.findall(r"""['"]((?:cli|theme|mod|build|test|gui)\.[a-z_]+)['"]""", code))
         used -= {'theme.toml', 'module.toml'}   # file names, not keys
         self.assertGreater(len(used), 100)
         self.assertEqual(sorted(used - set(REF)), [])

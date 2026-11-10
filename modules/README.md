@@ -72,6 +72,10 @@ nbkit_register <id> <prefix> <category> "<name>" "<description>" <version>
 `version_status`, `file_copy <file> <destination> <sha256>`, `module_xml <codename>`, `log_has_module <name>` and
 `log_module_errors <regex>` (for `check`). The installed version of each module is kept in `$UD/nbkit/<id>.version`.
 
+The graphical interface follows `step` (progress bar) and `ask_yn` (dialog) by itself. A question asked from Python
+has to call `event(ev='ask', text=..., default='Y' or 'N')` of `lib/uievents.py` before reading the answer and
+`event(ev='answered')` after, as `lib/themes/build.py` does.
+
 ### Texts
 
 Everything shown in the terminal comes from `lang/<language>.lang`. Use `t <key> [values...]`, which prints the text with

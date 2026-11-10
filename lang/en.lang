@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Error:
-cli.usage=nbkit v%s: modules for NetBeans\n\nUsage:\n  bash %s                                menu: shows the status and what can be done\n  bash %s install [module...] [userdir]  installs or updates (no module: all)\n  bash %s uninstall [module...] [userdir] removes (no module: all installed)\n  bash %s check [userdir]                after opening NetBeans: checks that everything loaded\n  bash %s test                           runs the tests (only in the repository)\n  bash %s --help                         this help\n\nModules: %s\nLanguage: --lang pt-BR or --lang en (without it, the system one)\nIf the NetBeans installation is not found: NB_HOME=/path/to/netbeans bash %s\n
+cli.usage=nbkit v%s: modules for NetBeans\n\nUsage:\n  bash %s                                  menu: shows the status and what can be done\n  bash %s gui                              graphical interface\n  bash %s install [module...] [userdir]    installs or updates (no module: all)\n  bash %s uninstall [module...] [userdir]  removes (no module: all installed)\n  bash %s check [userdir]                  after opening NetBeans: checks that everything loaded\n  bash %s status [--json] [userdir]        what is installed (--json: for programs)\n  bash %s restore <backup>                 goes back to a backup\n  bash %s delete-backup <backup>           deletes a backup\n  bash %s test                             runs the tests (only in the repository)\n  bash %s build                            builds the modules of src/ (src/build.sh --help)\n  bash %s --help                           this help\n\nModules: %s\nLanguage: --lang pt-BR or --lang en (without it, the system one)\nIf the NetBeans installation is not found: NB_HOME=/path/to/netbeans bash %s\n
 cli.theme_label=Theme %s
 cli.no_modules_dir=modules/ folder not found next to %s. Download the whole nbkit folder.
 cli.no_modules=no module in %s.
@@ -88,6 +88,12 @@ cli.menu_check=Check that it loaded in NetBeans
 cli.menu_backups=Backups (%s)
 cli.menu_uninstall=Uninstall
 cli.menu_test=Run the tests
+cli.menu_build=Build the modules
+cli.need_backup=%s needs the backup file (see: status --json)
+cli.not_a_backup=%s is not a backup of any module of this userdir
+cli.gui_missing=The graphical interface needs PyGObject, GTK 4 and VTE for GTK 4.
+cli.gui_packages=the graphical interface (PyGObject, GTK 4, VTE)
+cli.gui_manual=install PyGObject, GTK 4 and VTE for GTK 4 and run again (Debian/Ubuntu: python3-gi gir1.2-gtk-4.0 gir1.2-vte-3.91; Fedora: python3-gobject gtk4 vte291-gtk4; Arch: python-gobject gtk4 vte4; openSUSE: python3-gobject typelib-1_0-Gtk-4_0 typelib-1_0-Vte-3_91)
 cli.menu_quit=Quit
 cli.ask_uninstall=Uninstall?
 cli.nothing_installed=Nothing installed.
@@ -225,6 +231,8 @@ build.step=Building %s
 build.done=%s written
 build.step_sums=Updating the sha256 sums
 build.finished=Done. If you changed JSF, raise the version in modules/jsf/module.toml so the menu offers the update.
+build.usage=Builds the NetBeans modules of src/ and updates their sha256.\n\nUsage:\n  bash src/build.sh [netbeans folder] [--test]\n\n  --test   runs the JSF tests (tests/jsf.sh) after building\n  --help   this help\n\nWithout the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK 17 or newer.\n
+build.unknown_option=unknown option: %s (see bash src/build.sh --help)
 
 # ---------- tests (tests/run.sh) ----------
 test.missing_tools=Missing tools for the tests: %s.
@@ -233,6 +241,49 @@ test.no_warnings=no warnings
 test.part_python=Python unit tests
 test.part_engine=Engine (fake NetBeans)
 test.part_jsf=JSF checks
+test.part_gui=Graphical interface (virtual screen)
 test.skipped=skipped:
 test.failed=failed:
 test.all_passed=all tests passed
+
+# ---------- graphical interface (lib/gui) ----------
+gui.refresh=Refresh the list
+gui.about=About
+gui.about_comments=Modules for Apache NetBeans: JSF checks and themes.
+gui.readme=README
+gui.no_userdir=No NetBeans userdir found. Open NetBeans once and refresh the list.
+gui.nb_running=NetBeans is open: the actions ask to close it first.
+gui.section_tool=Tools
+gui.section_theme=Themes
+gui.section_dev=Development
+gui.status_no=not installed
+gui.status_ok=installed (v%s)
+gui.status_old=outdated: v%s, available v%s
+gui.status_old_unknown=old version, available v%s
+gui.status_new=newer than this nbkit (v%s)
+gui.install=Install
+gui.update=Update
+gui.reinstall=Reinstall
+gui.uninstall=Uninstall
+gui.install_all=Install or update all
+gui.reinstall_all=Reinstall all
+gui.uninstall_all=Uninstall all
+gui.backups=Backups (%s)
+gui.check=Check
+gui.test=Run the tests
+gui.build=Build the modules
+gui.ready=Ready. The output of the actions shows up here.
+gui.running=Running
+gui.done=Done
+gui.failed=Finished with an error (code %s)
+gui.yes=Yes
+gui.no=No
+gui.question=nbkit question
+gui.backups_title=Backups
+gui.restore=Restore
+gui.delete=Delete
+gui.close=Close
+gui.copy=Copy
+gui.select_all=Select all
+gui.original=original
+gui.status_error=Could not read the nbkit status: %s

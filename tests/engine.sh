@@ -93,4 +93,69 @@ contains "Portuguese from the system language" "$out" "módulos para o NetBeans"
 out="$(HOME="$H" NBKIT_LANG='' LC_ALL='' LANG=en_US.UTF-8 bash "$NBKIT_DIR/nbkit.sh" --help --lang pt-BR </dev/null 2>&1)"
 contains "--lang wins over the system language" "$out" "módulos para o NetBeans"
 
+
+echo "Status and events for the interface"
+PY="${NBKIT_PY:-python3}"
+# jget <json> <python expression on d>
+jget() { "$PY" -c 'import json, sys; d = json.loads(sys.argv[1]); print(eval(sys.argv[2]))' "$1" "$2" 2>&1; }
+new_home "$H"
+json="$(nbkit status --json)"; rc=$?
+check "status --json exits with 0" test "$rc" = 0
+check "status --json is valid JSON" test "$(jget "$json" "type(d).__name__")" = dict
+check "status --json finds the userdir" test "$(jget "$json" "d['userdir'] == '$U' and [u['path'] for u in d['userdirs']] == ['$U']")" = True
+check "status --json lists the modules, not installed" test "$(jget "$json" "[(m['id'], m['status'], m['installed']) for m in d['modules']]")" = "[('one-dark-pro-mix', 'no', None), ('jsf', 'no', None)]"
+check "status --json knows it runs from a clone" test "$(jget "$json" "d['clone'], d['netbeans_running'], d['can_check'], d['backups']")" = "(True, False, False, [])"
+E="$WORK/events"
+out="$(NBKIT_UI_EVENTS="$E" nbkit install)"; rc=$?
+check "install with events exits with 0" test "$rc" = 0
+# "n/total" of each step event, and how many other events there were
+steps="$("$PY" - "$E" <<'X' 2>&1
+import json, sys
+events = [json.loads(line) for line in open(sys.argv[1])]
+print(' '.join('%d/%d' % (e['n'], e['total']) for e in events if e['ev'] == 'step'), len([e for e in events if e['ev'] != 'step']))
+X
+)"
+check "one step event per step, up to the total" test "$steps" = "1/11 2/11 3/11 4/11 5/11 6/11 7/11 8/11 9/11 10/11 11/11 0"
+json="$(nbkit status --json)"
+check "status --json after the install" test "$(jget "$json" "[(m['status'], m['installed']) for m in d['modules']]")" = "[('ok', '29'), ('ok', '2')]"
+check "status --json lists the backup, marked as the original" test "$(jget "$json" "[(b['module'], b['original'], b['file'] .startswith('$U/nbkit-theme-backup-')) for b in d['backups']]")" = "[('one-dark-pro-mix', True, True)]"
+out="$(nbkit status)"
+contains "status without --json is for people" "$out" "JSF checks"
+out="$(HOME="$WORK/empty" bash "$NBKIT_DIR/nbkit.sh" status --json </dev/null 2>&1)"; rc=$?
+check "status --json without NetBeans still answers" test "$rc/$(jget "$out" "d['userdir'], d['modules']")" = "0/(None, [])"
+out="$(HOME="$WORK/empty" bash "$NBKIT_DIR/nbkit.sh" status </dev/null 2>&1)"; rc=$?
+check "status without NetBeans is an error" test "$rc" = 1
+rm -f "$E"
+rc=0; NBKIT_UI_EVENTS="$E" NBKIT_DIR="$NBKIT_DIR" setsid -w bash -c 'source "$NBKIT_DIR/lib/terminal.sh"; ask_yn "Go on?" Y' </dev/null >/dev/null 2>&1 || rc=$?
+check "a question without a terminal takes the default" test "$rc" = 0
+check "a question is an ask event, then answered" test "$(cat "$E")" = '{"ev":"ask","text":"Go on?","default":"Y"}
+{"ev":"answered"}'
+
+echo "Restore and delete a backup from the arguments"
+B="$(ls "$U"/nbkit-theme-backup-*.tar.gz)"
+out="$(nbkit restore)"; rc=$?
+check "restore without the file is an error" test "$rc" = 1
+contains "restore says what it needs" "$out" "restore needs the backup file"
+out="$(nbkit delete-backup "$NBKIT_DIR/LICENSE")"; rc=$?
+check "a file that is not a backup is refused" test "$rc" = 1
+contains "a file that is not a backup is named" "$out" "is not a backup of any module of this userdir"
+out="$(nbkit restore "$B")"; rc=$?
+check "restore exits with 0" test "$rc" = 0
+json="$(nbkit status --json)"
+check "after restoring the original the theme is not installed" test "$(jget "$json" "[m['status'] for m in d['modules']]")" = "['no', 'ok']"
+check "the restored UI file is the original one" grep -qx 'Component.arc=8' "$U/config/LookAndFeel/FlatDarkLaf.properties"
+out="$(nbkit delete-backup "$B")"; rc=$?
+check "delete-backup exits with 0" test "$rc" = 0
+check "delete-backup deletes the file" test ! -e "$B"
+
+echo "Help"
+out="$(nbkit --help)"
+contains "help shows the interface" "$out" "nbkit.sh gui"
+out="$(bash "$NBKIT_DIR/src/build.sh" --help 2>&1)"; rc=$?
+check "build.sh --help exits with 0" test "$rc" = 0
+contains "build.sh --help explains --test" "$out" "runs the JSF tests"
+out="$(bash "$NBKIT_DIR/src/build.sh" --nope 2>&1)"; rc=$?
+check "build.sh refuses an unknown option" test "$rc" = 1
+contains "build.sh names the unknown option" "$out" "unknown option: --nope"
+
 finish

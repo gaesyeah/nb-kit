@@ -7,7 +7,7 @@
 set -euo pipefail
 # Ctrl+C exits with code 130 (the exit trap uses it to undo a half-done install)
 trap 'exit 130' INT TERM HUP
-NBKIT_VERSION=2.3.0
+NBKIT_VERSION=3.0.0
 SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")"
 NBKIT_DIR="$(dirname "$SELF")"
 ME="$(basename "$SELF")"
@@ -84,7 +84,7 @@ mod_label() {
 
 usage() {
   local ids; ids="$(printf '%s ' "${MODS[@]}")"
-  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
+  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
 }
 
 # ---------- files shared by the engines ----------
@@ -125,15 +125,18 @@ done
 [ ${#MODS[@]} -gt 0 ] || die "$(t cli.no_modules "$NBKIT_DIR/modules")"
 
 # ---------- arguments ----------
-ACTION=""; UD=""; SEL=()
+ACTION=""; UD=""; SEL=(); JSON=0; BKF=""
 for a in "$@"; do
   case "$a" in
     -h|--help|help) usage; exit 0 ;;
-    install|uninstall|check|test) [ -z "$ACTION" ] && ACTION="$a" || die "$(t cli.repeated_command "$a")" ;;
+    install|uninstall|check|status|restore|delete-backup|gui|test|build)
+      [ -z "$ACTION" ] && ACTION="$a" || die "$(t cli.repeated_command "$a")" ;;
+    --json) JSON=1 ;;
     all|todos) SEL=("${MODS[@]}") ;;
     *)
       if [ -n "${MOD_FN[$a]:-}" ]; then SEL+=("$a")
       elif [ -d "$a" ]; then UD="$(readlink -f "$a")"
+      elif [ -f "$a" ]; then BKF="$(readlink -f "$a")"
       else t cli.unknown_arg "$a" >&2; echo >&2; echo >&2; usage >&2; exit 1; fi ;;
   esac
 done
@@ -147,6 +150,28 @@ fi
 if [ "$ACTION" = test ]; then
   [ -f "$NBKIT_DIR/tests/run.sh" ] || die "$(t cli.no_tests)"
   exec bash "$NBKIT_DIR/tests/run.sh"
+fi
+# rebuilds the NetBeans modules from src/ (see src/build.sh)
+if [ "$ACTION" = build ]; then exec bash "$NBKIT_DIR/src/build.sh"; fi
+
+# ---------- graphical interface (lib/gui): GTK 4 and VTE through PyGObject ----------
+if [ "$ACTION" = gui ]; then
+  # shellcheck disable=SC1091
+  source "$NBKIT_DIR/lib/gui.sh"
+  GUI_PY="$(gui_python || true)"
+  if [ -z "$GUI_PY" ]; then
+    t cli.gui_missing; echo
+    if m="$(pkg_manager)"; then
+      pkgs=()
+      while IFS= read -r spec; do
+        # shellcheck disable=SC2086
+        pkgs+=("$(pkg_for "$m" $spec)")
+      done < <(gui_package_specs)
+      if pkg_run "$(t cli.gui_packages)" "${pkgs[@]}"; then GUI_PY="$(gui_python || true)"; fi
+    fi
+    [ -n "$GUI_PY" ] || die "$(t cli.gui_manual)"
+  fi
+  exec "$GUI_PY" "$NBKIT_DIR/lib/gui/app.py" ${UD:+"$UD"}
 fi
 
 # ---------- terminal ----------
@@ -204,8 +229,10 @@ list_userdirs() {
     done
   return 0
 }
+mapfile -t UDS < <(list_userdirs)
+# a userdir given as argument that is not in the usual places also goes to the list
+if [ -n "$UD" ] && [[ " ${UDS[*]} " != *" $UD "* ]]; then UDS=("$UD" ${UDS[@]+"${UDS[@]}"}); fi
 if [ -z "$UD" ]; then
-  mapfile -t UDS < <(list_userdirs)
   if [ $MENU = 1 ] && [ ${#UDS[@]} -gt 1 ]; then
     header
     t cli.which_userdir; echo
@@ -224,8 +251,9 @@ if [ -z "$UD" ]; then
     UD="${UDS[0]:-}"
   fi
 fi
-[ -n "$UD" ] || die "$(t cli.no_userdir)"
-[ -d "$UD/config" ] || die "$(t cli.not_userdir "$UD")"
+# status --json also answers without a userdir (the interface shows that NetBeans was not found)
+[ -n "$UD" ] || [ "$ACTION$JSON" = status1 ] || die "$(t cli.no_userdir)"
+[ -z "$UD" ] || [ -d "$UD/config" ] || die "$(t cli.not_userdir "$UD")"
 C="$UD/config"
 STATEDIR="$UD/nbkit"
 mod_version_file() { echo "$STATEDIR/$1.version"; }
@@ -494,7 +522,12 @@ after_change() {
     exit 0
   fi
   echo
-  if find_launcher && ask_yn "$(t cli.ask_open)" Y; then open_netbeans; fi
+  # waits for NetBeans to check by itself, unless you said not to open it now
+  local wait=1
+  if find_launcher; then
+    if ask_yn "$(t cli.ask_open)" Y; then open_netbeans; else wait=0; fi
+  fi
+  if [ "$1" = install ] && [ $wait = 0 ]; then t cli.check_later_menu "$(t cli.menu_check)"; echo; exit 0; fi
   if [ "$1" = install ]; then
     if spin_until "$(t cli.waiting_open)" nb_running \
        && spin_until "$(t cli.waiting_modules)" nb_loaded; then
@@ -572,6 +605,29 @@ all_backups() {
   done
   return 0
 }
+# backup_owner <file>: "id<TAB>file" of the module that keeps this backup
+backup_owner() {
+  local id f
+  while IFS=$'\t' read -r id f; do
+    if [ "$(readlink -f "$f")" = "$1" ]; then printf '%s\t%s\n' "$id" "$f"; return 0; fi
+  done < <(all_backups)
+  return 1
+}
+# confirm_restore <id> <file> and confirm_delete_backup <id> <file>: explain and ask (menu, arguments and interface)
+confirm_restore() {
+  t cli.restore_back_to "$(bk_date "$2")" "$(mod_call "$1" backup_desc "$2")"; echo
+  if mod_installed "$1"; then t cli.restore_uninstalls_first "$(mod_label "$1")"; echo
+  else t cli.restore_makes_backup; echo; fi
+  echo
+  ask_yn "$(t cli.ask_restore)" N
+}
+confirm_delete_backup() {
+  if [ "$(mod_call "$1" backups | wc -l)" = 1 ] && mod_installed "$1"; then
+    t cli.only_backup "$(mod_label "$1")"; echo
+    echo
+  fi
+  ask_yn "$(t cli.ask_delete_backup "$(bk_date "$2")")" N
+}
 # browses the backups: Enter restores, Del deletes, Esc goes back. A confirmed restore goes to RESTORE_ID/RESTORE_BK
 browse_backups() {
   local -a rows; local i=0 n j k rest line id f first mods
@@ -615,23 +671,10 @@ browse_backups() {
       q) break ;;
       del)
         printf '\e[?25h\n\n'
-        if [ "$(mod_call "$id" backups | wc -l)" = 1 ] && mod_installed "$id"; then
-          t cli.only_backup "$(mod_label "$id")"; echo
-          echo
-        fi
-        if ask_yn "$(t cli.ask_delete_backup "$(bk_date "$f")")" N; then
-          rm -f "$f"; ok "$(t cli.backup_deleted)"; sleep 0.8
-        fi ;;
+        if confirm_delete_backup "$id" "$f"; then rm -f "$f"; ok "$(t cli.backup_deleted)"; sleep 0.8; fi ;;
       '')
         printf '\e[?25h\n\n'
-        t cli.restore_back_to "$(bk_date "$f")" "$(mod_call "$id" backup_desc "$f")"; echo
-        if mod_installed "$id"; then
-          t cli.restore_uninstalls_first "$(mod_label "$id")"; echo
-        else
-          t cli.restore_makes_backup; echo
-        fi
-        echo
-        if ask_yn "$(t cli.ask_restore)" N; then RESTORE_BK="$f"; RESTORE_ID="$id"; break; fi ;;
+        if confirm_restore "$id" "$f"; then RESTORE_BK="$f"; RESTORE_ID="$id"; break; fi ;;
     esac
   done
   printf '\e[?25h\e[?1049l'; trap 'exit 130' INT
@@ -644,7 +687,8 @@ do_restore() {
   snapshot "$id"
   TOTAL=$total
   mod_call "$id" restore "$f"
-  mod_installed "$id" || rm -f "$(mod_version_file "$id")"
+  # a backup is the state before the module: its version file goes too (it alone would count as installed)
+  rm -f "$(mod_version_file "$id")"
   local any=0 m
   for m in "${MODS[@]}"; do mod_installed "$m" && any=1; done
   [ $any = 1 ] || core_uninstall
@@ -665,6 +709,65 @@ status_line() {
     new:*) t cli.status_new "${s#new:}" ;;
     *) t cli.status_no ;;
   esac
+}
+# the module lines of the menu (and of "status")
+print_status() {
+  local id l w=0
+  for id in "${MODS[@]}"; do l="$(mod_label "$id")"; [ ${#l} -gt $w ] && w=${#l}; done
+  for id in "${MODS[@]}"; do
+    l="$(mod_label "$id")"
+    printf '  %s%*s%s\n' "$l" $((w + 3 - ${#l})) '' "$(status_line "$id")"
+  done
+}
+# check makes sense: something installed and NetBeans opened after the install
+can_check() {
+  local id any=0 log="$UD/var/log/messages.log"
+  for id in "${MODS[@]}"; do mod_installed "$id" && any=1; done
+  [ $any = 1 ] && [ -e "$log" ] && [ -e "$CORE_JAR" ] && [ "$log" -nt "$CORE_JAR" ]
+}
+# asks before uninstalling (menu and interface): what each module removes
+confirm_uninstall() {
+  local id
+  for id in "$@"; do
+    echo "  ${B}$(mod_label "$id")${N}"
+    mod_call "$id" uninstall_summary
+  done
+  echo
+  ask_yn "$(t cli.ask_uninstall)" N
+}
+# status --json: what the interface shows (userdirs, modules, backups), see lib/gui/model.py
+json_bool() { if "$@"; then echo true; else echo false; fi; }
+status_json() {
+  local d id s inst sep="" f first
+  printf '{"version":%s,"lang":%s,"clone":%s,"userdirs":[' "$(json_str "$NBKIT_VERSION")" "$(json_str "$NBKIT_LANG")" \
+    "$(json_bool test -f "$NBKIT_DIR/tests/run.sh")"
+  for d in ${UDS[@]+"${UDS[@]}"}; do
+    printf '%s{"path":%s,"name":%s,"has_nbkit":%s}' "$sep" "$(json_str "$d")" "$(json_str "NetBeans ${d##*/}")" \
+      "$(json_bool test -e "$d/modules/nbkit-core.jar")"
+    sep=,
+  done
+  if [ -z "$UD" ]; then printf '],"userdir":null,"modules":[],"backups":[]}\n'; return 0; fi
+  printf '],"userdir":%s,"netbeans_running":%s,"can_check":%s,"modules":[' "$(json_str "$UD")" "$(json_bool nb_running)" "$(json_bool can_check)"
+  sep=""
+  for id in "${MODS[@]}"; do
+    s="$(mod_status "$id")"
+    case "$s" in ok) inst="$(json_str "${MOD_VER[$id]}")" ;; no|old:\?) inst=null ;; *) inst="$(json_str "${s#*:}")" ;; esac
+    printf '%s{"id":%s,"category":%s,"name":%s,"label":%s,"description":%s,"version":%s,"status":%s,"installed":%s}' "$sep" \
+      "$(json_str "$id")" "$(json_str "${MOD_CAT[$id]}")" "$(json_str "${MOD_NAME[$id]}")" "$(json_str "$(mod_label "$id")")" \
+      "$(json_str "${MOD_DESC[$id]}")" "$(json_str "${MOD_VER[$id]}")" "$(json_str "${s%%:*}")" "$inst"
+    sep=,
+  done
+  printf '],"backups":['
+  sep=""
+  while IFS=$'\t' read -r id f; do
+    [ -n "$f" ] || continue
+    first="$(mod_call "$id" backups | head -1)"
+    printf '%s{"module":%s,"file":%s,"date":%s,"size":%s,"description":%s,"original":%s}' "$sep" "$(json_str "$id")" \
+      "$(json_str "$f")" "$(json_str "$(bk_date "$f")")" "$(json_str "$(bk_size "$f")")" \
+      "$(json_str "$(mod_call "$id" backup_desc "$f")")" "$(json_bool test "$f" = "$first")"
+    sep=,
+  done < <(all_backups)
+  printf ']}\n'
 }
 # module submenu: "All" + each one. Result in PICK (list of ids); empty = went back with Esc
 pick_modules() {
@@ -692,12 +795,7 @@ pick_modules() {
 if [ $MENU = 1 ]; then
   header
   userdir_line
-  w=0
-  for id in "${MODS[@]}"; do l="$(mod_label "$id")"; [ ${#l} -gt $w ] && w=${#l}; done
-  for id in "${MODS[@]}"; do
-    l="$(mod_label "$id")"
-    printf '  %s%*s%s\n' "$l" $((w + 3 - ${#l})) '' "$(status_line "$id")"
-  done
+  print_status
   echo
   MENU_START=0
   while :; do
@@ -714,14 +812,15 @@ if [ $MENU = 1 ]; then
       if [ ${#installed[@]} = 0 ]; then opts+=("$(t cli.menu_install)"); else opts+=("$(t cli.menu_install_update)"); fi; acts+=(install)
     fi
     if [ ${#current[@]} -gt 0 ]; then opts+=("$(t cli.menu_reinstall)"); acts+=(reinstall); fi
-    if [ ${#installed[@]} -gt 0 ] && [ -e "$UD/var/log/messages.log" ] && [ -e "$CORE_JAR" ] && [ "$UD/var/log/messages.log" -nt "$CORE_JAR" ]; then
-      opts+=("$(t cli.menu_check)"); acts+=(check)
-    fi
+    if can_check; then opts+=("$(t cli.menu_check)"); acts+=(check); fi
     nbk="$(all_backups | wc -l)"
     if [ "$nbk" -gt 0 ]; then opts+=("$(t cli.menu_backups "$nbk")"); acts+=(backups); fi
     if [ ${#installed[@]} -gt 0 ]; then opts+=("$(t cli.menu_uninstall)"); acts+=(uninstall); fi
     # only in a clone of the repository (the release zip has no tests/)
-    if [ -f "$NBKIT_DIR/tests/run.sh" ]; then opts+=("$(t cli.menu_test)"); acts+=(test); fi
+    if [ -f "$NBKIT_DIR/tests/run.sh" ]; then
+      opts+=("$(t cli.menu_test)"); acts+=(test)
+      opts+=("$(t cli.menu_build)"); acts+=(build)
+    fi
     opts+=("$(t cli.menu_quit)"); acts+=(quit)
     menu "${opts[@]}"
     [ "$MENU_IDX" -lt 0 ] && { echo; exit 0; }
@@ -731,6 +830,7 @@ if [ $MENU = 1 ]; then
     case "$act" in
       quit) echo; exit 0 ;;
       test) echo; echo; exec bash "$NBKIT_DIR/tests/run.sh" ;;
+      build) echo; echo; exec bash "$NBKIT_DIR/src/build.sh" ;;
       check) echo; echo; do_check ;;
       backups)
         browse_backups
@@ -745,12 +845,7 @@ if [ $MENU = 1 ]; then
         if [ ${#PICK[@]} = 0 ]; then continue; fi
         echo
         if [ "$act" = uninstall ]; then
-          for id in "${PICK[@]}"; do
-            echo "  ${B}$(mod_label "$id")${N}"
-            mod_call "$id" uninstall_summary
-          done
-          echo
-          ask_yn "$(t cli.ask_uninstall)" N || { t cli.nothing_changed; echo; exit 0; }
+          confirm_uninstall "${PICK[@]}" || { t cli.nothing_changed; echo; exit 0; }
           echo
           do_uninstall "${PICK[@]}"
         else
@@ -763,6 +858,19 @@ fi
 # ---------- without the menu (arguments) ----------
 case "$ACTION" in
   check) do_check ;;
+  status)
+    if [ $JSON = 1 ]; then status_json; else header; userdir_line; print_status; fi ;;
+  restore|delete-backup)
+    [ -n "$BKF" ] || die "$(t cli.need_backup "$ACTION")"
+    row="$(backup_owner "$BKF")" || die "$(t cli.not_a_backup "$BKF")"
+    id="${row%%$'\t'*}"; f="${row#*$'\t'}"
+    header; userdir_line; echo
+    if [ $INTERACTIVE = 1 ]; then
+      if [ "$ACTION" = restore ]; then confirm_restore "$id" "$f" || { t cli.nothing_changed; echo; exit 0; }
+      else confirm_delete_backup "$id" "$f" || { t cli.nothing_changed; echo; exit 0; }; fi
+      echo
+    fi
+    if [ "$ACTION" = restore ]; then do_restore "$id" "$f"; else rm -f "$f"; ok "$(t cli.backup_deleted)"; fi ;;
   install)
     [ ${#SEL[@]} -gt 0 ] || SEL=("${MODS[@]}")
     # one theme at a time
@@ -774,5 +882,11 @@ case "$ACTION" in
   uninstall)
     if [ ${#SEL[@]} = 0 ]; then for id in "${MODS[@]}"; do mod_installed "$id" && SEL+=("$id"); done; fi
     [ ${#SEL[@]} -gt 0 ] || { t cli.nothing_installed; echo; exit 0; }
+    # with a terminal to answer (the interface): asks first, like the menu
+    if [ $INTERACTIVE = 1 ]; then
+      header; userdir_line; echo
+      confirm_uninstall "${SEL[@]}" || { t cli.nothing_changed; echo; exit 0; }
+      echo
+    fi
     do_uninstall "${SEL[@]}" ;;
 esac

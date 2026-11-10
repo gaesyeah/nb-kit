@@ -2,6 +2,7 @@
 import sys, os, json, re
 import xml.dom.minidom as M
 from text import T
+from uievents import event
 
 UD, OLD = sys.argv[1], sys.argv[2]
 MAN = os.environ['NBKIT_THEME_MANIFEST']
@@ -149,7 +150,9 @@ if os.path.exists(olaf) and os.path.exists(claf):
             with open('/dev/tty') as tty, open('/dev/tty', 'w') as out:
                 out.write(''.join('      ' + l + '\n' for l in msg.splitlines()) + '      ' + T('theme.merge_ask_keep') + ' ' + T('cli.yn_no') + ' ')
                 out.flush()
+                event(ev='ask', text=T('theme.merge_ask_keep'), detail=msg, default='N')
                 ans = tty.readline().strip().lower()
+                event(ev='answered')
         except OSError:
             print(msg + T('theme.merge_no_tty'))
         if ans in ('s', 'sim', 'y', 'yes'):

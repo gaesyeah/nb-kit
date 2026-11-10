@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs every nbkit test: lint (shellcheck, pyflakes), Python unit tests, the end-to-end engine tests and
-# the JSF checks. Missing tools are offered for install first (with a terminal to ask); a part whose tool
+# Runs every nbkit test: lint (shellcheck, pyflakes), Python unit tests, the end-to-end engine tests,
+# the JSF checks and the graphical interface (on a virtual screen). Missing tools are offered for install first (with a terminal to ask); a part whose tool
 # is still missing is skipped with a warning. Also: bash nbkit.sh test
 set -uo pipefail
 TESTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,6 +10,8 @@ cd "$NBKIT_DIR" || exit 1
 source "$NBKIT_DIR/lib/terminal.sh"
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/packages.sh"
+# shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/gui.sh"
 PY="${NBKIT_PY:-python3}"
 export PYTHONDONTWRITEBYTECODE=1
 JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
@@ -37,6 +39,11 @@ install_tools() {
   has_shellcheck || { names+=(shellcheck); specs+=("apt:shellcheck dnf:ShellCheck pacman:shellcheck zypper:ShellCheck"); }
   pyflakes_cmd >/dev/null || { names+=(pyflakes); specs+=("apt:python3-pyflakes dnf:python3-pyflakes pacman:python-pyflakes zypper:python3-pyflakes"); }
   has_jdk || { names+=(JDK); specs+=("apt:openjdk-21-jdk-headless|openjdk-17-jdk-headless dnf:java-21-openjdk-devel|java-17-openjdk-devel pacman:jdk21-openjdk|jdk17-openjdk zypper:java-21-openjdk-devel|java-17-openjdk-devel"); }
+  if ! gui_python >/dev/null; then
+    names+=("GTK 4/VTE")
+    while IFS= read -r p; do specs+=("$p"); done < <(gui_package_specs)
+  fi
+  command -v xvfb-run >/dev/null 2>&1 || { names+=(xvfb-run); specs+=("apt:xvfb dnf:xorg-x11-server-Xvfb pacman:xorg-server-xvfb zypper:xvfb-run"); }
   [ ${#names[@]} -gt 0 ] || return 0
   t test.missing_tools "$(IFS=,; echo "${names[*]}" | sed 's/,/, /g')"; echo
   m="$(pkg_manager)" || return 0
@@ -63,7 +70,7 @@ lint_shell() {
 lint_python() {
   local p
   p="$(pyflakes_cmd)" || { t test.skipped_tool pyflakes; echo; return 3; }
-  "$p" -m pyflakes lib/*.py lib/themes/*.py tests/python/*.py && echo "  ${G}ok${N}    $(t test.no_warnings)"
+  "$p" -m pyflakes lib/*.py lib/themes/*.py lib/gui/*.py tests/python/*.py && echo "  ${G}ok${N}    $(t test.no_warnings)"
 }
 python_tests() { "$PY" -m unittest discover -s tests/python -t tests/python; }
 jsf_tests() {
@@ -77,6 +84,7 @@ part "pyflakes" lint_python
 part "$(t test.part_python)" python_tests
 part "$(t test.part_engine)" bash tests/engine.sh
 part "$(t test.part_jsf)" jsf_tests
+part "$(t test.part_gui)" bash tests/gui.sh
 
 if [ ${#skipped[@]} -gt 0 ]; then echo "${Y}$(t test.skipped)${N} ${skipped[*]}"; fi
 if [ ${#failed[@]} -gt 0 ]; then echo "${R}${B}$(t test.failed)${N} ${failed[*]}"; exit 1; fi

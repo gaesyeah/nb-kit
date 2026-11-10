@@ -1,5 +1,5 @@
 # Runs every nbkit test (bash nbkit.sh test) on each push and pull request,
-# with the oldest and the newest Python nbkit supports.
+# with the oldest and the newest Python nbkit supports (the interface uses the system one).
 name: tests
 
 on:
@@ -27,5 +27,10 @@ jobs:
         run: |
           python -m pip install --quiet pyflakes
           shellcheck --version | head -2
+      # the interface tests run with the system Python, the one python3-gi is built for
+      - name: Interface tools (GTK 4, VTE, virtual screen)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-gi gir1.2-gtk-4.0 gir1.2-vte-3.91 xvfb
       - name: Tests
         run: bash nbkit.sh test

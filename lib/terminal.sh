@@ -47,23 +47,39 @@ t() {
 }
 
 die() { echo "${R}$(t cli.error)${N} $*" >&2; exit 1; }
+
+# ---------- events for the graphical interface ----------
+# json_str <text>: the text as a JSON string
+json_str() {
+  local s="$1"
+  s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\t'/\\t}"; s="${s//$'\n'/\\n}"; s="${s//$'\r'/\\r}"; s="${s//$'\e'/\\u001b}"
+  printf '"%s"' "$s"
+}
+# ui_event <json object>: with the interface (NBKIT_UI_EVENTS = its file), one event per line; otherwise nothing
+ui_event() { if [ -n "${NBKIT_UI_EVENTS:-}" ]; then printf '%s\n' "$1" >> "$NBKIT_UI_EVENTS"; fi; return 0; }
 STEP=0; TOTAL=0
 step() {
   STEP=$((STEP + 1))
   # tests only: simulates a failure at this step, to check that everything goes back (tests/engine.sh)
   if [ "${NBKIT_TEST_FAIL_STEP:-}" = "$STEP" ]; then die "NBKIT_TEST_FAIL_STEP=$STEP"; fi
   printf '%s[%d/%d]%s %s\n' "$BL" "$STEP" "$TOTAL" "$N" "$*"
+  ui_event "{\"ev\":\"step\",\"n\":$STEP,\"total\":$TOTAL,\"text\":$(json_str "$*")}"
+  # tests only: stops at this step until interrupted (tests/gui.sh closes the window there)
+  if [ "${NBKIT_TEST_PAUSE_STEP:-}" = "$STEP" ]; then sleep 120; fi
 }
 ok()   { printf '      %s✓%s %s\n' "$G" "$N" "$*"; }
 info() { printf '      %s%s%s\n' "$D" "$*" "$N"; }
 warn() { printf '      %s!%s %s\n' "$Y" "$N" "$*"; }
 
 # ---------- yes/no ----------
-# yes/no question; the uppercase letter is the Enter default (Y or N in $2)
+# yes/no question; the uppercase letter is the Enter default (Y or N in $2).
+# With the interface it also becomes a dialog there, which answers by typing here (see lib/gui/model.py).
 ask_yn() {
   local a hint; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
   printf '%s %s ' "$1" "$hint"
+  ui_event "{\"ev\":\"ask\",\"text\":$(json_str "$1"),\"default\":\"$2\"}"
   IFS= read -r a </dev/tty || a=""
+  ui_event '{"ev":"answered"}'
   a="${a,,}"
   if [ -z "$a" ]; then [ "$2" = Y ]; return; fi
   case "$a" in s|sim|y|yes) return 0 ;; *) return 1 ;; esac

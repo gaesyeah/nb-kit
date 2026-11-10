@@ -1,24 +1,28 @@
 #!/usr/bin/env bash
 # Builds the NetBeans modules of nbkit from the Java code in src/, against the jars of an Apache NetBeans
 # installation, and updates their sha256 (lib/jars/SHA256SUMS and modules/jsf/module.toml).
-#   bash src/build.sh [netbeans folder] [--test]      --test: runs the JSF tests (tests/jsf.sh) after building
+#   bash src/build.sh [netbeans folder] [--test]      --test: runs the JSF tests (tests/jsf.sh) after building; --help
 # Without the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK 17 or newer (javac, jar).
 set -euo pipefail
 trap 'exit 130' INT TERM HUP
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NBKIT_DIR="$(dirname "$SRC")"
-NB=""; TEST=0
+NB=""; TEST=0; HELP=0; BAD=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --lang=*) NBKIT_LANG="${1#--lang=}" ;;
     --lang) NBKIT_LANG="${2:-}"; [ $# -gt 1 ] && shift ;;
     --test) TEST=1 ;;
+    -h|--help|help) HELP=1 ;;
+    -*) BAD="$1" ;;
     *) NB="$1" ;;
   esac
   shift
 done
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/terminal.sh"
+if [ $HELP = 1 ]; then t build.usage; exit 0; fi
+[ -z "$BAD" ] || die "$(t build.unknown_option "$BAD")"
 
 # ---------- NetBeans and JDK ----------
 find_netbeans() {

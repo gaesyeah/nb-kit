@@ -12,10 +12,10 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/gaesyeah/nb-kit?style=for-the-badge&color=30363D"></a>
 </p>
 
-A kit of modules for **Apache NetBeans** on Linux, installed by a terminal CLI. It has two modules today:
+A kit of modules for **Apache NetBeans** on Linux, installed by a terminal CLI or by a graphical interface. It has two modules today:
 
-- **One Dark Pro Mix theme:** the colors of the VS Code theme, with the FlatLaf Dark look and feel and the JetBrains Mono font.
 - **JSF checks:** warnings in the xhtml editor for errors NetBeans does not show, such as a misspelled bean name (`#{customerVn.name}` instead of `#{customerVm.name}`).
+- **One Dark Pro Mix theme:** the colors of the VS Code theme, with the FlatLaf Dark look and feel and the JetBrains Mono font.
 
 Each module installs and uninstalls on its own.
 
@@ -32,10 +32,22 @@ The CLI shows the status of each module and only the options that make sense. Us
 - **Install or update:** choose "All" or one module.
 - **Reinstall** and **Uninstall:** also per module.
 - **Check that it loaded in NetBeans:** checks each installed module.
-- **Run the tests:** only shows up in a clone of the repository (see "Tests").
+- **Run the tests** and **Build the modules:** only show up in a clone of the repository (see "Tests" and "Building the jars").
 - **Backups:** only shows up when there is one. Enter restores, Del deletes, Esc goes back, and both restore and delete ask for confirmation.
 
-If NetBeans is open, nbkit offers to close it the same way as File > Exit, so NetBeans asks about unsaved files and running processes as usual. At the end, it offers to open NetBeans and checks by itself that everything loaded. If something fails midway, or if you press Ctrl+C, everything goes back to how it was.
+If NetBeans is open, nbkit offers to close it the same way as File > Exit, so NetBeans asks about unsaved files and running processes as usual. At the end, it offers to open NetBeans and checks by itself that everything loaded (if you say no, it tells you how to check later). If something fails midway, or if you press Ctrl+C, everything goes back to how it was.
+
+### Graphical interface
+
+```bash
+bash nbkit/nbkit.sh gui
+```
+
+A window with the same options: the modules with their status and buttons (tools first, then themes), install or update, reinstall and uninstall all at once, the userdir, Backups (restore or delete each one), Check and, in a clone, Run the tests and Build the modules. At the bottom, a terminal runs the CLI itself, so you see the same progress, colors and messages, with a progress bar on top. To copy from it: select and press Ctrl+Shift+C, or right-click; without a selection, it copies everything.
+
+Every question of the CLI also shows up as a dialog. You can answer there or type in the terminal: the dialog closes by itself. The sudo password, when needed, is typed in the terminal; the interface never sees it. Closing the window in the middle of an action presses Ctrl+C for you, so everything goes back to how it was.
+
+It needs GTK 4 and VTE for GTK 4 (through PyGObject). If they are missing, nbkit offers to install them (`python3-gi`, `gir1.2-gtk-4.0` and `gir1.2-vte-3.91` on Debian, Ubuntu and Pop!_OS; the right names on Fedora, Arch and openSUSE). It works on any desktop (GNOME, KDE, XFCE, Cinnamon, COSMIC) and follows the system GTK theme and its dark mode preference, terminal included.
 
 ### Without the menu
 
@@ -44,11 +56,16 @@ If NetBeans is open, nbkit offers to close it the same way as File > Exit, so Ne
 | `bash nbkit.sh install [module...] [userdir]` | Installs or updates (no module: all) |
 | `bash nbkit.sh uninstall [module...] [userdir]` | Removes (no module: all installed) |
 | `bash nbkit.sh check [userdir]` | With NetBeans open, checks that everything loaded |
+| `bash nbkit.sh gui [userdir]` | Opens the graphical interface |
+| `bash nbkit.sh status [--json] [userdir]` | What is installed; `--json` for programs (the interface uses it) |
+| `bash nbkit.sh restore <backup>` | Goes back to a backup (the files are listed by `status --json`) |
+| `bash nbkit.sh delete-backup <backup>` | Deletes a backup |
 | `bash nbkit.sh test` | Runs the tests (in the repository, see "Tests") |
+| `bash nbkit.sh build` | Builds the jars from `src/` (see "Building the jars") |
 | `bash nbkit.sh --help` | Help and list of modules |
 | `--lang en` or `--lang pt-BR` | With any command, changes the language |
 
-The module ids are `one-dark-pro-mix` and `jsf`. The default userdir is the newest NetBeans in `~/.netbeans/`; if there is more than one, the menu asks which one to use.
+The module ids are `jsf` and `one-dark-pro-mix`. The default userdir is the newest NetBeans in `~/.netbeans/`; if there is more than one, the menu asks which one to use.
 
 ## Languages
 
@@ -66,6 +83,52 @@ To add a language:
 - Apache NetBeans, tested on version 31. Works with a regular install, Flatpak or Snap.
 - NetBeans running on Java 17 or newer. `check` warns if it is older.
 - `curl` or `wget`, only if JetBrains Mono needs to be downloaded. With neither, nbkit offers to install `curl`.
+- For the graphical interface only: GTK 4 and VTE for GTK 4 with PyGObject (nbkit offers to install them).
+
+## JSF checks
+
+NetBeans checks tags, attributes and the EL syntax, but does not catch errors that only show up at runtime, or that never show up. This module marks those errors in the editor:
+- **Red:** certainly breaks.
+- **Yellow:** probable error, or depends on something outside the file.
+
+Each rule turns on and off in **Tools > Options > Editor > JSF**. The messages come out in English or Portuguese, following the NetBeans language.
+
+- **EL:**
+  - name that does not exist;
+  - variable out of place;
+  - property or method missing in the bean;
+  - input `value` that cannot be written;
+  - method where a property is expected;
+  - enum constant that does not exist;
+  - undeclared `cc.attrs`;
+  - `${}` in a JSF component.
+- **Declared and never used:** `ui:param`, `c:set`, `var`, `varStatus`, `cc:attribute`, lambda parameter.
+- **IDs:**
+  - `update`/`process`/`for` pointing to a missing id;
+  - wrong search keyword (`@from`);
+  - invalid or repeated id;
+  - update of a component with `rendered`;
+  - `PF('x')` without `widgetVar`.
+- **Forms:**
+  - button or input outside `h:form`;
+  - form inside a form;
+  - `p:dialog` with `appendTo` body;
+  - `p:fileUpload` without multipart;
+  - validation without a message component.
+- **Lifecycle:**
+  - `c:if`/`c:forEach` using the variable of a `ui:repeat`/`p:dataTable`;
+  - `f:viewParam` outside `f:metadata`;
+  - `p:ajax` event the component does not have.
+- **Templates and files:**
+  - `ui:define` without `ui:insert`;
+  - content outside `ui:define`;
+  - missing include, template, resource or navigation page.
+- **Others:**
+  - EL inside a comment (Facelets runs it);
+  - `&nbsp;` and other HTML entities;
+  - `escape="false"`.
+
+The beans (Spring `@Component` and its derivatives, `@Bean`, CDI `@Named`, `@ManagedBean`) and the types come from the compiled classes of the project and from the classpath jars, so it works in any project without configuration. Classes not compiled yet come in by name, read from the source code.
 
 ## One Dark Pro Mix theme
 
@@ -198,51 +261,6 @@ The brackets are `nbkit-bracket1`, `nbkit-bracket2` and `nbkit-bracket3`, one pe
 
 `modules/themes/one-dark-pro-mix/` is a complete example.
 
-## JSF checks
-
-NetBeans checks tags, attributes and the EL syntax, but does not catch errors that only show up at runtime, or that never show up. This module marks those errors in the editor:
-- **Red:** certainly breaks.
-- **Yellow:** probable error, or depends on something outside the file.
-
-Each rule turns on and off in **Tools > Options > Editor > JSF**. The messages come out in English or Portuguese, following the NetBeans language.
-
-- **EL:**
-  - name that does not exist;
-  - variable out of place;
-  - property or method missing in the bean;
-  - input `value` that cannot be written;
-  - method where a property is expected;
-  - enum constant that does not exist;
-  - undeclared `cc.attrs`;
-  - `${}` in a JSF component.
-- **Declared and never used:** `ui:param`, `c:set`, `var`, `varStatus`, `cc:attribute`, lambda parameter.
-- **IDs:**
-  - `update`/`process`/`for` pointing to a missing id;
-  - wrong search keyword (`@from`);
-  - invalid or repeated id;
-  - update of a component with `rendered`;
-  - `PF('x')` without `widgetVar`.
-- **Forms:**
-  - button or input outside `h:form`;
-  - form inside a form;
-  - `p:dialog` with `appendTo` body;
-  - `p:fileUpload` without multipart;
-  - validation without a message component.
-- **Lifecycle:**
-  - `c:if`/`c:forEach` using the variable of a `ui:repeat`/`p:dataTable`;
-  - `f:viewParam` outside `f:metadata`;
-  - `p:ajax` event the component does not have.
-- **Templates and files:**
-  - `ui:define` without `ui:insert`;
-  - content outside `ui:define`;
-  - missing include, template, resource or navigation page.
-- **Others:**
-  - EL inside a comment (Facelets runs it);
-  - `&nbsp;` and other HTML entities;
-  - `escape="false"`.
-
-The beans (Spring `@Component` and its derivatives, `@Bean`, CDI `@Named`, `@ManagedBean`) and the types come from the compiled classes of the project and from the classpath jars, so it works in any project without configuration. Classes not compiled yet come in by name, read from the source code.
-
 ## Structure
 
 ```
@@ -255,6 +273,9 @@ nbkit/
 │   ├── themes/                  Python parts of the theme engine
 │   ├── modules.sh, modules.py   engine for NetBeans modules (module.toml)
 │   ├── text.py                  texts of lang/ for the Python parts
+│   ├── uievents.py              events for the interface (questions) from the Python parts
+│   ├── gui.sh                   what the interface needs (GTK 4, VTE) and how to find it
+│   ├── gui/                     graphical interface: model.py (no GTK, tested alone) and app.py (window)
 │   └── jars/                    base modules: nbkit-core (closes NetBeans) and nbkit-colors (used by the themes)
 ├── modules/                     only data
 │   ├── README.md                how to create a module
@@ -277,10 +298,10 @@ To add a NetBeans module, create a folder in `modules/` with its jar and a `modu
 The jars are already built in `lib/jars/` and `modules/jsf/`. To build them again from `src/`, after changing the Java code or the texts:
 
 ```bash
-bash src/build.sh [netbeans folder]
+bash src/build.sh [netbeans folder]       # or: bash nbkit.sh build
 ```
 
-It compiles against the jars of your NetBeans installation (without the folder: `NB_HOME`, or the NetBeans that last used `~/.netbeans`) with a JDK 17 or newer, and updates the sha256 sums.
+It compiles against the jars of your NetBeans installation (without the folder: `NB_HOME`, or the NetBeans that last used `~/.netbeans`) with a JDK 17 or newer, and updates the sha256 sums. `bash src/build.sh --help` shows the options.
 
 ## Tests
 
@@ -291,9 +312,10 @@ bash nbkit.sh test
 Runs everything in `tests/`, also on GitHub Actions at each push:
 
 - **Lint:** shellcheck and pyflakes.
-- **Python unit tests** (`tests/python/`): the `colors.toml` format and its error messages, the validation of `theme.toml` and `module.toml`, and the `lang/` files (same keys in every language, every key the code uses exists).
-- **Engine** (`tests/engine.sh`): installs into a fake NetBeans (`tests/netbeans/`) and checks that the files are exactly the expected ones (`tests/expected/install.sha1`), that a reinstall keeps your customizations, that `check` finds a missing module, that uninstalling brings back exactly what was there, that a failure at any step changes nothing, and that broken files are skipped with the reason.
+- **Python unit tests** (`tests/python/`): the `colors.toml` format and its error messages, the validation of `theme.toml` and `module.toml`, the `lang/` files (same keys in every language, every key the code uses exists) and the interface model (statuses, buttons, commands, events, progress and questions).
+- **Engine** (`tests/engine.sh`): installs into a fake NetBeans (`tests/netbeans/`) and checks that the files are exactly the expected ones (`tests/expected/install.sha1`), that a reinstall keeps your customizations, that `check` finds a missing module, that uninstalling brings back exactly what was there, that a failure at any step changes nothing, that broken files are skipped with the reason, and what the interface uses: `status --json`, the step and question events, `restore` and `delete-backup`.
 - **JSF checks** (`tests/jsf.sh`, needs a JDK 17 or newer): runs the analyzer on the sample project in `src/nbkit-jsf/test/fixture`, whose pages mark where each warning must show up, in English and in Portuguese.
+- **Graphical interface** (`tests/gui.sh`, on a virtual screen with Xvfb): opens the window against the fake NetBeans and uses it like a person would: installs and uninstalls from the buttons, follows the progress bar, answers questions in the dialog and in the terminal, deletes a backup, opens About, closes the window in the middle of an install to check that everything goes back, and checks that it follows the dark mode of the system.
 
 What you need, besides bash and Python 3.11:
 
@@ -302,6 +324,8 @@ What you need, besides bash and Python 3.11:
 | shellcheck | lint of the bash files | `sudo apt install shellcheck` |
 | pyflakes | lint of the Python files | `sudo apt install python3-pyflakes` |
 | JDK 17 or newer (`javac`, `jar`, `java`) | JSF checks | `sudo apt install openjdk-21-jdk-headless` (or 17) |
+| GTK 4, VTE and PyGObject | interface | `sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-vte-3.91` |
+| xvfb-run | interface (virtual screen) | `sudo apt install xvfb` |
 
 The JSF checks need nothing else: the libraries the sample project uses (Spring and Jakarta annotations and a PrimeFaces component) are small stubs in `src/nbkit-jsf/test/libs/`, built by the test.
 

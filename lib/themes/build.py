@@ -2,6 +2,7 @@
 import sys, os, re, json, glob, zipfile
 import xml.dom.minidom as M
 from text import T
+from uievents import event
 
 UD, STAGE, PROFILE, FONTJSON = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 BASE = os.environ.get('NBKIT_THEME_BASE', 'FlatLafDark')            # folder of the NetBeans profile that is copied
@@ -283,7 +284,10 @@ def ask(question):
     try:
         with open('/dev/tty') as tty, open('/dev/tty', 'w') as out:
             out.write('      ' + question + ' ' + T('cli.yn_no') + ' '); out.flush()
-            return tty.readline().strip().lower() in ('s', 'sim', 'y', 'yes')
+            event(ev='ask', text=question, default='N')
+            answer = tty.readline()
+            event(ev='answered')
+            return answer.strip().lower() in ('s', 'sim', 'y', 'yes')
     except OSError:
         print(question + ' ' + T('theme.no_tty_font'))
         return False

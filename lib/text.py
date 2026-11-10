@@ -9,10 +9,11 @@ def T(key, *args):
         _TEXTS = {}
         for path in os.environ.get('NBKIT_LANG_FILES', '').split('\n'):
             if path and os.path.exists(path):
-                for line in open(path, encoding='utf-8'):
-                    line = line.rstrip('\n')
-                    if line and not line.startswith('#') and '=' in line:
-                        k, v = line.split('=', 1)
-                        _TEXTS[k] = v
+                with open(path, encoding='utf-8') as f:
+                    for line in f:
+                        line = line.rstrip('\n')
+                        if line and not line.startswith('#') and '=' in line:
+                            k, v = line.split('=', 1)
+                            _TEXTS[k] = v
     text = _TEXTS.get(key, key).replace('\\n', '\n')
     return text % args if args else text.replace('%%', '%')
