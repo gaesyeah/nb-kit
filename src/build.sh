@@ -31,7 +31,8 @@ find_netbeans() {
   local f inst d logs=()
   if [ -n "${NB_HOME:-}" ]; then echo "$NB_HOME"; return 0; fi
   # newest log first
-  mapfile -t logs < <(find "$HOME"/.netbeans -path '*/var/log/messages.log' -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2-)
+  # -H: ~/.netbeans can be a link to another folder
+  mapfile -t logs < <(find -H "$HOME"/.netbeans -path '*/var/log/messages.log' -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2-)
   for f in ${logs[@]+"${logs[@]}"}; do
     inst="$(sed -n 's/^ *Installation *= *//p' "$f" | tail -1)"
     [ -n "$inst" ] || continue

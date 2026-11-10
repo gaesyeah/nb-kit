@@ -133,6 +133,8 @@ font = json.loads(FONTJSON) if FONTJSON else None      # font you used in the ba
 
 def ask(question):
     try:
+        if os.environ.get('NBKIT_INTERACTIVE') != '1':
+            raise OSError('not interactive')       # same answer as with no terminal
         with open('/dev/tty') as tty, open('/dev/tty', 'w') as out:
             out.write('      ' + question + ' ' + T('cli.yn_no') + ' '); out.flush()
             event(ev='ask', text=question, default='N')

@@ -115,9 +115,9 @@ def actions(w):
     natural = w.top.measure(Gtk.Orientation.VERTICAL, w.get_width())[1]
     check('opens with the whole top visible, development included', wait(lambda: w.paned.get_position() >= natural, 3),
           (w.paned.get_position(), natural))
-    term = w.terminal.get_allocated_height()
-    check('the terminal opens with room for about 16 lines', wait(lambda: w.terminal.get_allocated_height() >= 300, 3),
-          w.terminal.get_allocated_height())
+    term = w.terminal.get_height()
+    check('the terminal opens with room for about 16 lines', wait(lambda: w.terminal.get_height() >= 300, 3),
+          w.terminal.get_height())
     check('its last line is never cut (lines sit at the bottom)', not w.terminal.get_yfill() and w.terminal.get_yalign() == Vte.Align.END, term)
     check('the terminal is whole, inside the window', inside(w))
     check('check and backups start disabled', not w.check_button.get_sensitive() and not w.backups_button.get_sensitive())
@@ -126,6 +126,20 @@ def actions(w):
           and w.backups_button.get_cursor().get_name() == 'not-allowed')
     check('the module buttons are not inside a list (they keep the normal button look)',
           not any(isinstance(p, Gtk.ListBoxRow) for p in ancestors(w.rows['jsf']['buttons']['install'])))
+    tips = [b for b in w.action_buttons + [w.refresh_button, w.about_button, w.copy_button, w.clear_button] if not b.get_tooltip_text()]
+    check('every button explains itself on hover (tooltip)', not tips, [b.get_label() for b in tips])
+    check('the tooltip of "Build the modules" says what is built and when', 'src/' in w.dev.get_last_child().get_tooltip_text())
+    height = lambda x: x.measure(Gtk.Orientation.VERTICAL, -1)[1]
+    check('Running/Done is as far from the bar as a title from its buttons (the clear button adds no height)',
+          w.status_row.get_spacing() == w.content.get_spacing() and height(w.result_row) == height(w.result),
+          (height(w.result_row), height(w.result)))
+    check('the clear button is a small broom icon, no text',
+          w.clear_button.get_icon_name() == 'nbkit-broom-symbolic' and not w.clear_button.get_label()
+          and Gtk.IconTheme.get_for_display(w.get_display()).has_icon('nbkit-broom-symbolic'))
+
+    default = Gtk.ProgressBar().measure(Gtk.Orientation.VERTICAL, -1)[0]
+    check('the progress bar is 50% taller than the theme one, with room for the step inside',
+          height(w.progress) >= int(default * 1.5) and height(w.progress) >= height(w.progress_text), (height(w.progress), default))
     check('install all is offered for both modules', [b.get_name() for b in children(w.bulk)] == ['install-all'])
 
     print('Install from a button')
@@ -134,16 +148,17 @@ def actions(w):
     check('the cursor shows it is loading', w.top.get_cursor().get_name() == 'progress'
           and w.rows['one-dark-pro-mix']['buttons']['install'].get_cursor().get_name() == 'progress')
     check('the result is above the progress bar, in the type of the titles',
-          w.result.get_next_sibling() is w.progress and w.result.has_css_class('heading'))
+          w.result.get_parent().get_next_sibling() is w.progress_box and w.result.has_css_class('heading'))
     check('the terminal runs nbkit.sh', wait(lambda: 'Installed: JSF checks' in terminal_text(w), 30), terminal_text(w)[-400:])
-    check('the progress bar reaches the last step', wait(lambda: w.progress.get_text() == '2/2' and w.progress.get_fraction() == 1, 10),
-          w.progress.get_text())
+    check('the bar reaches the last step, written inside the bar',
+          wait(lambda: w.progress_text.get_text() == '2/2' and w.progress_text.get_parent() is w.progress_box
+               and w.progress.get_fraction() == 1, 10) and w.result.get_text() == 'Running', w.progress_text.get_text())
     check('the action finishes', finish_waiting(w))
     check('the result is shown', w.result.get_text() == 'Done', w.result.get_text())
     check('after it, the cursor is a hand again', w.top.get_cursor() is None
           and w.rows['jsf']['buttons']['reinstall'].get_cursor().get_name() == 'pointer')
-    check('a finished action shows a full bar, without n/total', w.progress.get_fraction() == 1 and w.progress.get_text() == '',
-          (w.progress.get_fraction(), w.progress.get_text()))
+    check('a finished action shows a full bar and only "Done"', w.progress.get_fraction() == 1 and w.result.get_text() == 'Done'
+          and w.progress_text.get_text() == '', (w.progress.get_fraction(), w.result.get_text(), w.progress_text.get_text()))
     check('the status is refreshed', status(w, 'jsf') == 'installed (v2)', status(w, 'jsf'))
     check('the buttons follow the new status', list(w.rows['jsf']['buttons']) == ['reinstall', 'uninstall'])
 
@@ -155,6 +170,20 @@ def actions(w):
     check('copy without a selection takes the whole output', wait(lambda: got, 5) and 'Installed: JSF checks' in (got[0] or ''), got)
     check('the right-click menu has copy and select all', [w.terminal.get_context_menu_model().get_item_attribute_value(i, 'action').unpack()
                                                           for i in range(2)] == ['term.copy', 'term.select-all'])
+    w.terminal.feed(''.join('line %d\r\n' % i for i in range(300)).encode())   # more than the screen: scrollback
+    wait(lambda: 'line 299' in terminal_text(w), 5)
+    w.terminal.unselect_all()
+    w.terminal.get_clipboard().set('')
+    got.clear()
+    w.copy_button.emit('clicked')
+    w.terminal.get_clipboard().read_text_async(None, lambda cb, res: got.append(cb.read_text_finish(res)))
+    check('the copy button copies the whole output, scrollback included',
+          wait(lambda: got, 5) and 'Installed: JSF checks' in (got[0] or '') and 'line 0\n' in got[0] and 'line 299\n' in got[0],
+          (got[0] or '')[-80:] if got else got)
+    check('and selects nothing', not w.terminal.get_has_selection())
+    w.clear_button.emit('clicked')
+    check('the clear button empties the terminal', terminal_text(w).strip() == '' and w.result.get_text() == ''
+          and not w.progress_box.get_visible(), terminal_text(w)[-200:])
 
     print('A question answered in the dialog')
     w.rows['jsf']['buttons']['uninstall'].emit('clicked')
@@ -165,7 +194,7 @@ def actions(w):
 
     print('A question answered in the terminal')
     w.rows['one-dark-pro-mix']['buttons']['install'].emit('clicked')
-    check('theme install goes step by step', wait(lambda: w.progress.get_text() == '10/10', 60), w.progress.get_text())
+    check('theme install goes step by step', wait(lambda: w.progress_text.get_text() == '10/10', 60), w.progress_text.get_text())
     check('theme install finishes', finish_waiting(w) and status(w, 'one-dark-pro-mix') == 'installed (v29)')
     check('the backup shows up', w.backups_button.get_label() == 'Backups (1)' and w.backups_button.get_sensitive())
     w.rows['one-dark-pro-mix']['buttons']['uninstall'].emit('clicked')
@@ -184,6 +213,7 @@ def actions(w):
     w.backups_button.emit('clicked')
     wait(lambda: False, 0.3)
     check('the backups window lists the backup', len(w.backup_rows) == 1)
+    check('its buttons explain themselves on hover', w.backup_rows[0]['restore'].get_tooltip_text() and w.backup_rows[0]['delete'].get_tooltip_text())
     w.backup_rows[0]['delete'].emit('clicked')
     check('deleting asks first', wait(lambda: w.question is not None, 15) and w.run.question['text'].startswith('Delete the backup of'))
     w.question_buttons['yes'].emit('clicked')
@@ -263,7 +293,7 @@ def closing(w):
     before = fingerprint()
     os.environ['NBKIT_TEST_PAUSE_STEP'] = '6'       # nbkit stops at step 6 (lib/terminal.sh), half-way
     w.rows['one-dark-pro-mix']['buttons']['install'].emit('clicked')
-    check('the install reaches step 6', wait(lambda: w.run.step == 6, 60), w.progress.get_text())
+    check('the install reaches step 6', wait(lambda: w.run.step == 6, 60), w.result.get_text())
     w.close()
     check('the window waits for nbkit to stop', w.closing and w.busy)
     check('nbkit stops', wait(lambda: not w.busy, 30))

@@ -133,6 +133,8 @@ def props(path):
 def ask_keep(msg):
     """asks whether to keep the values the user changed (default: no)"""
     try:
+        if os.environ.get('NBKIT_INTERACTIVE') != '1':
+            raise OSError('not interactive')       # same answer as with no terminal
         with open('/dev/tty') as tty, open('/dev/tty', 'w') as out:
             out.write(''.join('      ' + line + '\n' for line in msg.splitlines()) + '      ' + T('theme.merge_ask_keep')
                       + ' ' + T('cli.yn_no') + ' ')

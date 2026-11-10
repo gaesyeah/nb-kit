@@ -13,13 +13,20 @@ list_userdirs() {
 }
 
 # ---------- NetBeans open/closed ----------
-# NetBeans processes using this userdir (the launcher passes --userdir to java)
+# NetBeans processes using this userdir (the launcher passes --userdir to java). The paths are compared
+# resolved: ~/.netbeans can be a link, and NetBeans and nbkit may each name the userdir another way
 nb_pids() {
-  local p
+  local p a prev ud
+  ud="$(readlink -f "$UD")"
   for p in $(pgrep -f 'org.netbeans.Main' 2>/dev/null || true); do
     [ -r "/proc/$p/cmdline" ] || continue
-    if tr '\0' '\n' < "/proc/$p/cmdline" 2>/dev/null \
-       | grep -xF -e "$UD" -e "-XX:HeapDumpPath=$UD/var/log/heapdump.hprof" >/dev/null; then echo "$p"; fi
+    prev=""
+    while IFS= read -r a; do
+      [ "$prev" = --userdir ] || case "$a" in -XX:HeapDumpPath=*/var/log/heapdump.hprof) ;; *) prev="$a"; continue ;; esac
+      a="${a#-XX:HeapDumpPath=}"; a="${a%/var/log/heapdump.hprof}"
+      if [ "$(readlink -f "$a")" = "$ud" ]; then echo "$p"; break; fi
+      prev="$a"
+    done < <(tr '\0' '\n' < "/proc/$p/cmdline" 2>/dev/null)
   done
   return 0
 }
@@ -49,7 +56,8 @@ find_launcher() {
       ?*) if [ -x "$(dirname "$inst")/bin/netbeans" ]; then LAUNCH=("$(dirname "$inst")/bin/netbeans"); fi ;;
     esac
   fi
-  if [ ${#LAUNCH[@]} -eq 0 ] && command -v netbeans >/dev/null 2>&1; then LAUNCH=("$(command -v netbeans)"); fi
+  # "netbeans" on the PATH only when the log names no installation: it may be another NetBeans than this userdir's
+  if [ ${#LAUNCH[@]} -eq 0 ] && [ -z "$inst" ] && command -v netbeans >/dev/null 2>&1; then LAUNCH=("$(command -v netbeans)"); fi
   [ ${#LAUNCH[@]} -gt 0 ] || return 1
   # the launcher alone picks the system java, which may be too old (the menu shortcut may use another one);
   # use the same Java NetBeans ran with last time. Flatpak and Snap bring their own Java.

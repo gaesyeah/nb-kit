@@ -1410,7 +1410,13 @@ public final class Analyzer {
             for (Xml.Element d : in.el.elements()) {
                 if (d.is("ui", "define")) {
                     Xml.Attr n = d.attr("name");
-                    if (n != null && !inserts.contains(n.value.trim())) {
+                    // only f:metadata, in the page itself: works without the ui:insert. JSF reads the f:metadata of
+                    // the page in a pass of its own, ignoring the template, and keeps it in the view on every request
+                    // (Mojarra: SAXCompiler metadata compile, FaceletViewHandlingStrategy.restoreView, ComponentSupport;
+                    // MyFaces since 2.1.11, MYFACES-3665). In a template or included file it is not read: error
+                    boolean onlyMetadata = !d.elements().isEmpty() && d.elements().stream().allMatch(c -> c.is("f", "metadata"))
+                            && d.children.stream().noneMatch(c -> c instanceof Xml.Text && !((Xml.Text) c).raw.isBlank());
+                    if (n != null && !(onlyMetadata && ws.incoming(in.from).isEmpty()) && !inserts.contains(n.value.trim())) {
                         String hint = closest(n.value.trim(), inserts);
                         report("tpl.define", Severity.ERROR, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.name", n.value.trim()) + Msg.hint(hint));
                     }

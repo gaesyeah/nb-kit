@@ -43,7 +43,7 @@ If NetBeans is open, nbkit offers to close it the same way as File > Exit, so Ne
 bash nbkit/nbkit.sh gui
 ```
 
-A window with the same options: the modules with their status and buttons (tools first, then themes), install or update, reinstall and uninstall all at once, the userdir, Backups (restore or delete each one), Check and, in a clone, Run the tests and Build the modules. At the bottom, a terminal runs the CLI itself, so you see the same progress, colors and messages, with the progress bar above it. What changes outside the window (NetBeans opened or closed, the CLI in a terminal) shows up by itself. To copy from it: select and press Ctrl+Shift+C, or right-click; without a selection, it copies everything.
+A window with the same options: the modules with their status and buttons (tools first, then themes), install or update, reinstall and uninstall all at once, the userdir, Backups (restore or delete each one), Check and, in a clone, Run the tests and Build the modules. At the bottom, a terminal runs the CLI itself, so you see the same progress, colors and messages, with the progress bar above it (the step inside it). What changes outside the window (NetBeans opened or closed, the CLI in a terminal) shows up by itself. To copy from it: select and press Ctrl+Shift+C, or right-click; without a selection, it copies everything; the copy button beside the result always copies all of it, without selecting. The broom button beside it empties the terminal, and every button explains itself when the mouse is over it.
 
 Every question of the CLI also shows up as a dialog. You can answer there or type in the terminal: the dialog closes by itself. The sudo password, when needed, is typed in the terminal; the interface never sees it. Closing the window in the middle of an action presses Ctrl+C for you, so everything goes back to how it was.
 
@@ -135,7 +135,7 @@ The beans (Spring `@Component` and its derivatives, `@Bean`, CDI `@Named`, `@Man
 - Creates the **"One Dark Pro Mix"** profile as a copy of the FlatLaf Dark of your NetBeans version, with the theme colors. The original FlatLaf Dark profile is not changed.
 - Uses the Mix colors whenever there is an equivalent. Where the Mix does not define a color, it uses the VS Code default.
 - Keeps the NetBeans italics and bold, except for keywords, which are not bold, as in the Mix.
-- Selects the FlatLaf Dark look and feel, the profile and the terminal selection color, and installs JetBrains Mono if it is missing.
+- Selects the FlatLaf Dark look and feel, the profile and, in the NetBeans terminal, the selection color and JetBrains Mono (unless you chose a font there), and installs JetBrains Mono if it is missing.
 - Warnings in yellow and errors in red, both with a soft background.
 - A coloring module paints what the editor does not tell apart by itself:
   - **JavaScript:** calls, objects and constants.
@@ -155,7 +155,7 @@ A theme is a folder in `modules/themes/` with three data files, no code. nbkit f
 - keeping the user's customizations;
 - installing the font if it is missing, and removing it later only if nbkit installed it;
 - installing the coloring module (`nbkit-colors.jar`): calls, objects, constants, units, functions, brackets by level, DOCTYPE...;
-- applying the terminal selection color;
+- applying the terminal selection color, and the theme font in the NetBeans terminal when you chose none there;
 - undoing everything on Ctrl+C;
 - checking with NetBeans open (`check`).
 

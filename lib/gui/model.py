@@ -93,6 +93,11 @@ def actions(m):
     return ['reinstall', 'uninstall']
 
 
+# tooltips of the buttons (lang/), by action
+TIP_KEYS = {'install': 'gui.tip_install', 'update': 'gui.tip_update', 'reinstall': 'gui.tip_reinstall',
+            'uninstall': 'gui.tip_uninstall', 'install-all': 'gui.tip_install_all', 'reinstall-all': 'gui.tip_reinstall_all',
+            'uninstall-all': 'gui.tip_uninstall_all', 'backups': 'gui.tip_backups', 'check': 'gui.tip_check',
+            'test': 'gui.tip_test', 'build': 'gui.tip_build', 'restore': 'gui.tip_restore', 'delete': 'gui.tip_delete'}
 BULK_KEYS = {'install': 'gui.install_all', 'reinstall': 'gui.reinstall_all', 'uninstall': 'gui.uninstall_all'}
 
 

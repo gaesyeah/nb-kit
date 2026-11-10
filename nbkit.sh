@@ -8,7 +8,7 @@
 set -euo pipefail
 # Ctrl+C exits with code 130 (the exit trap uses it to undo a half-done install)
 trap 'exit 130' INT TERM HUP
-NBKIT_VERSION=3.1.2
+NBKIT_VERSION=3.2.0
 SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")"
 NBKIT_DIR="$(dirname "$SELF")"
 ME="$(basename "$SELF")"
@@ -91,7 +91,7 @@ for a in "$@"; do
     all|todos) SEL=("${MODS[@]}") ;;
     *)
       if [ -n "${MOD_FN[$a]:-}" ]; then SEL+=("$a")
-      elif [ -d "$a" ]; then UD="$(readlink -f "$a")"
+      elif [ -d "$a" ]; then UD="$(cd "$a" && pwd)"      # the path as you see it (~/... stays ~/... with links)
       elif [ -f "$a" ]; then BKF="$(readlink -f "$a")"
       else t cli.unknown_arg "$a" >&2; echo >&2; echo >&2; usage >&2; exit 1; fi ;;
   esac
@@ -101,6 +101,8 @@ MENU=0; INTERACTIVE=0
 if [ -t 0 ] && [ -t 1 ]; then
   if [ $# -eq 0 ]; then MENU=1; INTERACTIVE=1; elif [ "${NBKIT_TTY:-}" = 1 ]; then INTERACTIVE=1; fi
 fi
+# the questions the theme scripts ask follow the same rule (with arguments and no NBKIT_TTY: no questions)
+export NBKIT_INTERACTIVE=$INTERACTIVE
 [ -n "$ACTION" ] || ACTION=install
 # tests: they live in the repository, not in the release zip
 if [ "$ACTION" = test ]; then
@@ -127,7 +129,12 @@ if [ "$ACTION" = gui ]; then
     fi
     [ -n "$GUI_PY" ] || die "$(t cli.gui_manual)"
   fi
-  exec "$GUI_PY" "$NBKIT_DIR/lib/gui/app.py" ${UD:+"$UD"}
+  # in its own session: the terminal is free at once, and closing the window ends it; messages go to a log
+  log="${XDG_CACHE_HOME:-$HOME/.cache}/nbkit/gui.log"
+  mkdir -p "$(dirname "$log")"
+  setsid -f "$GUI_PY" "$NBKIT_DIR/lib/gui/app.py" ${UD:+"$UD"} </dev/null >"$log" 2>&1
+  t cli.gui_started "${log/#$HOME/\~}"; echo
+  exit 0
 fi
 
 # ---------- userdir ----------

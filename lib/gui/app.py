@@ -68,9 +68,12 @@ def label(text, *classes, wrap=False, xalign=0.0):
     return w
 
 
-def button(text, callback, *args):
+def button(text, callback, *args, tip=None):
+    """a button with a hand cursor; tip: the lang/ key of its tooltip (GTK draws it with the theme colors)"""
     b = Gtk.Button(label=text)
     b.set_cursor_from_name('pointer')
+    if tip:
+        b.set_tooltip_text(T(tip))
     b.connect('clicked', lambda _b: callback(*args))
     return b
 
@@ -96,10 +99,10 @@ class Window(Gtk.ApplicationWindow):
         self.poll_id = self.pulse_id = 0
 
         header = Gtk.HeaderBar()
-        self.about_button = Gtk.Button(label=T('gui.about'))
+        self.about_button = Gtk.Button(label=T('gui.about'), tooltip_text=T('gui.tip_about'))
         self.about_button.set_cursor_from_name('pointer')
         self.about_button.connect('clicked', lambda _b: self.show_about())
-        self.refresh_button = Gtk.Button(icon_name='view-refresh-symbolic', tooltip_text=T('gui.refresh'))
+        self.refresh_button = Gtk.Button(icon_name='view-refresh-symbolic', tooltip_text=T('gui.tip_refresh'))
         self.refresh_button.connect('clicked', lambda _b: self.refresh())
         header.pack_end(self.about_button)
         header.pack_end(self.refresh_button)
@@ -118,14 +121,38 @@ class Window(Gtk.ApplicationWindow):
         self.top.append(self.content)
         top_scroll = Gtk.ScrolledWindow(child=self.top, vexpand=True, min_content_height=160)
 
-        # progress: pulses until the first step, then step n of total
-        # progress bar and result on one row, so the terminal keeps the room
-        # what is running or how it ended, in the same type as the section titles, with the progress bar below
-        self.progress = Gtk.ProgressBar(show_text=True, visible=False)
+        # what is running or how it ended, in the type of the section titles, with small buttons beside it that
+        # copy the terminal (the same as Ctrl+Shift+C) and clear it; below, at the same distance as a title from its
+        # buttons, the progress bar with the step inside ("5/10"): it pulses until the first step, then step by step
         self.result = label('', 'heading', xalign=0.0)
-        status_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, margin_start=14, margin_end=14)
-        status_row.append(self.result)
-        status_row.append(self.progress)
+        self.result.set_hexpand(True)
+        self.result_row = Gtk.Box(spacing=6)
+        self.result_row.append(self.result)
+        # the broom is our own icon (lib/gui/icons, themes have none); in a hicolor folder so GTK paints it in the
+        # text color, like the theme icons
+        Gtk.IconTheme.get_for_display(self.get_display()).add_search_path(os.path.join(model.ROOT, 'lib', 'gui', 'icons'))
+        small = []
+        for icon, name, tip, callback in (
+                ('edit-copy-symbolic', 'gui.copy', 'gui.tip_copy', lambda _b: self.copy_all()),
+                ('nbkit-broom-symbolic', 'gui.clear', 'gui.tip_clear', lambda _b: self.clear_terminal())):
+            b = Gtk.Button(icon_name=icon, tooltip_text=T(tip), valign=Gtk.Align.CENTER)
+            b.add_css_class('nbkit-small')
+            b.update_property([Gtk.AccessibleProperty.LABEL], [T(name)])
+            b.set_cursor_from_name('pointer')
+            b.connect('clicked', callback)
+            self.result_row.append(b)
+            small.append(b)
+        self.copy_button, self.clear_button = small
+        self.progress = Gtk.ProgressBar()
+        self.progress.add_css_class('nbkit')
+        self.progress_text = label('', 'caption')
+        self.progress_text.set_halign(Gtk.Align.CENTER)
+        self.progress_text.set_valign(Gtk.Align.CENTER)
+        self.progress_box = Gtk.Overlay(child=self.progress, visible=False)
+        self.progress_box.add_overlay(self.progress_text)
+        self.status_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_start=14, margin_end=14)
+        self.status_row.append(self.result_row)
+        self.status_row.append(self.progress_box)
 
         # bottom: the terminal where nbkit.sh runs
         self.terminal = Vte.Terminal(scrollback_lines=10000, vexpand=True)
@@ -135,14 +162,20 @@ class Window(Gtk.ApplicationWindow):
         self.terminal.set_yfill(False)
         self.terminal.set_yalign(Vte.Align.END)
         css = Gtk.CssProvider()
-        css.load_from_data(b'vte-terminal { padding: 2px 6px 6px 6px; }')
+        # the progress bar at least 50% taller than the theme's, and tall enough for the step written inside;
+        # the clear button no taller than the title beside it, so the bar keeps the title distance
+        bar = max(int(Gtk.ProgressBar().measure(Gtk.Orientation.VERTICAL, -1)[0] * 1.5 + 0.5),
+                  self.progress_text.measure(Gtk.Orientation.VERTICAL, -1)[1])
+        css.load_from_data(b'vte-terminal { padding: 2px 6px 6px 6px; } '
+                           b'progressbar.nbkit trough, progressbar.nbkit progress { min-height: %dpx; } '
+                           b'button.nbkit-small { min-height: 0; min-width: 0; padding: 3px; margin: -3px 0; }' % bar)
         Gtk.StyleContext.add_provider_for_display(self.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.terminal.connect('child-exited', self.on_child_exited)
         self.add_terminal_copy()
         # with nothing running there is nothing to type: no cursor (\e[?25l); each action shows it again
         self.terminal.feed(('\x1b[2m' + T('gui.ready') + '\x1b[0m\r\n\x1b[?25l').encode())
         term_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=6)
-        term_box.append(status_row)
+        term_box.append(self.status_row)
         # colors of the system theme: the terminal is transparent over a "view" background (the color of text
         # fields) and writes in the theme's text color; it follows when the theme or the dark mode changes
         # the terminal scrolls by itself (a ScrolledWindow around it can hide the last line): only a scrollbar
@@ -192,6 +225,12 @@ class Window(Gtk.ApplicationWindow):
             self.terminal.select_all()
         self.terminal.copy_clipboard_format(Vte.Format.TEXT)
 
+    def copy_all(self):
+        # the button: always the whole output, scrollback included, without selecting it
+        adj = self.terminal.get_vadjustment()
+        text = self.terminal.get_text_range_format(Vte.Format.TEXT, int(adj.get_lower()), 0, int(adj.get_upper()) - 1, -1)[0]
+        self.terminal.get_clipboard().set(text.rstrip('\n') + '\n')
+
     # when it opens: the whole top visible and the terminal with room for about 16 lines; the window grows up to
     # 90% of the screen for that, and on a smaller screen the top scrolls
     TERMINAL_ROOM = 360
@@ -199,7 +238,7 @@ class Window(Gtk.ApplicationWindow):
 
     def fit_top(self):
         _min, natural, _b, _b2 = self.top.measure(Gtk.Orientation.VERTICAL, max(self.get_width(), 1))
-        rest = self.get_height() - self.paned.get_allocated_height()          # header bar
+        rest = self.get_height() - self.paned.get_height()          # header bar
         want = rest + natural + self.TERMINAL_ROOM
         monitor = self.get_display().get_monitor_at_surface(self.get_surface()) if self.get_surface() else None
         limit = int(monitor.get_geometry().height * 0.9) if monitor else want
@@ -214,7 +253,7 @@ class Window(Gtk.ApplicationWindow):
         # the bottom (progress + terminal) never gets less than its minimum, or GTK cuts its last lines: the top,
         # which scrolls, gives up the room instead
         bottom_min = self.paned.get_end_child().measure(Gtk.Orientation.VERTICAL, max(self.get_width(), 1))[0]
-        self.paned.set_position(max(0, min(natural, self.paned.get_allocated_height() - bottom_min)))
+        self.paned.set_position(max(0, min(natural, self.paned.get_height() - bottom_min)))
         return False
 
     def sync_terminal_colors(self):
@@ -304,15 +343,15 @@ class Window(Gtk.ApplicationWindow):
             # the "All" of the menu: install or update, reinstall and uninstall every module at once
             self.bulk = Gtk.Box(spacing=8, hexpand=True)
             for act, ids in model.bulk(self.st):
-                b = button(T(model.BULK_KEYS[act]), self.start, act, ids)
+                b = button(T(model.BULK_KEYS[act]), self.start, act, ids, tip=model.TIP_KEYS[act + '-all'])
                 b.set_name(act + '-all')
                 self.bulk.append(b)
                 self.action_buttons.append(b)
             bar.append(self.bulk)
             n = len(self.st.get('backups', []))
-            self.backups_button = button(T('gui.backups', n), self.show_backups)
+            self.backups_button = button(T('gui.backups', n), self.show_backups, tip=model.TIP_KEYS['backups'])
             self.backups_button.set_sensitive(n > 0)
-            self.check_button = button(T('gui.check'), self.start, 'check')
+            self.check_button = button(T('gui.check'), self.start, 'check', tip=model.TIP_KEYS['check'])
             self.check_button.set_sensitive(bool(self.st.get('can_check')))
             for b in (self.backups_button, self.check_button):
                 bar.append(b)
@@ -324,7 +363,7 @@ class Window(Gtk.ApplicationWindow):
             self.content.append(label(T('gui.section_dev'), 'heading'))
             self.dev = Gtk.Box(spacing=8)
             for key, act in (('gui.test', 'test'), ('gui.build', 'build')):
-                b = button(T(key), self.start, act)
+                b = button(T(key), self.start, act, tip=model.TIP_KEYS[act])
                 b.set_name(act)
                 self.dev.append(b)
                 self.action_buttons.append(b)
@@ -341,7 +380,7 @@ class Window(Gtk.ApplicationWindow):
         row.append(text)
         buttons = {}
         for act in model.actions(m):
-            b = button(T(model.ACTION_KEYS[act]), self.start, act, m['id'])
+            b = button(T(model.ACTION_KEYS[act]), self.start, act, m['id'], tip=model.TIP_KEYS[act])
             b.set_valign(Gtk.Align.CENTER)
             if act in ('install', 'update'):
                 b.add_css_class('suggested-action')
@@ -367,7 +406,8 @@ class Window(Gtk.ApplicationWindow):
         self.userdir_drop.set_sensitive(not busy)
         # cursors: loading while an action runs, "not allowed" on what is disabled, a hand on what can be clicked
         self.top.set_cursor_from_name('progress' if busy else None)
-        for b in self.action_buttons + [self.refresh_button, self.userdir_drop]:
+        self.clear_button.set_sensitive(not busy)
+        for b in self.action_buttons + [self.refresh_button, self.userdir_drop, self.clear_button]:
             b.set_cursor_from_name('progress' if busy else 'pointer' if b.get_sensitive() else 'not-allowed')
 
     def start(self, action, target=None):
@@ -380,8 +420,8 @@ class Window(Gtk.ApplicationWindow):
         env = [f'{k}={v}' for k, v in model.child_env(self.events_path).items()]
         self.set_busy(True)
         self.result.set_text(T('gui.running'))
-        self.progress.set_visible(True)
-        self.progress.set_text('')
+        self.progress_text.set_text('')
+        self.progress_box.set_visible(True)
         self.progress.set_fraction(0)
         self.pulse_id = GLib.timeout_add(150, self.pulse)
         self.terminal.feed(('\x1b[?25h\r\n\x1b[1m$ nbkit ' + ' '.join(argv[2:]).replace(os.path.expanduser('~'), '~')
@@ -390,6 +430,12 @@ class Window(Gtk.ApplicationWindow):
                                   None, None, -1, None, self.on_spawned)
         self.poll_id = GLib.timeout_add(100, self.poll)
         self.terminal.grab_focus()
+
+    def clear_terminal(self):
+        self.terminal.reset(True, True)
+        self.terminal.feed(b'\x1b[?25l')
+        self.result.set_text('')
+        self.progress_box.set_visible(False)
 
     def on_spawned(self, _terminal, pid, error, *_args):
         if error is not None or pid == -1:
@@ -409,7 +455,7 @@ class Window(Gtk.ApplicationWindow):
             kind = self.run.apply(ev)
             if kind == 'progress':
                 self.progress.set_fraction(self.run.fraction())
-                self.progress.set_text(self.run.progress_text())
+                self.progress_text.set_text(self.run.progress_text())
             elif kind == 'ask':
                 self.ask(self.run.question)
             elif kind == 'answered':
@@ -431,13 +477,11 @@ class Window(Gtk.ApplicationWindow):
                 GLib.source_remove(getattr(self, i))
                 setattr(self, i, 0)
         self.close_question()
-        # done: full bar and no "n/total" (the result says it); with an error, the step where it stopped
+        # done: full bar, no step; with an error the bar keeps the step where it stopped
+        self.result.set_text(model.result_text(code))
         if code == 0:
             self.progress.set_fraction(1)
-            self.progress.set_text('')
-        else:
-            self.progress.set_text(self.run.progress_text() if self.run else '')
-        self.result.set_text(model.result_text(code))
+            self.progress_text.set_text('')
         self.terminal.feed(b'\x1b[?25l')
         self.last_code = code
         if self.events_path:
@@ -506,8 +550,8 @@ class Window(Gtk.ApplicationWindow):
             text.append(label(f"{names.get(b['module'], b['module'])}: {top}", 'heading'))
             text.append(label(b['description'], 'dim-label', wrap=True))
             row.append(text)
-            restore = button(T('gui.restore'), self.backup_action, d, 'restore', b['file'])
-            delete = button(T('gui.delete'), self.backup_action, d, 'delete-backup', b['file'])
+            restore = button(T('gui.restore'), self.backup_action, d, 'restore', b['file'], tip=model.TIP_KEYS['restore'])
+            delete = button(T('gui.delete'), self.backup_action, d, 'delete-backup', b['file'], tip=model.TIP_KEYS['delete'])
             delete.add_css_class('destructive-action')
             for w in (restore, delete):
                 w.set_valign(Gtk.Align.CENTER)

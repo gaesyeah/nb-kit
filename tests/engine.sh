@@ -219,6 +219,15 @@ check "the tests do not send their steps to the interface that runs them" test -
 echo "Help"
 out="$(nbkit --help)"
 contains "help shows the interface" "$out" "nbkit.sh gui"
+# the interface leaves the terminal free: nbkit.sh gui returns at once (here without a screen, the window
+# itself fails at once too, into the log)
+# shellcheck disable=SC1091
+if (source "$NBKIT_DIR/lib/gui.sh"; gui_python >/dev/null); then
+  start=$SECONDS
+  out="$(HOME="$H" XDG_CACHE_HOME="" DISPLAY="" WAYLAND_DISPLAY="" timeout 20 bash "$NBKIT_DIR/nbkit.sh" gui </dev/null 2>&1)"; rc=$?
+  check "nbkit.sh gui gives the terminal back at once" test "$rc" = 0 -a $((SECONDS - start)) -lt 10
+  contains "and says where its messages go" "$out" "Interface opened (messages in ~/.cache/nbkit/gui.log)"
+fi
 out="$(bash "$NBKIT_DIR/src/build.sh" --help 2>&1)"; rc=$?
 check "build.sh --help exits with 0" test "$rc" = 0
 contains "build.sh --help explains --test" "$out" "runs the JSF tests"
@@ -243,6 +252,49 @@ if command -v javac >/dev/null 2>&1; then
   out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/no-jdk" bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"; rc=$?
   contains "build.sh without a JDK says it needs one" "$out" "needs a JDK 17 or newer"
   check "and, with nothing installed, stops with an error" test "$rc" = 1
+  # ~/.netbeans as a link to another folder, as on machines where the home folder is elsewhere
+  new_home "$WORK/real"
+  rm -rf "$H"; mkdir -p "$H"; ln -s "$WORK/real/.netbeans" "$H/.netbeans"
+  out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"
+  contains "build.sh finds NetBeans with ~/.netbeans as a link" "$out" "NetBeans: $(readlink -f "$TESTS/netbeans")"
 fi
+
+echo "Questions of the theme only when interactive"
+# the font of the theme installed on the machine: the build asks whether to keep yours, but only with the
+# menu or NBKIT_TTY=1; with arguments it must not wait on the terminal (it used to, from the tests)
+new_home "$H"
+mkdir -p "$WORK/bin"
+printf '#!/bin/sh\necho "JetBrains Mono"\n' > "$WORK/bin/fc-list"; chmod +x "$WORK/bin/fc-list"
+# with a terminal (script), as when you run the tests yourself
+out="$(HOME="$H" PATH="$WORK/bin:$PATH" timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' install one-dark-pro-mix" /dev/null </dev/null 2>&1)"; rc=$?
+check "install with arguments does not wait for an answer" test "$rc" = 0
+contains "and keeps the theme font without asking" "$out" "no terminal to ask: using the theme's"
+TP="$U/config/Preferences/org/netbeans/modules/terminal/nb.properties"
+check "the NetBeans terminal gets the theme font" grep -qx 'term.fontFamily=JetBrains Mono' "$TP"
+HOME="$H" PATH="$WORK/bin:$PATH" bash "$NBKIT_DIR/nbkit.sh" uninstall one-dark-pro-mix </dev/null >/dev/null 2>&1
+check "uninstalling takes the font out of the terminal" test ! -e "$TP"
+new_home "$H"
+mkdir -p "$(dirname "$TP")"; echo 'term.fontFamily=Hack' > "$TP"
+out="$(HOME="$H" PATH="$WORK/bin:$PATH" bash "$NBKIT_DIR/nbkit.sh" install one-dark-pro-mix </dev/null 2>&1)"
+check "a terminal font you chose is kept" grep -qx 'term.fontFamily=Hack' "$TP"
+contains "and the install says so" "$out" "terminal font: kept the one you chose"
+HOME="$H" PATH="$WORK/bin:$PATH" bash "$NBKIT_DIR/nbkit.sh" uninstall one-dark-pro-mix </dev/null >/dev/null 2>&1
+check "and uninstalling leaves it" grep -qx 'term.fontFamily=Hack' "$TP"
+rm -rf "${WORK:?}/bin"
+
+echo "NetBeans open, with ~/.netbeans as a link"
+# as on machines where the home folder is elsewhere: NetBeans says the userdir one way, the interface another
+new_home "$WORK/real"
+rm -rf "$H"; mkdir -p "$H"; ln -s "$WORK/real/.netbeans" "$H/.netbeans"
+bash -c 'sleep 60; :' org.netbeans.Main --userdir "$H/.netbeans/31" &
+fake=$!
+sleep 0.3
+for ud in "$H/.netbeans/31" "$WORK/real/.netbeans/31"; do
+  out="$(HOME="$H" setsid -w bash "$NBKIT_DIR/nbkit.sh" install jsf "$ud" </dev/null 2>&1)"
+  contains "NetBeans is seen open with the userdir as ${ud#"$WORK"/}" "$out" "NetBeans seems to be open"
+done
+out="$(HOME="$H" bash "$NBKIT_DIR/nbkit.sh" check "$H/.netbeans/31" </dev/null 2>&1)"
+contains "a userdir given through the link keeps its ~ path" "$out" "userdir  ~/.netbeans/31"
+kill "$fake" 2>/dev/null; wait "$fake" 2>/dev/null
 
 finish

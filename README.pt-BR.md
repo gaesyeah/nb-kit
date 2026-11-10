@@ -43,7 +43,7 @@ Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File 
 bash nbkit/nbkit.sh gui
 ```
 
-Uma janela com as mesmas opções: os módulos com o status e os botões (ferramentas primeiro, depois temas), instalar ou atualizar, reinstalar e desinstalar todos de uma vez, o userdir, Backups (restaurar ou apagar cada um), Verificar e, num clone, Rodar os testes e Compilar os módulos. Embaixo, um terminal roda o próprio CLI, então você vê o mesmo progresso, as mesmas cores e mensagens, com a barra de progresso acima dele. O que muda fora da janela (o NetBeans aberto ou fechado, o CLI num terminal) aparece sozinho. Para copiar dele: selecione e aperte Ctrl+Shift+C, ou use o botão direito; sem seleção, copia tudo.
+Uma janela com as mesmas opções: os módulos com o status e os botões (ferramentas primeiro, depois temas), instalar ou atualizar, reinstalar e desinstalar todos de uma vez, o userdir, Backups (restaurar ou apagar cada um), Verificar e, num clone, Rodar os testes e Compilar os módulos. Embaixo, um terminal roda o próprio CLI, então você vê o mesmo progresso, as mesmas cores e mensagens, com a barra de progresso acima dele (o passo dentro dela). O que muda fora da janela (o NetBeans aberto ou fechado, o CLI num terminal) aparece sozinho. Para copiar dele: selecione e aperte Ctrl+Shift+C, ou use o botão direito; sem seleção, copia tudo; o botão de copiar ao lado do resultado sempre copia tudo, sem selecionar. O botão de vassoura ao lado dele limpa o terminal, e cada botão explica o que faz quando o mouse passa por cima.
 
 Toda pergunta do CLI também aparece como diálogo. Dá para responder nele ou digitando no terminal: o diálogo fecha sozinho. A senha do sudo, quando precisa, é digitada no terminal; a interface nunca vê a senha. Fechar a janela no meio de uma ação aperta Ctrl+C por você, então tudo volta como estava.
 
@@ -135,7 +135,7 @@ Os beans (Spring `@Component` e derivados, `@Bean`, CDI `@Named`, `@ManagedBean`
 - Cria o perfil **"One Dark Pro Mix"** como cópia do FlatLaf Dark da sua versão do NetBeans, com as cores do tema. O perfil FlatLaf Dark original não é alterado.
 - Usa as cores do Mix sempre que existe um equivalente. Onde o Mix não define uma cor, usa o padrão do VS Code.
 - Mantém o itálico e o negrito do NetBeans, exceto nas palavras-chave, que ficam sem negrito como no Mix.
-- Seleciona o visual FlatLaf Dark, o perfil e a cor de seleção do terminal, e instala a JetBrains Mono se faltar.
+- Seleciona o visual FlatLaf Dark, o perfil e, no terminal do NetBeans, a cor de seleção e a JetBrains Mono (se você não escolheu uma fonte lá), e instala a JetBrains Mono se faltar.
 - Avisos em amarelo e erros em vermelho, os dois com um fundo suave.
 - Um módulo de coloração pinta o que o editor não distingue sozinho:
   - **JavaScript:** chamadas, objetos e constantes.
@@ -155,7 +155,7 @@ Um tema é uma pasta em `modules/themes/` com três arquivos de dados, sem códi
 - preservar as personalizações de quem usa;
 - instalar a fonte se ela faltar, e removê-la depois só se foi o nbkit que instalou;
 - instalar o módulo de coloração (`nbkit-colors.jar`): chamadas, objetos, constantes, unidades, funções, colchetes por nível, DOCTYPE...;
-- aplicar a cor de seleção do terminal;
+- aplicar a cor de seleção do terminal, e a fonte do tema no terminal do NetBeans quando você não escolheu uma lá;
 - desfazer tudo com Ctrl+C;
 - conferir com o NetBeans aberto (`check`).
 

@@ -28,7 +28,7 @@ class Status(unittest.TestCase):
         self.assertEqual(model.status_text(mod(JSF, status='new', installed='5')), 'newer than this nbkit (v5)')
 
     def test_every_section_and_button_has_a_text(self):
-        for key in list(model.SECTION_KEYS.values()) + list(model.ACTION_KEYS.values()):
+        for key in list(model.SECTION_KEYS.values()) + list(model.ACTION_KEYS.values()) + list(model.TIP_KEYS.values()):
             self.assertNotEqual(model.T(key), key)
 
     def test_buttons_follow_the_status(self):

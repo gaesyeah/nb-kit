@@ -359,6 +359,16 @@ EOF
       t theme.terminal_kept; echo
     fi
   fi
+  # the font of the theme in the NetBeans terminal too, when it is installed and you chose none there
+  if [ -n "$NBKIT_THEME_FONT" ]; then
+    mkdir -p "$(dirname "$TERMPREF")"
+    touch "$TERMPREF"
+    if ! grep -q '^term\.fontFamily=' "$TERMPREF"; then
+      echo "term.fontFamily=$NBKIT_THEME_FONT" >> "$TERMPREF"
+    elif ! grep -qx "term\.fontFamily=$NBKIT_THEME_FONT" "$TERMPREF"; then
+      t theme.terminal_font_kept; echo
+    fi
+  fi
   theme_select_state select "$THEME_LAF" "$THEME_PROFILE"
   rm -f "$UD/onedark-version"
   if [ -n "$THEME_TERMINAL_SELECTION" ]; then ok "$(t theme.selected_terminal "$THEME_BASE_NAME" "$THEME_PROFILE")"
@@ -391,8 +401,9 @@ theme_uninstall() {
     info "$(t theme.font_kept_uninstall "$THEME_FONT_NAME")"
   fi
   rm -f "$THEME_MANIFEST" "$UD/onedark-version"
-  if [ -n "$THEME_TERMINAL_SELECTION" ] && [ -f "$TERMPREF" ]; then
-    sed -i "/^term\.selectionBackground=$THEME_TERMINAL_SELECTION\$/d" "$TERMPREF"
+  if [ -f "$TERMPREF" ]; then
+    if [ -n "$THEME_TERMINAL_SELECTION" ]; then sed -i "/^term\.selectionBackground=$THEME_TERMINAL_SELECTION\$/d" "$TERMPREF"; fi
+    if [ -n "$THEME_FONT_NAME" ]; then sed -i "/^term\.fontFamily=$THEME_FONT_NAME\$/d" "$TERMPREF"; fi
     # empty: the file did not exist before the theme
     [ -s "$TERMPREF" ] || rm -f "$TERMPREF"
   fi
