@@ -2,6 +2,7 @@
 the fake NetBeans of tests/netbeans in HOME: buttons, terminal, progress, questions, backups, about, closing."""
 import hashlib
 import os
+import subprocess
 import sys
 import time
 
@@ -36,6 +37,14 @@ def wait(cond, seconds=60):
             return True
         time.sleep(0.02)
     return False
+
+
+def ancestors(widget):
+    out, p = [], widget.get_parent()
+    while p:
+        out.append(p)
+        p = p.get_parent()
+    return out
 
 
 def children(box):
@@ -112,16 +121,27 @@ def actions(w):
     check('its last line is never cut (lines sit at the bottom)', not w.terminal.get_yfill() and w.terminal.get_yalign() == Vte.Align.END, term)
     check('the terminal is whole, inside the window', inside(w))
     check('check and backups start disabled', not w.check_button.get_sensitive() and not w.backups_button.get_sensitive())
+    check('a hand on what can be clicked, "not allowed" on what is disabled',
+          w.rows['jsf']['buttons']['install'].get_cursor().get_name() == 'pointer'
+          and w.backups_button.get_cursor().get_name() == 'not-allowed')
+    check('the module buttons are not inside a list (they keep the normal button look)',
+          not any(isinstance(p, Gtk.ListBoxRow) for p in ancestors(w.rows['jsf']['buttons']['install'])))
     check('install all is offered for both modules', [b.get_name() for b in children(w.bulk)] == ['install-all'])
 
     print('Install from a button')
     w.rows['jsf']['buttons']['install'].emit('clicked')
     check('the buttons are disabled while it runs', w.busy and not w.rows['one-dark-pro-mix']['buttons']['install'].get_sensitive())
+    check('the cursor shows it is loading', w.top.get_cursor().get_name() == 'progress'
+          and w.rows['one-dark-pro-mix']['buttons']['install'].get_cursor().get_name() == 'progress')
+    check('the result is above the progress bar, in the type of the titles',
+          w.result.get_next_sibling() is w.progress and w.result.has_css_class('heading'))
     check('the terminal runs nbkit.sh', wait(lambda: 'Installed: JSF checks' in terminal_text(w), 30), terminal_text(w)[-400:])
     check('the progress bar reaches the last step', wait(lambda: w.progress.get_text() == '2/2' and w.progress.get_fraction() == 1, 10),
           w.progress.get_text())
     check('the action finishes', finish_waiting(w))
     check('the result is shown', w.result.get_text() == 'Done', w.result.get_text())
+    check('after it, the cursor is a hand again', w.top.get_cursor() is None
+          and w.rows['jsf']['buttons']['reinstall'].get_cursor().get_name() == 'pointer')
     check('a finished action shows a full bar, without n/total', w.progress.get_fraction() == 1 and w.progress.get_text() == '',
           (w.progress.get_fraction(), w.progress.get_text()))
     check('the status is refreshed', status(w, 'jsf') == 'installed (v2)', status(w, 'jsf'))
@@ -182,6 +202,11 @@ def actions(w):
     if w.question is not None:                          # keep the backup of the theme
         w.question_buttons['no'].emit('clicked')
     check('uninstall all removes both', wait(lambda: not w.busy, 20) and [status(w, m) for m in w.rows] == ['not installed'] * 2)
+
+    print('Changes made outside the window')
+    subprocess.run(['bash', app.model.NBKIT, 'install', 'jsf'], stdin=subprocess.DEVNULL, capture_output=True)
+    check('a module installed from the terminal shows up by itself', wait(lambda: status(w, 'jsf') == 'installed (v2)', 10),
+          status(w, 'jsf'))
 
     print('About')
     w.about_button.emit('clicked')

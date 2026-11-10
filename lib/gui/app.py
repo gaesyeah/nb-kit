@@ -1,6 +1,7 @@
 """nbkit graphical interface (bash nbkit.sh gui): GTK 4 and the VTE terminal widget.
 On top, the modules from "nbkit.sh status --json"; at the bottom, a terminal where every action runs nbkit.sh
 itself. The questions of nbkit also show up as dialogs, the progress bar follows the steps (lib/gui/model.py)."""
+import json
 import os
 import sys
 import tempfile
@@ -69,8 +70,21 @@ def label(text, *classes, wrap=False, xalign=0.0):
 
 def button(text, callback, *args):
     b = Gtk.Button(label=text)
+    b.set_cursor_from_name('pointer')
     b.connect('clicked', lambda _b: callback(*args))
     return b
+
+
+def framed(rows):
+    """rows inside a frame, with a line between them (plain buttons keep their normal look, unlike in a list)"""
+    frame = Gtk.Frame()
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    for i, row in enumerate(rows):
+        if i:
+            box.append(Gtk.Separator())
+        box.append(row)
+    frame.set_child(box)
+    return frame
 
 
 class Window(Gtk.ApplicationWindow):
@@ -83,6 +97,7 @@ class Window(Gtk.ApplicationWindow):
 
         header = Gtk.HeaderBar()
         self.about_button = Gtk.Button(label=T('gui.about'))
+        self.about_button.set_cursor_from_name('pointer')
         self.about_button.connect('clicked', lambda _b: self.show_about())
         self.refresh_button = Gtk.Button(icon_name='view-refresh-symbolic', tooltip_text=T('gui.refresh'))
         self.refresh_button.connect('clicked', lambda _b: self.refresh())
@@ -105,9 +120,10 @@ class Window(Gtk.ApplicationWindow):
 
         # progress: pulses until the first step, then step n of total
         # progress bar and result on one row, so the terminal keeps the room
-        self.progress = Gtk.ProgressBar(show_text=True, visible=False, hexpand=True, valign=Gtk.Align.CENTER)
-        self.result = label('', 'dim-label', xalign=0.0)
-        status_row = Gtk.Box(spacing=12, margin_start=14, margin_end=14)
+        # what is running or how it ended, in the same type as the section titles, with the progress bar below
+        self.progress = Gtk.ProgressBar(show_text=True, visible=False)
+        self.result = label('', 'heading', xalign=0.0)
+        status_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, margin_start=14, margin_end=14)
         status_row.append(self.result)
         status_row.append(self.progress)
 
@@ -149,6 +165,8 @@ class Window(Gtk.ApplicationWindow):
         self.set_child(paned)
         self.connect('close-request', self.on_close)
         self.refresh()
+        watch_id = GLib.timeout_add_seconds(self.WATCH_SECONDS, self.watch)
+        self.connect('destroy', lambda *_a: GLib.source_remove(watch_id))
 
     # ---------- copying from the terminal: Ctrl+Shift+C, Ctrl+Shift+A and the right-click menu ----------
     def add_terminal_copy(self):
@@ -206,12 +224,40 @@ class Window(Gtk.ApplicationWindow):
     # ---------- status ----------
     def refresh(self):
         try:
-            self.st = model.status(self.userdir)
+            st = model.status(self.userdir)
         except model.StatusError as e:
             self.st = {}
             self.notice.set_text(T('gui.status_error', str(e)))
             self.build_content()
             return
+        self.show_status(st)
+
+    # what changes outside the window (NetBeans opened or closed, the CLI in a terminal) shows up by itself:
+    # every few seconds, while idle, status --json runs in the background and the window redraws only if it changed
+    WATCH_SECONDS = 3
+
+    def watch(self):
+        if not self.busy and self.question is None:
+            launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
+            launcher.set_environ([f'{k}={v}' for k, v in model.child_env().items()])
+            argv = ['bash', model.NBKIT, 'status', '--json'] + ([self.userdir] if self.userdir else [])
+            try:
+                launcher.spawnv(argv).communicate_utf8_async(None, None, self.on_watched)
+            except GLib.Error:
+                pass
+        return True
+
+    def on_watched(self, proc, result):
+        try:
+            _ok, out, _err = proc.communicate_utf8_finish(result)
+            st = json.loads(out) if proc.get_successful() else None
+        except (GLib.Error, ValueError):
+            return
+        if st and st != self.st and not self.busy:
+            self.show_status(st)
+
+    def show_status(self, st):
+        self.st = st
         self.userdir = self.st.get('userdir')
         self.fill_userdirs()
         if not self.userdir:
@@ -252,11 +298,7 @@ class Window(Gtk.ApplicationWindow):
         self.action_buttons, self.rows = [], {}
         for cat, mods in model.sections(self.st):
             self.content.append(label(T(model.SECTION_KEYS[cat]), 'heading'))
-            box = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
-            box.add_css_class('frame')
-            for m in mods:
-                box.append(self.module_row(m))
-            self.content.append(box)
+            self.content.append(framed([self.module_row(m) for m in mods]))
         if self.userdir:
             bar = Gtk.Box(spacing=8)
             # the "All" of the menu: install or update, reinstall and uninstall every module at once
@@ -323,6 +365,10 @@ class Window(Gtk.ApplicationWindow):
                 b.set_sensitive(True)
         self.refresh_button.set_sensitive(not busy)
         self.userdir_drop.set_sensitive(not busy)
+        # cursors: loading while an action runs, "not allowed" on what is disabled, a hand on what can be clicked
+        self.top.set_cursor_from_name('progress' if busy else None)
+        for b in self.action_buttons + [self.refresh_button, self.userdir_drop]:
+            b.set_cursor_from_name('progress' if busy else 'pointer' if b.get_sensitive() else 'not-allowed')
 
     def start(self, action, target=None):
         if self.busy:
@@ -418,6 +464,8 @@ class Window(Gtk.ApplicationWindow):
         box.append(label(q['text'], 'heading', wrap=True))
         buttons = Gtk.Box(spacing=8, halign=Gtk.Align.END)
         no, yes = Gtk.Button(label=T('gui.no')), Gtk.Button(label=T('gui.yes'))
+        for b in (no, yes):
+            b.set_cursor_from_name('pointer')
         no.connect('clicked', lambda _b: self.reply(False))
         yes.connect('clicked', lambda _b: self.reply(True))
         (yes if q['default_yes'] else no).add_css_class('suggested-action')
@@ -450,9 +498,7 @@ class Window(Gtk.ApplicationWindow):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_top=14, margin_bottom=14,
                       margin_start=14, margin_end=14)
         names = {m['id']: m['name'] for m in self.st.get('modules', [])}
-        lst = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
-        lst.add_css_class('frame')
-        self.backup_rows = []
+        rows, self.backup_rows = [], []
         for b in self.st.get('backups', []):
             row = Gtk.Box(spacing=10, margin_top=6, margin_bottom=6, margin_start=8, margin_end=8)
             text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True)
@@ -466,9 +512,9 @@ class Window(Gtk.ApplicationWindow):
             for w in (restore, delete):
                 w.set_valign(Gtk.Align.CENTER)
                 row.append(w)
-            lst.append(row)
+            rows.append(row)
             self.backup_rows.append({'file': b['file'], 'restore': restore, 'delete': delete})
-        box.append(lst)
+        box.append(framed(rows))
         close = button(T('gui.close'), d.destroy)
         close.set_halign(Gtk.Align.END)
         box.append(close)

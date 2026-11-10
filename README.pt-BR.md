@@ -43,7 +43,7 @@ Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File 
 bash nbkit/nbkit.sh gui
 ```
 
-Uma janela com as mesmas opções: os módulos com o status e os botões (ferramentas primeiro, depois temas), instalar ou atualizar, reinstalar e desinstalar todos de uma vez, o userdir, Backups (restaurar ou apagar cada um), Verificar e, num clone, Rodar os testes e Compilar os módulos. Embaixo, um terminal roda o próprio CLI, então você vê o mesmo progresso, as mesmas cores e mensagens, com uma barra de progresso em cima. Para copiar dele: selecione e aperte Ctrl+Shift+C, ou use o botão direito; sem seleção, copia tudo.
+Uma janela com as mesmas opções: os módulos com o status e os botões (ferramentas primeiro, depois temas), instalar ou atualizar, reinstalar e desinstalar todos de uma vez, o userdir, Backups (restaurar ou apagar cada um), Verificar e, num clone, Rodar os testes e Compilar os módulos. Embaixo, um terminal roda o próprio CLI, então você vê o mesmo progresso, as mesmas cores e mensagens, com a barra de progresso acima dele. O que muda fora da janela (o NetBeans aberto ou fechado, o CLI num terminal) aparece sozinho. Para copiar dele: selecione e aperte Ctrl+Shift+C, ou use o botão direito; sem seleção, copia tudo.
 
 Toda pergunta do CLI também aparece como diálogo. Dá para responder nele ou digitando no terminal: o diálogo fecha sozinho. A senha do sudo, quando precisa, é digitada no terminal; a interface nunca vê a senha. Fechar a janela no meio de uma ação aperta Ctrl+C por você, então tudo volta como estava.
 
