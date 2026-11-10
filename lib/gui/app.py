@@ -385,9 +385,12 @@ class Window(Gtk.ApplicationWindow):
                 GLib.source_remove(getattr(self, i))
                 setattr(self, i, 0)
         self.close_question()
+        # done: full bar and no "n/total" (the result says it); with an error, the step where it stopped
         if code == 0:
             self.progress.set_fraction(1)
-        self.progress.set_text(self.run.progress_text() if self.run else '')
+            self.progress.set_text('')
+        else:
+            self.progress.set_text(self.run.progress_text() if self.run else '')
         self.result.set_text(model.result_text(code))
         self.terminal.feed(b'\x1b[?25l')
         self.last_code = code

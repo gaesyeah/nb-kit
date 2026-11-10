@@ -210,6 +210,12 @@ check "the old theme files leave FlatLaf Dark" test ! -e "$U/config/Editors/Font
 check "FlatLaf Dark comes back from the old backup" test "$(sha1sum < "$U/$P0")" = "$original"
 check "the old backup is listed first, as the original" test "$(jget "$(nbkit status --json)" "[(b['file'].split('/')[-1][:15], b['original']) for b in d['backups']]")" = "[('onedark-backup-', True), ('nbkit-theme-bac', False)]"
 
+echo "Run from the interface"
+E2="$WORK/outer-events"
+: > "$E2"
+NBKIT_UI_EVENTS="$E2" NBKIT_TTY=1 bash -c 'source "$1/tests/lib.sh"; echo "${NBKIT_UI_EVENTS:-}${NBKIT_TTY:-}"' _ "$NBKIT_DIR" > "$WORK/env-seen"
+check "the tests do not send their steps to the interface that runs them" test -z "$(cat "$WORK/env-seen" "$E2")"
+
 echo "Help"
 out="$(nbkit --help)"
 contains "help shows the interface" "$out" "nbkit.sh gui"

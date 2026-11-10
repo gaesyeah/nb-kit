@@ -3,6 +3,8 @@
 TESTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NBKIT_DIR="$(dirname "$TESTS")"
 export LC_ALL=C.UTF-8 NBKIT_LANG=en NBKIT_OFFLINE=1
+# run from the interface ("Run the tests"): the nbkit runs inside the tests must not send it their steps
+unset NBKIT_UI_EVENTS NBKIT_TTY
 PASS=0; FAIL=0
 if [ -t 1 ]; then G=$'\e[32m'; R=$'\e[31m'; D=$'\e[2m'; N=$'\e[0m'; else G=; R=; D=; N=; fi
 

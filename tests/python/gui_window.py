@@ -122,6 +122,8 @@ def actions(w):
           w.progress.get_text())
     check('the action finishes', finish_waiting(w))
     check('the result is shown', w.result.get_text() == 'Done', w.result.get_text())
+    check('a finished action shows a full bar, without n/total', w.progress.get_fraction() == 1 and w.progress.get_text() == '',
+          (w.progress.get_fraction(), w.progress.get_text()))
     check('the status is refreshed', status(w, 'jsf') == 'installed (v2)', status(w, 'jsf'))
     check('the buttons follow the new status', list(w.rows['jsf']['buttons']) == ['reinstall', 'uninstall'])
 
