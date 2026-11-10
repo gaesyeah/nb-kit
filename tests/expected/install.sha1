@@ -82,9 +82,9 @@ e6bcc6331e4eb8b789044c69cefb6170faef9dd8  ./config/LookAndFeel/FlatDarkLaf.prope
 62c80afe584b42f9dd71b69f3847129402f488b2  ./config/Modules/nbkit-jsf.xml
 9e4576a4bfe0a0c1c767f37361d5a028a197448e  ./config/Preferences/laf.properties
 f0bfca728b7d44dfe6ba69006776c2bdd8f7e680  ./config/Preferences/org/netbeans/modules/terminal/nb.properties
-16b5399592b27b6ecec0bc98fcb73b92cce951aa  ./modules/nbkit-colors.jar
-95d7ea80f93c3f22a0a3440977227f5445bc30a8  ./modules/nbkit-core.jar
-eb9422367d5cfe457af3d4abe3f3039e80e1d6b7  ./modules/nbkit-jsf.jar
+jar-of-this-nbkit  ./modules/nbkit-colors.jar
+jar-of-this-nbkit  ./modules/nbkit-core.jar
+jar-of-this-nbkit  ./modules/nbkit-jsf.jar
 7448d8798a4380162d4b56f9b452e2f6f9e24e7a  ./nbkit/jsf.version
 c6112fc247276d82a57cc9b56a41999dbba4b169  ./nbkit/one-dark-pro-mix.version
 0e333c5c2025dc6c6da141edb3c6a25b8b3c9672  ./nbkit/theme-manifest.json

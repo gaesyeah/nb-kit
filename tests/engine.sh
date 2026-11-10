@@ -19,13 +19,21 @@ out="$(nbkit install)"; rc=$?
 check "install exits with 0" test "$rc" = 0
 contains "install says what was installed" "$out" "Installed: Theme One Dark Pro Mix; JSF checks"
 lacks "install shows no error" "$out" "Error:"
+# the jars are compared with the ones in this folder, not by a fixed hash: src/build.sh rebuilds them
+golden() { fingerprint "$H" | sed -E 's#^[0-9a-f]{40}  (\./modules/[^/]*\.jar)$#jar-of-this-nbkit  \1#'; }
 if [ "${1:-}" = --update ]; then
-  fingerprint "$H" > "$EXPECTED"
+  golden > "$EXPECTED"
   echo "  written: tests/expected/install.sha1 ($(wc -l < "$EXPECTED") files)"
 fi
-diff_out="$(diff "$EXPECTED" <(fingerprint "$H"))"
+diff_out="$(diff "$EXPECTED" <(golden))"
 if [ -z "$diff_out" ]; then pass "installed files are exactly the expected ones ($(wc -l < "$EXPECTED"))"
 else fail "installed files are exactly the expected ones" "$(head -20 <<<"$diff_out")"; fi
+same_jars() {
+  cmp -s "$U/modules/nbkit-jsf.jar" "$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar" \
+    && cmp -s "$U/modules/nbkit-core.jar" "$NBKIT_DIR/lib/jars/nbkit-core.jar" \
+    && cmp -s "$U/modules/nbkit-colors.jar" "$NBKIT_DIR/lib/jars/nbkit-colors.jar"
+}
+check "the installed jars are the ones of this nbkit" same_jars
 check "user key kept in the UI file" grep -qx '@myKey=#123456' "$U/config/LookAndFeel/FlatDarkLaf.properties"
 check "base profile left untouched" cmp -s "$U/config/Editors/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml" \
   "$U/config/Editors/text/x-java/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml"
