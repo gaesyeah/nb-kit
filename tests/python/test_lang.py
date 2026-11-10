@@ -45,11 +45,19 @@ class Lang(unittest.TestCase):
             if '/tests/' not in p:
                 with open(p, encoding='utf-8') as f:
                     code += f.read()
-        used = set(re.findall(r'\bt ((?:cli|theme|mod|build|test|gui)\.[a-z_]+)', code))
-        used |= set(re.findall(r"""['"]((?:cli|theme|mod|build|test|gui)\.[a-z_]+)['"]""", code))
-        used -= {'theme.toml', 'module.toml'}   # file names, not keys
+        used = set(re.findall(r'\bt ((?:cli|theme|tool|build|test|gui)\.[a-z_]+)', code))
+        used |= set(re.findall(r"""['"]((?:cli|theme|tool|build|test|gui)\.[a-z_]+)['"]""", code))
+        used -= {'theme.toml', 'tool.toml', 'tool.sh'}   # file names, not keys
         self.assertGreater(len(used), 100)
         self.assertEqual(sorted(used - set(REF)), [])
+
+    def test_every_key_is_used(self):
+        code = ''
+        for p in glob.glob(os.path.join(helpers.ROOT, '**', '*.sh'), recursive=True) + \
+                 glob.glob(os.path.join(helpers.ROOT, 'lib', '**', '*.py'), recursive=True):
+            with open(p, encoding='utf-8') as f:
+                code += f.read()
+        self.assertEqual([k for k in REF if k not in code], [], 'keys nothing uses')
 
 
 if __name__ == '__main__':

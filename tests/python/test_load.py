@@ -1,4 +1,4 @@
-"""theme.toml and module.toml: what is registered and what is skipped, with the reason."""
+"""theme.toml and tool.toml: what is registered and what is skipped, with the reason."""
 import os
 import tempfile
 import unittest
@@ -82,20 +82,68 @@ class Themes(unittest.TestCase):
         self.assertNotIn('skipped', out)
 
 
-class Modules(unittest.TestCase):
-    def test_real_module_loads(self):
-        rc, out, err = helpers.run('modules.py', os.path.join(helpers.ROOT, 'modules'))
+class Tools(unittest.TestCase):
+    SHA = '0' * 64
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = self.tmp.name
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def tool(self, tid, toml, files=()):
+        helpers.write(os.path.join(self.root, tid, 'tool.toml'), toml)
+        for f in files:
+            helpers.write(os.path.join(self.root, tid, f), '')
+
+    def load(self):
+        rc, out, err = helpers.run('tools/load.py', self.root)
         self.assertEqual(rc, 0, err)
-        self.assertIn("nbmod_register jsf nm_jsf 'JSF checks'", out)
+        return out
+
+    def test_real_tool_loads(self):
+        rc, out, err = helpers.run('tools/load.py', os.path.join(helpers.ROOT, 'modules', 'tools'))
+        self.assertEqual(rc, 0, err)
+        self.assertIn("tool_register jsf 'JSF checks'", out)
+        self.assertIn('nbkit-jsf.jar nbkit.jsf', out)
+        self.assertNotIn('skipped', out)
+
+    def test_netbeans_module_tool(self):
+        self.tool('a', f'[tool]\nname = "A"\nversion = 2\nhint = {{ en = "Hint", pt-BR = "Dica" }}\n'
+                       f'[netbeans_module]\njar = "a.jar"\ncodename = "a.b"\nsha256 = "{self.SHA}"\n', ['a.jar'])
+        out = self.load()
+        self.assertIn("tool_register a A '' 2 ", out)
+        self.assertIn(f' Hint a.jar a.b {self.SHA} ', out)
+        self.assertNotIn('source', out)
+
+    def test_tool_sh_is_loaded_after_registering(self):
+        self.tool('b', '[tool]\nname = "B"\nversion = 1\n', ['tool.sh'])
+        out = self.load().splitlines()
+        self.assertTrue(out[0].startswith('tool_register b B'), out)
+        self.assertEqual(out[1], 'source ' + os.path.join(self.root, 'b', 'tool.sh'))
 
     def test_skipped_with_reason(self):
-        with tempfile.TemporaryDirectory() as root:
-            helpers.write(os.path.join(root, 'a', 'module.toml'), '[module]\nname = "A"\nversion = 1\njar = "a.jar"\ncodename = "a.b"\n')
-            helpers.write(os.path.join(root, 'b', 'module.toml'),
-                          '[module]\nname = "B"\nversion = 1\njar = "b.jar"\ncodename = "b.c"\nsha256 = "' + '0' * 64 + '"\n')
-            rc, out, _ = helpers.run('modules.py', root)
-        self.assertIn('module "a" skipped: "sha256" is missing in module.toml', out)
-        self.assertIn('module "b" skipped: file b.jar is missing', out)
+        cases = {
+            'no-version': ('[tool]\nname = "X"\n', '"tool.version" is missing in tool.toml'),
+            'no-sha': ('[tool]\nname = "X"\nversion = 1\n[netbeans_module]\njar = "x.jar"\ncodename = "a.b"\n',
+                       '"netbeans_module.sha256" is missing in tool.toml'),
+            'bad-sha': ('[tool]\nname = "X"\nversion = 1\n[netbeans_module]\njar = "x.jar"\ncodename = "a.b"\nsha256 = "abc"\n',
+                        'invalid value for "netbeans_module.sha256"'),
+            'no-jar': (f'[tool]\nname = "X"\nversion = 1\n[netbeans_module]\njar = "x.jar"\ncodename = "a.b"\nsha256 = "{self.SHA}"\n',
+                       'file x.jar is missing'),
+            'nothing': ('[tool]\nname = "X"\nversion = 1\n', 'the tool installs nothing'),
+            'Bad_Id': ('[tool]\nname = "X"\nversion = 1\n', 'only have lowercase letters'),
+        }
+        for tid, (toml, _) in cases.items():
+            self.tool(tid, toml)
+        self.tool('good', '[tool]\nname = "Good"\nversion = 1\n', ['tool.sh'])
+        out = self.load()
+        for tid, (_, reason) in cases.items():
+            with self.subTest(tool=tid):
+                self.assertIn(f'tool "{tid}" skipped', out)
+                self.assertIn(reason, out)
+        self.assertIn('tool_register good', out)
 
 
 if __name__ == '__main__':

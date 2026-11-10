@@ -14,7 +14,6 @@ source "$NBKIT_DIR/lib/packages.sh"
 source "$NBKIT_DIR/lib/gui.sh"
 PY="${NBKIT_PY:-python3}"
 export PYTHONDONTWRITEBYTECODE=1
-JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 failed=(); skipped=()
 
 # ---------- tools ----------
@@ -27,18 +26,13 @@ pyflakes_cmd() {
   done
   return 1
 }
-has_jdk() {
-  local v
-  command -v "$JAVAC" >/dev/null 2>&1 || return 1
-  v="$("$JAVAC" -version 2>&1 | sed -n 's/^javac \([0-9][0-9]*\).*/\1/p' | tail -1)"
-  [ -n "$v" ] && [ "$v" -ge 17 ]
-}
+has_jdk() { jdk_ok; }
 # offers to install, in one question, every tool that is missing
 install_tools() {
   local m names=() specs=() p pkgs=()
   has_shellcheck || { names+=(shellcheck); specs+=("apt:shellcheck dnf:ShellCheck pacman:shellcheck zypper:ShellCheck"); }
   pyflakes_cmd >/dev/null || { names+=(pyflakes); specs+=("apt:python3-pyflakes dnf:python3-pyflakes pacman:python-pyflakes zypper:python3-pyflakes"); }
-  has_jdk || { names+=(JDK); specs+=("apt:openjdk-21-jdk-headless|openjdk-17-jdk-headless dnf:java-21-openjdk-devel|java-17-openjdk-devel pacman:jdk21-openjdk|jdk17-openjdk zypper:java-21-openjdk-devel|java-17-openjdk-devel"); }
+  has_jdk || { names+=(JDK); specs+=("$JDK_SPEC"); }
   if ! gui_python >/dev/null; then
     names+=("GTK 4/VTE")
     while IFS= read -r p; do specs+=("$p"); done < <(gui_package_specs)
@@ -70,7 +64,7 @@ lint_shell() {
 lint_python() {
   local p
   p="$(pyflakes_cmd)" || { t test.skipped_tool pyflakes; echo; return 3; }
-  "$p" -m pyflakes lib/*.py lib/themes/*.py lib/gui/*.py tests/python/*.py && echo "  ${G}ok${N}    $(t test.no_warnings)"
+  "$p" -m pyflakes lib/*.py lib/themes/*.py lib/tools/*.py lib/gui/*.py tests/python/*.py && echo "  ${G}ok${N}    $(t test.no_warnings)"
 }
 python_tests() { "$PY" -m unittest discover -s tests/python -t tests/python; }
 jsf_tests() {

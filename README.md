@@ -261,25 +261,46 @@ The brackets are `nbkit-bracket1`, `nbkit-bracket2` and `nbkit-bracket3`, one pe
 
 `modules/themes/one-dark-pro-mix/` is a complete example.
 
+## Creating a tool
+
+A tool is a folder in `modules/tools/` with a `tool.toml`: its name, version and, if it is a NetBeans module, its jar.
+nbkit finds it by itself and the tool engine (`lib/tools.sh`) gives it install, update, uninstall, the restore point and
+`check`. What is specific to a tool goes in an optional `tool.sh` next to it. See [how to create a tool](modules/README.md).
+
+### Building the jars
+
+The jars are already built in `lib/jars/` and `modules/tools/jsf/`. To build them again from `src/`, after changing the Java code or the texts:
+
+```bash
+bash src/build.sh [netbeans folder]       # or: bash nbkit.sh build
+```
+
+It compiles against the jars of your NetBeans installation (without the folder: `NB_HOME`, or the NetBeans that last used `~/.netbeans`) with a JDK 17 or newer, and updates the sha256 sums. `bash src/build.sh --help` shows the options.
+
 ## Structure
 
 ```
 nbkit/
-├── nbkit.sh                     CLI
+├── nbkit.sh                     CLI: arguments, menu and actions
 ├── lang/                        terminal texts: pt-BR.lang (reference) and en.lang
 ├── lib/                         code used by the CLI
-│   ├── terminal.sh              colors, language and output helpers
-│   ├── themes.sh                theme engine (see "Creating a theme")
-│   ├── themes/                  Python parts of the theme engine
-│   ├── modules.sh, modules.py   engine for NetBeans modules (module.toml)
-│   ├── text.py                  texts of lang/ for the Python parts
+│   ├── terminal.sh              colors, language, output helpers, arrow key menu
+│   ├── packages.sh              installs what is missing with the package manager (apt, dnf, pacman, zypper)
+│   ├── registry.sh              module registry and the helpers the engines share
+│   ├── netbeans.sh              userdirs, NetBeans open or closed, opening and closing it
+│   ├── restore.sh               restore point (everything goes back on an error or Ctrl+C)
+│   ├── backups.sh, status.sh    backups and status (also "status --json" for the interface)
+│   ├── themes.sh, themes/       theme engine and its Python parts (see "Creating a theme")
+│   ├── tools.sh, tools/         tool engine and its Python part (see "Creating a tool")
+│   ├── text.py, toml_data.py    texts of lang/ and helpers for the TOML files, for the Python parts
 │   ├── uievents.py              events for the interface (questions) from the Python parts
 │   ├── gui.sh                   what the interface needs (GTK 4, VTE) and how to find it
 │   ├── gui/                     graphical interface: model.py (no GTK, tested alone) and app.py (window)
 │   └── jars/                    base modules: nbkit-core (closes NetBeans) and nbkit-colors (used by the themes)
 ├── modules/                     only data
-│   ├── README.md                how to create a module
-│   ├── jsf/                     module.toml + nbkit-jsf.jar
+│   ├── README.md                how to create a tool
+│   ├── tools/
+│   │   └── jsf/                 tool.toml + nbkit-jsf.jar
 │   └── themes/
 │       └── one-dark-pro-mix/    theme.toml, ui.properties, colors.toml
 ├── src/                         Java code of the NetBeans modules
@@ -291,18 +312,6 @@ nbkit/
 └── .github/workflows/tests.yml  runs the tests on GitHub Actions
 ```
 
-To add a NetBeans module, create a folder in `modules/` with its jar and a `module.toml` (see [how to create a module](modules/README.md)).
-
-### Building the jars
-
-The jars are already built in `lib/jars/` and `modules/jsf/`. To build them again from `src/`, after changing the Java code or the texts:
-
-```bash
-bash src/build.sh [netbeans folder]       # or: bash nbkit.sh build
-```
-
-It compiles against the jars of your NetBeans installation (without the folder: `NB_HOME`, or the NetBeans that last used `~/.netbeans`) with a JDK 17 or newer, and updates the sha256 sums. `bash src/build.sh --help` shows the options.
-
 ## Tests
 
 ```bash
@@ -312,8 +321,8 @@ bash nbkit.sh test
 Runs everything in `tests/`, also on GitHub Actions at each push:
 
 - **Lint:** shellcheck and pyflakes.
-- **Python unit tests** (`tests/python/`): the `colors.toml` format and its error messages, the validation of `theme.toml` and `module.toml`, the `lang/` files (same keys in every language, every key the code uses exists) and the interface model (statuses, buttons, commands, events, progress and questions).
-- **Engine** (`tests/engine.sh`): installs into a fake NetBeans (`tests/netbeans/`) and checks that the files are exactly the expected ones (`tests/expected/install.sha1`), that a reinstall keeps your customizations, that `check` finds a missing module, that uninstalling brings back exactly what was there, that a failure at any step changes nothing, that broken files are skipped with the reason, and what the interface uses: `status --json`, the step and question events, `restore` and `delete-backup`.
+- **Python unit tests** (`tests/python/`): the `colors.toml` format and its error messages, the validation of `theme.toml` and `tool.toml`, the `lang/` files (same keys in every language, every key the code uses exists) and the interface model (statuses, buttons, commands, events, progress and questions).
+- **Engine** (`tests/engine.sh`): installs into a fake NetBeans (`tests/netbeans/`) and checks that the files are exactly the expected ones (`tests/expected/install.sha1`), that a reinstall keeps your customizations, that `check` finds a missing module, that uninstalling brings back exactly what was there, that a failure at any step changes nothing, that broken files are skipped with the reason, what the interface uses (`status --json`, the step and question events, `restore` and `delete-backup`), a tool made only of `tool.sh`, and an install over what the installer before nbkit left.
 - **JSF checks** (`tests/jsf.sh`, needs a JDK 17 or newer): runs the analyzer on the sample project in `src/nbkit-jsf/test/fixture`, whose pages mark where each warning must show up, in English and in Portuguese.
 - **Graphical interface** (`tests/gui.sh`, on a virtual screen with Xvfb): opens the window against the fake NetBeans and uses it like a person would: installs and uninstalls from the buttons, follows the progress bar, answers questions in the dialog and in the terminal, deletes a backup, opens About, closes the window in the middle of an install to check that everything goes back, and checks that it follows the dark mode of the system.
 

@@ -84,3 +84,49 @@ ask_yn() {
   if [ -z "$a" ]; then [ "$2" = Y ]; return; fi
   case "$a" in s|sim|y|yes) return 0 ;; *) return 1 ;; esac
 }
+
+# ---------- interactive terminal: arrow key menu, spinner, header ----------
+# arrow key menu; result in MENU_IDX (-1 = left with Esc or q). MENU_HINT changes the legend.
+menu() {
+  local -a o=("$@"); local n=$# i=${MENU_START:-0} j k rest
+  [ "$i" -lt "$n" ] || i=0
+  printf '\e[?25l'; trap 'printf "\e[?25h\n"; exit 130' INT
+  while :; do
+    for ((j = 0; j < n; j++)); do
+      if [ $j -eq $i ]; then printf '\r\e[K  %s> %s%s\n' "$BL$B" "${o[j]}" "$N"
+      else printf '\r\e[K    %s\n' "${o[j]}"; fi
+    done
+    printf '\r\e[K  %s%s%s' "$D" "${MENU_HINT:-$(t cli.menu_hint)}" "$N"
+    IFS= read -rsn1 k </dev/tty || k=q
+    if [ "$k" = $'\e' ]; then
+      rest=""; IFS= read -rsn2 -t 0.05 rest </dev/tty || true
+      case "$rest" in '[A'|OA) k=up ;; '[B'|OB) k=down ;; '') k=q ;; *) k=x ;; esac
+    fi
+    case "$k" in
+      up|k) i=$(( (i + n - 1) % n )) ;;
+      down|j) i=$(( (i + 1) % n )) ;;
+      '') break ;;
+      q) i=-1; break ;;
+    esac
+    printf '\r\e[%dA' "$n"
+  done
+  printf '\r\e[K\e[?25h'; trap 'exit 130' INT
+  MENU_IDX=$i
+}
+
+# spinner until the condition is true; any key cancels (returns 1)
+spin_until() {
+  local sp='|/-\' i=0 k cancel; cancel="$(t cli.enter_cancels)"
+  printf '\e[?25l'; trap 'printf "\r\e[K\e[?25h"; exit 130' INT
+  while ! "$2"; do
+    printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$1" "$D" "$cancel" "$N"; i=$((i + 1))
+    if IFS= read -rsn1 -t 0.25 k </dev/tty; then
+      IFS= read -rsn5 -t 0.05 k </dev/tty || true
+      printf '\r\e[K\e[?25h'; trap 'exit 130' INT; return 1
+    fi
+  done
+  printf '\r\e[K\e[?25h'; trap 'exit 130' INT
+}
+
+HEADER=0
+header() { [ $HEADER = 1 ] || echo "${B}nbkit${N} ${D}v$NBKIT_VERSION${N}"; HEADER=1; }

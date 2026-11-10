@@ -2,17 +2,20 @@
 # colors as the Java warnings. The texts inside NetBeans follow the system language (Bundle.properties
 # and Bundle_pt.properties in the jar). The Java code is in src/nbkit-jsf.
 
-[module]
+[tool]
 name = { en = "JSF checks", pt-BR = "Verificações de JSF" }
 description = { en = "Warnings in the xhtml editor: EL, ids, forms, templates", pt-BR = "Avisos no editor de xhtml: EL, ids, formulários, templates" }
 # raise it when the jar changes, so the menu offers the update
 version = 2
-# the jar in this folder, the module name inside it (OpenIDE-Module) and its sha256 (src/build.sh updates it)
+# shown after the install
+hint = { en = "the rules turn on and off in Tools > Options > Editor > JSF", pt-BR = "as regras ligam e desligam em Tools > Options > Editor > JSF" }
+
+# the NetBeans module the tool installs: the jar in this folder, the module name inside it (OpenIDE-Module)
+# and its sha256 (src/build.sh updates it)
+[netbeans_module]
 jar = "nbkit-jsf.jar"
 codename = "nbkit.jsf"
 sha256 = "2e95a0ddafbdea7c87f66fd2a47935a2bd95ea543a8579aedae30d4ade5d195a"
-# shown after the install
-hint = { en = "the rules turn on and off in Tools > Options > Editor > JSF", pt-BR = "as regras ligam e desligam em Tools > Options > Editor > JSF" }
 
 # lines shown before confirming the uninstall
 [uninstall]

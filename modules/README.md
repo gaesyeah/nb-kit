@@ -3,74 +3,92 @@
   <a href="README.pt-BR.md"><img alt="Português (Brasil)" src="https://img.shields.io/badge/Portugu%C3%AAs%20(Brasil)-30363D?style=for-the-badge"></a>
 </p>
 
-# Creating an nbkit module
+# Creating an nbkit tool
 
-A NetBeans module is a folder in `modules/` with its jar and a `module.toml`, with no code. nbkit finds the folder by
-itself and the module shows up in the menu, with install, update, reinstall, uninstall, the `[n/N]` progress, the
-restore point and the check. The engine is `lib/modules.sh`. Themes are folders in `modules/themes/` (see
-"Creating a theme" in the [README](../README.md#creating-a-theme)).
+nbkit has two kinds of modules, each with its own engine, and both are folders of data:
 
-## module.toml
+| Kind | Folder | Engine | Described in |
+|---|---|---|---|
+| Theme | `modules/themes/<id>/` | `lib/themes.sh` | "Creating a theme" in the [README](../README.md#creating-a-theme) |
+| Tool | `modules/tools/<id>/` | `lib/tools.sh` | this page |
+
+nbkit finds each folder by itself. The engine gives the module everything else: the menu and interface entries,
+install, update, reinstall and uninstall, the `[n/N]` progress, the restore point (everything goes back on an error
+or Ctrl+C), the version check and `check` with NetBeans open.
+
+## tool.toml
 
 ```toml
-[module]
+[tool]
 name = { en = "JSF checks", pt-BR = "Verificações de JSF" }
 description = { en = "Warnings in the xhtml editor", pt-BR = "Avisos no editor de xhtml" }
-version = 2                       # raise it when the jar changes, so the menu offers the update
+version = 2                       # raise it when the tool changes, so the menu offers the update
+hint = { en = "the rules turn on and off in Tools > Options > Editor > JSF", pt-BR = "..." }   # optional, after the install
+
+[netbeans_module]                 # optional: a NetBeans module (jar) the tool installs
 jar = "nbkit-jsf.jar"             # the jar in this folder
 codename = "nbkit.jsf"            # OpenIDE-Module of the jar
 sha256 = "2e95a0dd..."            # sha256 of the jar (src/build.sh updates it)
-hint = { en = "the rules turn on and off in Tools > Options > Editor > JSF", pt-BR = "..." }   # optional, after the install
 
 [uninstall]                       # optional: lines shown before confirming the uninstall
 goes = { en = "the checks module", pt-BR = "o módulo de verificações" }
 stays = { en = "your settings in Tools > Options", pt-BR = "suas opções em Tools > Options" }
 ```
 
-The folder name is the module id (`bash nbkit.sh install jsf`): lowercase letters, digits and hyphens. Texts can be
-plain text or one per language. The jar goes to `modules/<codename with dashes>.jar` in the userdir, and
-`check` looks for the codename in the NetBeans log. If `module.toml` has an error, nbkit skips the module and says why.
+The folder name is the tool id (`bash nbkit.sh install jsf`): lowercase letters, digits and hyphens. Texts can be plain
+text or one per language. With `[netbeans_module]`, the jar goes to `modules/<codename with dashes>.jar` in the userdir,
+is enabled in `config/Modules/`, and `check` looks for the codename in the NetBeans log. If `tool.toml` has an error,
+nbkit skips the tool and says why.
 
-## Modules in bash (advanced)
+## tool.sh: what is specific to the tool (optional)
 
-For something that is not just a jar, put a `.sh` in `modules/`. nbkit loads it with `source`; it registers itself with:
+A tool that does more than a jar (or no jar at all) puts a `tool.sh` next to `tool.toml`. nbkit loads it right after
+registering the tool, so it redefines only the functions it needs; the others stay with the engine. The functions are
+named `tool_<id>_<function>`, with the hyphens of the id as underscores (`my-tool` becomes `tool_my_tool_install`).
+For example, a tool that writes a folder in `config/`:
 
 ```bash
-nbkit_register <id> <prefix> <category> "<name>" "<description>" <version>
+tool_notes_paths() { echo config/nbkit-notes; }      # what it changes: goes into the restore point
+tool_notes_install() {
+  step "Notes"
+  mkdir -p "$C/nbkit-notes" && echo hi > "$C/nbkit-notes/a.txt"
+  ok "notes written"
+}
+tool_notes_uninstall() { step "Notes"; rm -rf "$C/nbkit-notes"; ok "notes removed"; }
 ```
 
-- **id:** what shows up on the command line (`bash nbkit.sh install <id>`).
-- **prefix:** start of the module function names (`<prefix>_status`, `<prefix>_install`...).
-- **category:** `theme` (only one theme is active at a time; installing another one switches) or `tool`.
-- **version:** an integer. When it changes, the menu offers the update.
+With a jar and something else, call the engine part inside your function: `tool_module_install <id>`,
+`tool_module_uninstall <id>` and `tool_module_check <id>`.
 
-### Required functions
+### The functions (the contract of every module)
 
-| Function | What it does |
-|---|---|
-| `<prefix>_status` | Prints `no` or calls `version_status <id>` (returns `ok`, `old:<v>` or `new:<v>`). |
-| `<prefix>_install_steps` | Prints how many `step` calls the install uses. |
-| `<prefix>_install` | Installs. Uses the nbkit `step`, `ok`, `info`, `warn` and `die`. |
-| `<prefix>_uninstall_steps` | Prints how many `step` calls the uninstall uses. |
-| `<prefix>_uninstall` | Removes. |
-| `<prefix>_paths` | Paths (relative to the userdir) the module changes: they go into the restore point. |
-| `<prefix>_uninstall_summary` | "Goes / Back / Stays" lines shown before confirming. |
-| `<prefix>_check` | With NetBeans open: prints `res 0 "..."` or `res 1 "..."`. Returns 0 (ok), 1 (reinstalling fixes it) or 2 (it does not). |
+| Function | What it does | Default of the engine |
+|---|---|---|
+| `_status` | Prints `no` or calls `version_status <id>` (`ok`, `old:<v>` or `new:<v>`). | installed if its jar is there or nbkit recorded its version |
+| `_install_steps` | Prints how many `step` calls the install uses. | 1 |
+| `_install` | Installs. Uses the nbkit `step`, `ok`, `info`, `warn` and `die`. | copies and enables the jar, shows the hint |
+| `_uninstall_steps` | Prints how many `step` calls the uninstall uses. | 1 |
+| `_uninstall` | Removes. | removes the jar |
+| `_paths` | Paths (relative to the userdir) it changes: they go into the restore point. | the jar and its xml |
+| `_uninstall_summary` | "Goes / Stays" lines shown before confirming. | `[uninstall]` of tool.toml |
+| `_check` | With NetBeans open: prints `res 0 "..."` or `res 1 "..."`. Returns 0 (ok), 1 (reinstalling fixes it) or 2 (it does not). | the jar loaded, no error in the log |
 
-### Optional functions
+Optional (the theme engine uses them; a tool may too):
 
 | Function | What it does |
 |---|---|
-| `<prefix>_backups` | Lists the module backup files (the oldest first). Makes the "Backups" item show up. |
-| `<prefix>_backup_desc <file>` | Short description of what is in the backup. |
-| `<prefix>_restore_steps <file>` and `<prefix>_restore <file>` | Restores a backup. |
-| `<prefix>_rollback` | Undoes something outside the userdir if the install stops midway. |
+| `_backups` | Lists the tool backup files (the oldest first). Makes the "Backups" item show up. |
+| `_backup_desc <file>` | Short description of what is in the backup. |
+| `_restore_steps <file>` and `_restore <file>` | Restores a backup. |
+| `_rollback` | Undoes something outside the userdir if the install stops midway. |
+
+nbkit records the installed version in `$UD/nbkit/<id>.version` by itself after each install.
 
 ### nbkit helpers
 
 `$UD` (userdir), `$C` (`$UD/config`), `tmpdir` (temporary folder deleted at the end), `ask_yn <question> Y|N`, `bk_date`,
-`version_status`, `file_copy <file> <destination> <sha256>`, `module_xml <codename>`, `log_has_module <name>` and
-`log_module_errors <regex>` (for `check`). The installed version of each module is kept in `$UD/nbkit/<id>.version`.
+`version_status`, `file_copy <file> <destination> <sha256>`, `module_xml <codename>`, `res <0|1> <text>`,
+`log_has_module <name>` and `log_module_errors <regex>` (for `check`). They are in `lib/registry.sh` and `lib/terminal.sh`.
 
 The graphical interface follows `step` (progress bar) and `ask_yn` (dialog) by itself. A question asked from Python
 has to call `event(ev='ask', text=..., default='Y' or 'N')` of `lib/uievents.py` before reading the answer and
@@ -79,5 +97,10 @@ has to call `event(ev='ask', text=..., default='Y' or 'N')` of `lib/uievents.py`
 ### Texts
 
 Everything shown in the terminal comes from `lang/<language>.lang`. Use `t <key> [values...]`, which prints the text with
-the `%s` filled in order (e.g. `step "$(t my.step "$name")"`), and create the key in every file in `lang/`, with the module
-prefix. Python parts get the same files in `NBKIT_LANG_FILES` and read them with `lib/text.py`.
+the `%s` filled in order (e.g. `step "$(t my.step "$name")"`), and create the key in every file in `lang/`, with the tool
+id as prefix. Python parts get the same files in `NBKIT_LANG_FILES` and read them with `lib/text.py`.
+
+### Tests
+
+`tests/engine.sh` has a tool made only of `tool.sh` ("Tools engine"), installed into the fake NetBeans: a good model for
+the tests of a new tool. Run everything with `bash nbkit.sh test`.

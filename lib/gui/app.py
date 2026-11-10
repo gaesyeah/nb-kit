@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """nbkit graphical interface (bash nbkit.sh gui): GTK 4 and the VTE terminal widget.
 On top, the modules from "nbkit.sh status --json"; at the bottom, a terminal where every action runs nbkit.sh
 itself. The questions of nbkit also show up as dialogs, the progress bar follows the steps (lib/gui/model.py)."""
@@ -105,24 +104,33 @@ class Window(Gtk.ApplicationWindow):
         top_scroll = Gtk.ScrolledWindow(child=self.top, vexpand=True, min_content_height=160)
 
         # progress: pulses until the first step, then step n of total
-        self.progress = Gtk.ProgressBar(show_text=True, visible=False, margin_start=14, margin_end=14)
+        # progress bar and result on one row, so the terminal keeps the room
+        self.progress = Gtk.ProgressBar(show_text=True, visible=False, hexpand=True, valign=Gtk.Align.CENTER)
         self.result = label('', 'dim-label', xalign=0.0)
-        self.result.set_margin_start(14)
+        status_row = Gtk.Box(spacing=12, margin_start=14, margin_end=14)
+        status_row.append(self.result)
+        status_row.append(self.progress)
 
         # bottom: the terminal where nbkit.sh runs
         self.terminal = Vte.Terminal(scrollback_lines=10000, vexpand=True)
         self.terminal.set_size(80, 14)
+        # the lines sit at the bottom: when the height is not a whole number of lines, the leftover goes on top
+        # (blank) instead of cutting the last line; a little padding keeps it off the edge
+        self.terminal.set_yfill(False)
+        self.terminal.set_yalign(Vte.Align.END)
+        css = Gtk.CssProvider()
+        css.load_from_data(b'vte-terminal { padding: 2px 6px 6px 6px; }')
+        Gtk.StyleContext.add_provider_for_display(self.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.terminal.connect('child-exited', self.on_child_exited)
         self.add_terminal_copy()
         # with nothing running there is nothing to type: no cursor (\e[?25l); each action shows it again
         self.terminal.feed(('\x1b[2m' + T('gui.ready') + '\x1b[0m\r\n\x1b[?25l').encode())
         term_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=6)
-        term_box.append(self.progress)
-        term_box.append(self.result)
+        term_box.append(status_row)
         # colors of the system theme: the terminal is transparent over a "view" background (the color of text
         # fields) and writes in the theme's text color; it follows when the theme or the dark mode changes
         # the terminal scrolls by itself (a ScrolledWindow around it can hide the last line): only a scrollbar
-        term_view = Gtk.Box(vexpand=True, height_request=200)
+        term_view = Gtk.Box(vexpand=True, height_request=self.TERMINAL_MIN)
         term_view.add_css_class('view')
         self.terminal.set_hexpand(True)
         term_view.append(self.terminal)
@@ -133,7 +141,8 @@ class Window(Gtk.ApplicationWindow):
             Gtk.Settings.get_default().connect('notify::' + prop, lambda *_a: GLib.idle_add(self.sync_terminal_colors))
 
         paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL, start_child=top_scroll, end_child=term_box,
-                          resize_start_child=False, resize_end_child=True)
+                          resize_start_child=False, resize_end_child=True,
+                          shrink_start_child=True, shrink_end_child=False)
         self.paned = paned
         # opens with the whole top visible (as long as the terminal keeps 200 px); the divider moves as usual
         self.connect('map', lambda *_a: GLib.idle_add(self.fit_top))
@@ -165,9 +174,29 @@ class Window(Gtk.ApplicationWindow):
             self.terminal.select_all()
         self.terminal.copy_clipboard_format(Vte.Format.TEXT)
 
+    # when it opens: the whole top visible and the terminal with room for about 16 lines; the window grows up to
+    # 90% of the screen for that, and on a smaller screen the top scrolls
+    TERMINAL_ROOM = 360
+    TERMINAL_MIN = 160                     # about 9 lines: the least the terminal gets, even on a short screen
+
     def fit_top(self):
         _min, natural, _b, _b2 = self.top.measure(Gtk.Orientation.VERTICAL, max(self.get_width(), 1))
-        self.paned.set_position(max(160, min(natural, self.get_height() - 260)))
+        rest = self.get_height() - self.paned.get_allocated_height()          # header bar
+        want = rest + natural + self.TERMINAL_ROOM
+        monitor = self.get_display().get_monitor_at_surface(self.get_surface()) if self.get_surface() else None
+        limit = int(monitor.get_geometry().height * 0.9) if monitor else want
+        if self.get_height() < min(want, limit) and not self.is_maximized():
+            self.set_default_size(self.get_width(), min(want, limit))
+            GLib.timeout_add(50, self.place_divider, natural)
+        else:
+            self.place_divider(natural)
+        return False
+
+    def place_divider(self, natural):
+        # the bottom (progress + terminal) never gets less than its minimum, or GTK cuts its last lines: the top,
+        # which scrolls, gives up the room instead
+        bottom_min = self.paned.get_end_child().measure(Gtk.Orientation.VERTICAL, max(self.get_width(), 1))[0]
+        self.paned.set_position(max(0, min(natural, self.paned.get_allocated_height() - bottom_min)))
         return False
 
     def sync_terminal_colors(self):

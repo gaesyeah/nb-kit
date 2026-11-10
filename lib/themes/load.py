@@ -1,10 +1,16 @@
 """Reads modules/themes/<id>/theme.toml and prints the bash that registers each theme."""
-import os, sys, re, tomllib
+import glob
+import os
+import re
+import shlex
+import sys
+import tomllib
+
 from text import T
 from theme_colors import COLOR, ThemeError, read_colors
+from toml_data import localized as text
+from toml_data import need as need_key
 
-
-import glob, shlex
 
 def say(text):
     """bash that prints a warning in the terminal"""
@@ -15,21 +21,11 @@ def message(e):
     text = T(key, *values)
     return T('theme.error_at', text, place, line) if place else text
 
-LANG = os.environ.get('NBKIT_LANG', 'en')
-
-def text(value):
-    """plain text, or a table by language: { en = "...", pt-BR = "..." }"""
-    if isinstance(value, dict):
-        return value.get(LANG) or value.get(LANG.split('-')[0]) or value.get('en') or next(iter(value.values()), '')
-    return value
 
 def need(table, key, kind, where):
-    value = table.get(key)
-    if value is None:
-        raise ThemeError('theme.missing_key', (where + key,))
-    if not isinstance(value, kind) or isinstance(value, bool):
-        raise ThemeError('theme.bad_value', (where + key,))
-    return value
+    return need_key(table, key, kind, lambda k, name: ThemeError('theme.missing_key' if k == 'missing' else 'theme.bad_value',
+                                                                 (where + name,)))
+
 
 q = shlex.quote
 for path in sorted(glob.glob(os.path.join(sys.argv[1], '*', 'theme.toml'))):

@@ -261,25 +261,47 @@ Os colchetes são `nbkit-bracket1`, `nbkit-bracket2` e `nbkit-bracket3`, um por 
 
 A `modules/themes/one-dark-pro-mix/` é um exemplo completo.
 
+## Criar uma ferramenta
+
+Uma ferramenta é uma pasta em `modules/tools/` com um `tool.toml`: nome, versão e, se for um módulo do NetBeans, o jar
+dele. O nbkit acha sozinho e o motor de ferramentas (`lib/tools.sh`) dá a ela instalar, atualizar, desinstalar, o ponto
+de restauração e o `check`. O que é específico de uma ferramenta vai num `tool.sh` opcional ao lado. Veja [como criar uma
+ferramenta](modules/README.pt-BR.md).
+
+### Compilar os jars
+
+Os jars já vêm compilados em `lib/jars/` e `modules/tools/jsf/`. Para compilar de novo a partir do `src/`, depois de mudar o código Java ou os textos:
+
+```bash
+bash src/build.sh [pasta do netbeans]     # ou: bash nbkit.sh build
+```
+
+Ele compila contra os jars da sua instalação do NetBeans (sem a pasta: `NB_HOME`, ou o NetBeans que usou o `~/.netbeans` por último) com um JDK 17 ou mais novo, e atualiza os sha256. `bash src/build.sh --help` mostra as opções.
+
 ## Estrutura
 
 ```
 nbkit/
-├── nbkit.sh                     CLI
+├── nbkit.sh                     CLI: argumentos, menu e ações
 ├── lang/                        textos do terminal: pt-BR.lang (referência) e en.lang
 ├── lib/                         código usado pelo CLI
-│   ├── terminal.sh              cores, idioma e funções de saída
-│   ├── themes.sh                motor de temas (veja "Criar um tema")
-│   ├── themes/                  partes em Python do motor de temas
-│   ├── modules.sh, modules.py   motor dos módulos do NetBeans (module.toml)
-│   ├── text.py                  textos de lang/ para as partes em Python
+│   ├── terminal.sh              cores, idioma, funções de saída, menu de setas
+│   ├── packages.sh              instala o que falta pelo gerenciador de pacotes (apt, dnf, pacman, zypper)
+│   ├── registry.sh              registro dos módulos e as funções que os motores dividem
+│   ├── netbeans.sh              userdirs, NetBeans aberto ou fechado, abrir e fechar
+│   ├── restore.sh               ponto de restauração (tudo volta num erro ou Ctrl+C)
+│   ├── backups.sh, status.sh    backups e status (também o "status --json" da interface)
+│   ├── themes.sh, themes/       motor de temas e as partes em Python dele (veja "Criar um tema")
+│   ├── tools.sh, tools/         motor de ferramentas e a parte em Python dele (veja "Criar uma ferramenta")
+│   ├── text.py, toml_data.py    textos de lang/ e funções para os arquivos TOML, para as partes em Python
 │   ├── uievents.py              eventos para a interface (perguntas) vindos das partes em Python
 │   ├── gui.sh                   o que a interface precisa (GTK 4, VTE) e como achar
 │   ├── gui/                     interface gráfica: model.py (sem GTK, testado sozinho) e app.py (janela)
 │   └── jars/                    módulos base: nbkit-core (fecha o NetBeans) e nbkit-colors (usado pelos temas)
 ├── modules/                     só dados
-│   ├── README.md                como criar um módulo
-│   ├── jsf/                     module.toml + nbkit-jsf.jar
+│   ├── README.md                como criar uma ferramenta
+│   ├── tools/
+│   │   └── jsf/                 tool.toml + nbkit-jsf.jar
 │   └── themes/
 │       └── one-dark-pro-mix/    theme.toml, ui.properties, colors.toml
 ├── src/                         código Java dos módulos do NetBeans
@@ -291,18 +313,6 @@ nbkit/
 └── .github/workflows/tests.yml  roda os testes no GitHub Actions
 ```
 
-Para adicionar um módulo do NetBeans, crie uma pasta em `modules/` com o jar dele e um `module.toml` (veja [como criar um módulo](modules/README.pt-BR.md)).
-
-### Compilar os jars
-
-Os jars já vêm compilados em `lib/jars/` e `modules/jsf/`. Para compilar de novo a partir do `src/`, depois de mudar o código Java ou os textos:
-
-```bash
-bash src/build.sh [pasta do netbeans]     # ou: bash nbkit.sh build
-```
-
-Ele compila contra os jars da sua instalação do NetBeans (sem a pasta: `NB_HOME`, ou o NetBeans que usou o `~/.netbeans` por último) com um JDK 17 ou mais novo, e atualiza os sha256. `bash src/build.sh --help` mostra as opções.
-
 ## Testes
 
 ```bash
@@ -312,8 +322,8 @@ bash nbkit.sh test
 Roda tudo o que está em `tests/`, e também no GitHub Actions a cada push:
 
 - **Lint:** shellcheck e pyflakes.
-- **Testes unitários de Python** (`tests/python/`): o formato do `colors.toml` e as mensagens de erro, a validação do `theme.toml` e do `module.toml`, os arquivos de `lang/` (mesmas chaves em todos os idiomas, toda chave usada no código existe) e o modelo da interface (status, botões, comandos, eventos, progresso e perguntas).
-- **Motor** (`tests/engine.sh`): instala num NetBeans falso (`tests/netbeans/`) e confere que os arquivos são exatamente os esperados (`tests/expected/install.sha1`), que reinstalar mantém as suas personalizações, que o `check` acha um módulo faltando, que desinstalar volta exatamente ao que havia, que uma falha em qualquer passo não muda nada, que arquivos com erro são ignorados com o motivo, e o que a interface usa: `status --json`, os eventos de passo e de pergunta, `restore` e `delete-backup`.
+- **Testes unitários de Python** (`tests/python/`): o formato do `colors.toml` e as mensagens de erro, a validação do `theme.toml` e do `tool.toml`, os arquivos de `lang/` (mesmas chaves em todos os idiomas, toda chave usada no código existe) e o modelo da interface (status, botões, comandos, eventos, progresso e perguntas).
+- **Motor** (`tests/engine.sh`): instala num NetBeans falso (`tests/netbeans/`) e confere que os arquivos são exatamente os esperados (`tests/expected/install.sha1`), que reinstalar mantém as suas personalizações, que o `check` acha um módulo faltando, que desinstalar volta exatamente ao que havia, que uma falha em qualquer passo não muda nada, que arquivos com erro são ignorados com o motivo, o que a interface usa (`status --json`, os eventos de passo e de pergunta, `restore` e `delete-backup`), uma ferramenta feita só de `tool.sh` e uma instalação por cima do que o instalador de antes do nbkit deixou.
 - **Verificações de JSF** (`tests/jsf.sh`, precisa de JDK 17 ou mais novo): roda o analisador no projeto de exemplo em `src/nbkit-jsf/test/fixture`, cujas páginas marcam onde cada aviso deve aparecer, em inglês e em português.
 - **Interface gráfica** (`tests/gui.sh`, numa tela virtual com Xvfb): abre a janela com o NetBeans falso e usa como uma pessoa usaria: instala e desinstala pelos botões, acompanha a barra de progresso, responde perguntas no diálogo e no terminal, apaga um backup, abre o Sobre, fecha a janela no meio de uma instalação para conferir que tudo volta e confere que segue o modo escuro do sistema.
 

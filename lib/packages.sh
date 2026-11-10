@@ -78,3 +78,14 @@ pkg_install() {
   p="$(pkg_for "$m" "$@")" || return 1
   pkg_run "$what" "$p"
 }
+
+# ---------- JDK (compiling the modules and the JSF tests) ----------
+# a JDK 17 or newer: javac and jar (of JAVA_HOME, if set)
+JDK_SPEC="apt:openjdk-21-jdk-headless|openjdk-17-jdk-headless dnf:java-21-openjdk-devel|java-17-openjdk-devel pacman:jdk21-openjdk|jdk17-openjdk zypper:java-21-openjdk-devel|java-17-openjdk-devel"
+jdk_javac() { echo "${JAVA_HOME:+$JAVA_HOME/bin/}javac"; }
+jdk_ok() {
+  local javac v; javac="$(jdk_javac)"
+  command -v "$javac" >/dev/null 2>&1 && command -v "${JAVA_HOME:+$JAVA_HOME/bin/}jar" >/dev/null 2>&1 || return 1
+  v="$("$javac" -version 2>&1 | sed -n 's/^javac \([0-9][0-9]*\).*/\1/p' | tail -1)"
+  [ -n "$v" ] && [ "$v" -ge 17 ]
+}

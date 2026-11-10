@@ -7,9 +7,12 @@ import time
 
 import helpers                  # lib/ on the path, English texts
 from gui import app
-from gi.repository import Gio, GLib, Gtk
+from gi.repository import Gio, GLib, Gtk, Vte
 
 PASS = FAIL = 0
+# the same colors as tests/lib.sh: tests/gui.sh asks for them when its output is a terminal
+COLOR = os.environ.get('NBKIT_TEST_COLOR') == '1'
+G, R, N = ('\033[32m', '\033[31m', '\033[0m') if COLOR else ('', '', '')
 U = os.path.join(os.environ['HOME'], '.netbeans', '31')
 ctx = GLib.MainContext.default()
 
@@ -18,10 +21,10 @@ def check(desc, ok, detail=''):
     global PASS, FAIL
     if ok:
         PASS += 1
-        print('  ok    ' + desc)
+        print(f'  {G}ok{N}    ' + desc)
     else:
         FAIL += 1
-        print('  FAIL  ' + desc + (('\n        ' + str(detail)) if detail else ''))
+        print(f'  {R}FAIL{N}  ' + desc + (('\n        ' + str(detail)) if detail else ''))
 
 
 def wait(cond, seconds=60):
@@ -87,9 +90,9 @@ def main():
     w = app.Window()
     w.present()
     wait(lambda: False, 0.3)
-    {'actions': actions, 'closing': closing, 'dark': dark, 'decline': decline}[scenario](w)
+    {'actions': actions, 'closing': closing, 'dark': dark, 'decline': decline, 'small': small, 'laptop': laptop}[scenario](w)
     print()
-    print(f'{PASS} passed' if FAIL == 0 else f'{FAIL} failed, {PASS} passed')
+    print(f'{G}{PASS} passed{N}' if FAIL == 0 else f'{R}{FAIL} failed{N}, {PASS} passed')
     return 0 if FAIL == 0 else 1
 
 
@@ -101,7 +104,13 @@ def actions(w):
     check('both modules not installed', [status(w, m) for m in w.rows] == ['not installed'] * 2)
     check('development section in a clone', w.dev is not None and w.dev.get_visible())
     natural = w.top.measure(Gtk.Orientation.VERTICAL, w.get_width())[1]
-    check('opens with the whole top visible, development included', w.paned.get_position() >= natural, (w.paned.get_position(), natural))
+    check('opens with the whole top visible, development included', wait(lambda: w.paned.get_position() >= natural, 3),
+          (w.paned.get_position(), natural))
+    term = w.terminal.get_allocated_height()
+    check('the terminal opens with room for about 16 lines', wait(lambda: w.terminal.get_allocated_height() >= 300, 3),
+          w.terminal.get_allocated_height())
+    check('its last line is never cut (lines sit at the bottom)', not w.terminal.get_yfill() and w.terminal.get_yalign() == Vte.Align.END, term)
+    check('the terminal is whole, inside the window', inside(w))
     check('check and backups start disabled', not w.check_button.get_sensitive() and not w.backups_button.get_sensitive())
     check('install all is offered for both modules', [b.get_name() for b in children(w.bulk)] == ['install-all'])
 
@@ -177,6 +186,30 @@ def actions(w):
     wait(lambda: False, 0.3)
     check('about shows the version and the repository', w.about.get_version() == w.st['version'] and 'gaesyeah/nb-kit' in w.about.get_website())
     w.about.destroy()
+
+
+def inside(w):
+    """the terminal ends inside the window (nothing of it cut at the bottom)"""
+    _, t = w.terminal.compute_bounds(w)
+    _, p = w.paned.compute_bounds(w)
+    return t.origin.y + t.size.height <= p.origin.y + p.size.height and t.size.height >= w.TERMINAL_MIN
+
+
+def laptop(w):
+    print('A laptop screen (1366x768)')
+    natural = w.top.measure(Gtk.Orientation.VERTICAL, w.get_width())[1]
+    check('the whole top is visible, development included', wait(lambda: w.paned.get_position() >= natural, 3),
+          (w.paned.get_position(), natural))
+    check('and the terminal is whole, inside the window', inside(w))
+
+
+def small(w):
+    print('A short screen')
+    check('the terminal is whole, inside the window', wait(lambda: inside(w), 3))
+    check('the top scrolls instead', w.paned.get_position() < w.top.measure(Gtk.Orientation.VERTICAL, w.get_width())[1])
+    w.set_default_size(w.get_width(), 380)
+    wait(lambda: False, 0.5)
+    check('making the window shorter by hand does not cut the terminal either', inside(w))
 
 
 def dark(w):

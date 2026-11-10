@@ -109,19 +109,22 @@ cli.python_using=usando %s
 cli.res_warn=aviso
 cli.java_too_old=os módulos do nbkit precisam de Java 17 ou mais novo, e o NetBeans roda com o %s. Aponte o netbeans_jdkhome do netbeans.conf para um Java mais novo.
 
-# ---------- módulos do NetBeans (lib/modules.sh) ----------
-mod.summary_out=    {B}Sai:{N}   %s
-mod.summary_stays=    {B}Fica:{N}  %s
-mod.step_install=%s (módulo do NetBeans)
-mod.corrupt=o arquivo %s está corrompido (o sha256 não confere). Baixe o nbkit de novo.
-mod.copied=módulo copiado e verificado (sha256)
-mod.step_uninstall=Removendo: %s
-mod.removed=módulo removido
-mod.check_loaded=módulo carregado
-mod.check_missing=o módulo não aparece entre os módulos ligados
-mod.invalid=Aviso: módulo "%s" ignorado: %s
-mod.missing_key=falta "%s" no module.toml
-mod.bad_value=valor inválido para "%s" no module.toml
+# ---------- ferramentas (lib/tools.sh) ----------
+tool.summary_out=    {B}Sai:{N}   %s
+tool.summary_stays=    {B}Fica:{N}  %s
+tool.step_install=%s (módulo do NetBeans)
+tool.corrupt=o arquivo %s está corrompido (o sha256 não confere). Baixe o nbkit de novo.
+tool.copied=módulo copiado e verificado (sha256)
+tool.step_uninstall=Removendo: %s
+tool.removed=módulo removido
+tool.check_loaded=módulo carregado
+tool.check_missing=o módulo não aparece entre os módulos ligados
+tool.invalid=Aviso: ferramenta "%s" ignorada: %s
+tool.missing_key=falta "%s" no tool.toml
+tool.bad_value=valor inválido para "%s" no tool.toml
+tool.nothing=o tool.toml não tem [netbeans_module] e não há um tool.sh: a ferramenta não instala nada
+tool.check_nothing=nada a conferir com o NetBeans aberto
+tool.step_install_plain=%s
 
 # ---------- motor de temas (lib/themes.sh) ----------
 theme.summary_out=    {B}Sai:{N}   perfil "%s", módulo de coloração, interface do tema%s
@@ -225,12 +228,13 @@ theme.missing_file=falta o arquivo %s
 # ---------- compilação dos módulos (src/build.sh) ----------
 build.no_netbeans=não achei a instalação do NetBeans. Passe a pasta dela: bash src/build.sh /caminho/do/netbeans
 build.no_jdk=não achei o javac e o jar (JDK 17 ou mais novo). Instale um JDK ou defina o JAVA_HOME.
+build.need_jdk=Para compilar os módulos precisa de um JDK 17 ou mais novo (javac e jar).
 build.old_jdk=o javac é da versão %s; precisa do 17 ou mais novo.
 build.using=NetBeans: %s | %s
 build.step=Compilando %s
 build.done=%s gerado
 build.step_sums=Atualizando os sha256
-build.finished=Pronto. Se mudou o JSF, aumente a version no modules/jsf/module.toml para o menu oferecer a atualização.
+build.finished=Pronto. Se mudou o JSF, aumente a version no modules/tools/jsf/tool.toml para o menu oferecer a atualização.
 build.usage=Compila os módulos do NetBeans de src/ e atualiza os sha256.\n\nUso:\n  bash src/build.sh [pasta do netbeans] [--test]\n\n  --test   roda os testes do JSF (tests/jsf.sh) depois de compilar\n  --help   esta ajuda\n\nSem a pasta: NB_HOME, ou o NetBeans que usou o ~/.netbeans por último. Precisa de um JDK 17 ou mais novo.\n
 build.unknown_option=opção desconhecida: %s (veja bash src/build.sh --help)
 
@@ -250,7 +254,6 @@ test.all_passed=todos os testes passaram
 gui.refresh=Atualizar a lista
 gui.about=Sobre
 gui.about_comments=Módulos para o Apache NetBeans: verificações de JSF e temas.
-gui.readme=README
 gui.no_userdir=Nenhum userdir do NetBeans encontrado. Abra o NetBeans uma vez e clique em atualizar a lista.
 gui.nb_running=O NetBeans está aberto: as ações pedem para fechá-lo antes.
 gui.section_tool=Ferramentas

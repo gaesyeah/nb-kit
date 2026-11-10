@@ -1,13 +1,12 @@
 """Writes the colors of colors.toml as NetBeans color files."""
-import os, sys
+import os
+import sys
+
+from nbfiles import FONTSCOLORS_HEADER as HDR
 from text import T
 from theme_colors import ThemeError, read_colors
 
-
 THEME_DIR, FC, EC, BASE, PREFIX = sys.argv[1:6]
-HDR = ('<?xml version="1.0" encoding="UTF-8"?>\n'
-       '<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" '
-       '"https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">\n')
 try:
     places = read_colors(os.path.join(THEME_DIR, 'colors.toml'))
 except ThemeError as e:

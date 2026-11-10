@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the NetBeans modules of nbkit from the Java code in src/, against the jars of an Apache NetBeans
-# installation, and updates their sha256 (lib/jars/SHA256SUMS and modules/jsf/module.toml).
+# installation, and updates their sha256 (lib/jars/SHA256SUMS and modules/tools/jsf/tool.toml).
 #   bash src/build.sh [netbeans folder] [--test]      --test: runs the JSF tests (tests/jsf.sh) after building; --help
 # Without the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK 17 or newer (javac, jar).
 set -euo pipefail
@@ -21,6 +21,8 @@ while [ $# -gt 0 ]; do
 done
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/terminal.sh"
+# shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/packages.sh"
 if [ $HELP = 1 ]; then t build.usage; exit 0; fi
 [ -z "$BAD" ] || die "$(t build.unknown_option "$BAD")"
 
@@ -32,7 +34,16 @@ find_netbeans() {
   mapfile -t logs < <(find "$HOME"/.netbeans -path '*/var/log/messages.log' -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2-)
   for f in ${logs[@]+"${logs[@]}"}; do
     inst="$(sed -n 's/^ *Installation *= *//p' "$f" | tail -1)"
-    if [ -n "$inst" ] && [ -d "$(dirname "$inst")/platform" ]; then dirname "$inst"; return 0; fi
+    [ -n "$inst" ] || continue
+    inst="$(dirname "$inst")"
+    # Flatpak: the log has the path inside the sandbox (/app/netbeans); the files are in the Flatpak folders
+    case "$inst" in /app/netbeans*)
+      for d in "$HOME/.local/share/flatpak/app/org.apache.netbeans/current/active/files/netbeans" \
+               /var/lib/flatpak/app/org.apache.netbeans/current/active/files/netbeans; do
+        if [ -d "$d/platform" ]; then echo "$d"; return 0; fi
+      done ;;
+    esac
+    if [ -d "$inst/platform" ]; then echo "$inst"; return 0; fi
   done
   if command -v netbeans >/dev/null 2>&1; then
     d="$(dirname "$(dirname "$(readlink -f "$(command -v netbeans)")")")"
@@ -45,6 +56,12 @@ find_netbeans() {
 NB="$(readlink -f "$NB")"
 JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 JAR="${JAVA_HOME:+$JAVA_HOME/bin/}jar"
+# without a JDK 17 or newer: offers to install one (asking first), like the tests
+if ! jdk_ok; then
+  t build.need_jdk; echo
+  # shellcheck disable=SC2086
+  pkg_install "JDK" $JDK_SPEC || true
+fi
 command -v "$JAVAC" >/dev/null 2>&1 && command -v "$JAR" >/dev/null 2>&1 || die "$(t build.no_jdk)"
 JV="$("$JAVAC" -version 2>&1 | sed -n 's/^javac \([0-9][0-9]*\).*/\1/p' | tail -1)"
 [ -n "$JV" ] && [ "$JV" -ge 17 ] || die "$(t build.old_jdk "${JV:-?}")"
@@ -63,7 +80,10 @@ build() {
   step "$(t build.step "$name")"
   mkdir -p "$dir"
   mapfile -t java < <(find "$SRC/$name/src" -name '*.java' | sort)
-  "$JAVAC" --release 17 -encoding UTF-8 -nowarn -d "$dir" -cp "$CP" "${java[@]}"
+  # the classpath goes in a javac @file: with hundreds of jars in a long folder (Flatpak) it is bigger than what
+  # a single command line argument may have ("Argument list too long")
+  printf -- '-cp\n"%s"\n' "$CP" > "$TMP/$name.classpath"
+  "$JAVAC" --release 17 -encoding UTF-8 -nowarn -d "$dir" @"$TMP/$name.classpath" "${java[@]}"
   cp -r "$SRC/$name/res/." "$dir/"
   rm -f "$out"
   (cd "$dir" && "$JAR" cfm "$out" "$SRC/$name/manifest.mf" .)
@@ -74,12 +94,12 @@ sum_of() { sha256sum "$1" | cut -d' ' -f1; }
 TOTAL=4
 build nbkit-core "$NBKIT_DIR/lib/jars/nbkit-core.jar"
 build nbkit-colors "$NBKIT_DIR/lib/jars/nbkit-colors.jar"
-build nbkit-jsf "$NBKIT_DIR/modules/jsf/nbkit-jsf.jar"
+build nbkit-jsf "$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar"
 
 step "$(t build.step_sums)"
 (cd "$NBKIT_DIR/lib/jars" && sha256sum nbkit-colors.jar nbkit-core.jar > SHA256SUMS)
-sed -i "s/^sha256 = \"[0-9a-f]*\"/sha256 = \"$(sum_of "$NBKIT_DIR/modules/jsf/nbkit-jsf.jar")\"/" "$NBKIT_DIR/modules/jsf/module.toml"
-ok "lib/jars/SHA256SUMS, modules/jsf/module.toml"
+sed -i "s/^sha256 = \"[0-9a-f]*\"/sha256 = \"$(sum_of "$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar")\"/" "$NBKIT_DIR/modules/tools/jsf/tool.toml"
+ok "lib/jars/SHA256SUMS, modules/tools/jsf/tool.toml"
 echo
 t build.finished; echo
 if [ $TEST = 1 ]; then

@@ -62,7 +62,24 @@ theme_use() {
   for m in $THEME_MIMES; do TARGETS+=("config/Editors/$m/FontsColors/$THEME_BASE"); done
 }
 
-# old names (theme v28 and the One Dark Pro Mix installer, before nbkit) move to the new ones
+# ---------- older versions ----------
+# The One Dark Pro Mix installer (netbeans-onedark.sh, before nbkit) and the first nbkit versions (v28, names in
+# Portuguese) were published too; what they left in a userdir is recognized and moved or cleaned here and in
+# theme_marked, theme_font_marked, theme_remove_modules, theme_paths and theme_backups.
+
+# versions up to v17 of the installer wrote the theme inside FlatLaf Dark itself
+theme_legacy_inside_base() {
+  [ -e "$C/Editors/FontsColors/FlatLafDark/Defaults/onedark-mix-tokenColorings.xml" ] \
+    || [ -e "$C/Editors/text/css/FontsColors/FlatLafDark/Defaults/onedark-mix-tokenColorings.xml" ]
+}
+# theme_legacy_restore_base <first backup>: brings the original colors of the base profile back from it
+theme_legacy_restore_base() {
+  local t
+  for t in "${TARGETS[@]}"; do case "$t" in config/Editors/*) rm -rf "${UD:?}/$t" ;; esac; done
+  if [ -n "$1" ]; then tar -xzf "$1" -C "$UD" --wildcards 'config/Editors/*' 2>/dev/null || true; fi
+}
+
+# state files with old names move to the new ones
 theme_migrate() {
   local old
   mkdir -p "$UD/nbkit"
@@ -188,10 +205,10 @@ theme_select_state() {
 
 # editor font configured today (to tell on uninstall)
 theme_current_font() {
-  "$NBKIT_PY" "$THEMES_LIB/profile_font.py" "$1" 2>/dev/null || true
+  "$NBKIT_PY" "$THEMES_LIB/font.py" text "$1" 2>/dev/null || true
 }
 
-# builds the profile (check mode: only validates the NetBeans installation)
+# builds the profile (lib/themes/build.py)
 theme_builder() {
   "$NBKIT_PY" "$THEMES_LIB/build.py" "$@"
 }
@@ -267,7 +284,7 @@ theme_install() {
   FC="$EC/Editors/FontsColors/$THEME_BASE"
 
   step "$(t theme.step_verify)"
-  theme_builder "$UD" "$STAGE" "$THEME_PROFILE" "" check
+  "$NBKIT_PY" "$THEMES_LIB/verify.py" "$UD"
   ok "$(t theme.nb_found)"
 
   step "$(t theme.step_backup)"
@@ -279,18 +296,8 @@ theme_install() {
 
   step "$(t theme.step_base "$THEME_BASE_NAME")"
   # font you used in the base profile (goes to the new profile)
-  FONTJSON="$("$NBKIT_PY" "$THEMES_LIB/base_font.py" "$C/Editors/FontsColors/$THEME_BASE/$COLORS_PREFIX-tokenColorings.xml" 2>/dev/null || true)"
-  # versions up to v17 of the old installer wrote the theme inside FlatLaf Dark: bring the original back
-  if [ -e "$C/Editors/FontsColors/FlatLafDark/Defaults/onedark-mix-tokenColorings.xml" ] \
-     || [ -e "$C/Editors/text/css/FontsColors/FlatLafDark/Defaults/onedark-mix-tokenColorings.xml" ]; then
-    local t first
-    for t in "${TARGETS[@]}"; do
-      case "$t" in config/Editors/*) rm -rf "${UD:?}/$t" ;; esac
-    done
-    first="$(theme_backups | head -1)"
-    if [ -n "$first" ]; then tar -xzf "$first" -C "$UD" --wildcards 'config/Editors/*' 2>/dev/null || true; fi
-    info "$(t theme.legacy_fixed)"
-  fi
+  FONTJSON="$("$NBKIT_PY" "$THEMES_LIB/font.py" json "$C/Editors/FontsColors/$THEME_BASE/$COLORS_PREFIX-tokenColorings.xml" 2>/dev/null || true)"
+  if theme_legacy_inside_base; then theme_legacy_restore_base "$(theme_backups | head -1)"; info "$(t theme.legacy_fixed)"; fi
   ok "$(t theme.base_kept "$THEME_BASE_NAME")"
 
   step "$(t theme.step_colors)"
@@ -360,18 +367,14 @@ EOF
 
 # ---------- uninstall ----------
 theme_uninstall() {
-  local FONT first t fontdir
+  local FONT first fontdir
   theme_migrate
   step "$(t theme.step_remove)"
   FONT="$(theme_current_font "$UD/config/Editors/FontsColors/$THEME_PROFILE/$COLORS_PREFIX-tokenColorings.xml")"
   rm -f "$UD/$LAFT"
   find "$C/Editors" -depth -type d -path "*/FontsColors/$THEME_PROFILE" -exec rm -rf {} + 2>/dev/null || true
   first="${THEME_RESTORE:-$(theme_backups | head -1)}"
-  # theme of an old version (up to v17) still inside FlatLaf Dark: bring the original back
-  if [ -e "$C/Editors/FontsColors/FlatLafDark/Defaults/onedark-mix-tokenColorings.xml" ]; then
-    for t in "${TARGETS[@]}"; do case "$t" in config/Editors/*) rm -rf "${UD:?}/$t" ;; esac; done
-    [ -n "$first" ] && tar -xzf "$first" -C "$UD" --wildcards 'config/Editors/*' 2>/dev/null || true
-  fi
+  if theme_legacy_inside_base; then theme_legacy_restore_base "$first"; fi
   theme_remove_modules
   ok "$(t theme.removed "$THEME_PROFILE" "$THEME_LAF_FILE")"
 
@@ -418,8 +421,7 @@ theme_restore() {
 
 # ---------- check (with NetBeans open) ----------
 theme_check() {
-  local rc=0 stage; stage="$(tmpdir)"
-  theme_builder "$UD" "$stage" "$THEME_PROFILE" "" check >/dev/null 2>&1 || true
+  local rc=0
   "$NBKIT_PY" "$THEMES_LIB/check.py" "$UD" || rc=$?
   return $rc
 }
