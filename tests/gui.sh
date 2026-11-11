@@ -35,10 +35,14 @@ done
 if command -v dbus-run-session >/dev/null 2>&1; then
   echo "One window at a time"
   new_home "$WORK/home"
-  # no portals: on the test's own bus D-Bus would start the desktop's xdg-desktop-portal (COSMIC, GNOME...), which
-  # hangs trying to reach the real session; and the output goes to a file, so a process left running cannot hold it
-  PATH="$WORK/bin:$PATH" HOME="$WORK/home" GSETTINGS_BACKEND=memory GDK_BACKEND=x11 NO_AT_BRIDGE=1 GDK_DEBUG=no-portals GTK_USE_PORTAL=0 \
-    dbus-run-session -- xvfb-run -a -s "-screen 0 1920x1080x24" bash -c '
+  # a bus of its own that starts no service: with the system's service list, D-Bus would start the desktop's
+  # xdg-desktop-portal (COSMIC, GNOME...), which stalls the windows trying to reach the real session; and the output
+  # goes to a file, so a process left running cannot hold the test
+  printf '%s\n' '<busconfig><type>session</type><listen>unix:tmpdir=/tmp</listen><auth>EXTERNAL</auth>' \
+    '<policy context="default"><allow send_destination="*" eavesdrop="true"/><allow eavesdrop="true"/><allow own="*"/></policy></busconfig>' \
+    > "$WORK/bus.conf"
+  PATH="$WORK/bin:$PATH" HOME="$WORK/home" GSETTINGS_BACKEND=memory GDK_BACKEND=x11 NO_AT_BRIDGE=1 \
+    dbus-run-session --config-file="$WORK/bus.conf" -- xvfb-run -a -s "-screen 0 1920x1080x24" bash -c '
       "$0" "$1" & first=$!; sleep 5
       timeout 20 "$0" "$1"; echo "second=$?"
       kill "$first" && echo "first=alive"; wait "$first"' "$GUI_PY" "$NBKIT_DIR/lib/gui/app.py" > "$WORK/one-window.log" 2>&1 </dev/null
