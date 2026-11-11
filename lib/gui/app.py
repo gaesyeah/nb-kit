@@ -99,39 +99,15 @@ def mtime(path):
         return None
 
 
-class SquareLayout(Gtk.BinLayout):
-    """The button's own layout, which also tells it the size it got (GTK has no signal for that)."""
-
-    def do_allocate(self, widget, width, height, baseline):
-        Gtk.BinLayout.do_allocate(self, widget, width, height, baseline)
-        widget.allocated(width, height)
-
-
-class SquareButton(Gtk.Button):
-    """An icon button with the raised look of the text buttons, as wide as the bar makes it tall (About's height)."""
-
-    def __init__(self, icon, name, tip):
-        # the icon as a child, not icon_name: an icon_name button gets the image-button class, which many themes
-        # draw flat in the title bar; this one keeps the raised look of About
-        super().__init__(child=Gtk.Image(icon_name=icon), tooltip_text=T(tip))
-        self.add_css_class('nbkit-square')
-        self.update_property([Gtk.AccessibleProperty.LABEL], [T(name)])
-        self.set_cursor_from_name('pointer')
-        self.fixing = False
-        self.set_layout_manager(SquareLayout())
-
-    def allocated(self, width, height):
-        if width != height and not self.fixing:
-            self.fixing = True              # resizing inside an allocation is not allowed: right after it
-            GLib.idle_add(self.fix_width)
-
-    def fix_width(self):
-        # the size request counts the theme's margins too: natural width (with margins) + what is missing
-        self.fixing = False
-        w, h = self.get_width(), self.get_height()
-        if w and h and w != h:
-            self.set_size_request(self.measure(Gtk.Orientation.HORIZONTAL, -1)[1] + h - w, -1)
-        return False
+def square_button(icon, name, tip):
+    """An icon button with the raised look of the text buttons (About). The icon goes as a child, not icon_name:
+    an icon_name button gets the image-button class, which many themes draw flat in the title bar. Its size is
+    all ours (button.nbkit-square), centered in the bar, so no theme stretches it out of square."""
+    b = Gtk.Button(child=Gtk.Image(icon_name=icon), tooltip_text=T(tip), valign=Gtk.Align.CENTER)
+    b.add_css_class('nbkit-square')
+    b.update_property([Gtk.AccessibleProperty.LABEL], [T(name)])
+    b.set_cursor_from_name('pointer')
+    return b
 
 
 class Window(Gtk.ApplicationWindow):
@@ -147,7 +123,7 @@ class Window(Gtk.ApplicationWindow):
         self.about_button = Gtk.Button(label=T('gui.about'), tooltip_text=T('gui.tip_about'))
         self.about_button.set_cursor_from_name('pointer')
         self.about_button.connect('clicked', lambda _b: self.show_about())
-        self.refresh_button = SquareButton('nbkit-refresh-symbolic', 'gui.refresh', 'gui.tip_refresh')
+        self.refresh_button = square_button('nbkit-refresh-symbolic', 'gui.refresh', 'gui.tip_refresh')
         self.refresh_button.connect('clicked', lambda _b: self.refresh())
         header.pack_end(self.about_button)
         header.pack_end(self.refresh_button)
@@ -156,7 +132,7 @@ class Window(Gtk.ApplicationWindow):
         self.self_buttons = []
         for icon, name, tip, action in (('nbkit-update-symbolic', 'gui.install_self', 'gui.tip_install_self', None),
                                         ('nbkit-trash-symbolic', 'gui.uninstall_self', 'gui.tip_uninstall_self', 'uninstall-self')):
-            b = SquareButton(icon, name, tip)
+            b = square_button(icon, name, tip)
             b.set_visible(False)
             b.connect('clicked', lambda _b, a=action: self.start(
                 a or ('update-self' if self.st.get('self_installed') else 'install-self')))
@@ -228,7 +204,7 @@ class Window(Gtk.ApplicationWindow):
         css.load_from_data(b'vte-terminal { padding: 2px 6px 6px 6px; } '
                            b'progressbar.nbkit trough, progressbar.nbkit progress { min-height: %dpx; } '
                            b'button.nbkit-small { min-height: 0; min-width: 0; padding: 3px; margin: -3px 0; } '
-                           b'button.nbkit-square { min-width: 0; padding-left: 0; padding-right: 0; }' % bar)
+                           b'button.nbkit-square { min-width: 32px; min-height: 32px; padding: 0; }' % bar)
         Gtk.StyleContext.add_provider_for_display(self.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.terminal.connect('child-exited', self.on_child_exited)
         self.add_terminal_copy()

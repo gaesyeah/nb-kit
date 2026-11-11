@@ -159,15 +159,15 @@ def actions(w):
           w.refresh_button.get_child().get_icon_name() == 'nbkit-refresh-symbolic'
           and all(theme.has_icon(b.get_child().get_icon_name()) for b in square))
     size = lambda b: (b.get_width(), b.get_height())
-    check('they look like About (not flat icon buttons) and are square, as tall as About',
-          all(not b.has_css_class('image-button') and size(b) == (w.about_button.get_height(),) * 2 for b in square),
-          [size(b) for b in square] + [w.about_button.get_height()])
+    check('they look like About (not flat icon buttons) and are square',
+          all(not b.has_css_class('image-button') and size(b)[0] == size(b)[1] > 16 for b in square), [size(b) for b in square])
+    # a theme with a taller title bar (COSMIC): the bar must not stretch them out of square
     css = Gtk.CssProvider()
-    css.load_from_data(b'button.nbkit-test-tall { min-height: 40px; }', -1)
+    css.load_from_data(b'button.nbkit-test-tall { min-height: 48px; }', -1)
     Gtk.StyleContext.add_provider_for_display(w.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
     w.about_button.add_css_class('nbkit-test-tall')
-    check('and they stay square when About ends up taller (a theme that lays the bar out later)',
-          wait(lambda: w.about_button.get_height() >= 40 and all(size(b) == (w.about_button.get_height(),) * 2 for b in square if b.get_visible()), 3),
+    check('and they stay square in a taller title bar',
+          wait(lambda: w.about_button.get_height() >= 48 and all(size(b)[0] == size(b)[1] for b in square if b.get_visible()), 3),
           [size(b) for b in square] + [w.about_button.get_height()])
     w.about_button.remove_css_class('nbkit-test-tall')
     Gtk.StyleContext.remove_provider_for_display(w.get_display(), css)
