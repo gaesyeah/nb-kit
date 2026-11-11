@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- nbkit: an editor window with a module snapping in (a kit for your editor) -->
+  <rect x="12" y="28" width="200" height="176" rx="18" fill="#1f6fc5"/>
+  <path d="M12 46a18 18 0 0 1 18-18h164a18 18 0 0 1 18 18v20H12z" fill="#2f8fe0"/>
+  <rect x="24" y="66" width="176" height="126" rx="8" fill="#f2f6fb"/>
+  <rect x="38" y="84" width="74" height="14" rx="7" fill="#e2336b"/>
+  <rect x="120" y="84" width="40" height="14" rx="7" fill="#9bc53d"/>
+  <rect x="58" y="110" width="94" height="14" rx="7" fill="#9bc53d"/>
+  <rect x="58" y="136" width="56" height="14" rx="7" fill="#2f8fe0"/>
+  <rect x="38" y="162" width="46" height="14" rx="7" fill="#e2336b"/>
+  <g transform="translate(150 130)">
+    <defs><clipPath id="m"><path d="M0 0 H96 V96 H0 V64 a16 16 0 1 1 0 -32 Z"/></clipPath></defs>
+    <path d="M0 0 H96 V96 H0 V64 a16 16 0 1 1 0 -32 Z" fill="#e2336b"/>
+    <rect x="-40" y="0" width="140" height="20" fill="#ef6f96" clip-path="url(#m)"/>
+  </g>
+</svg>

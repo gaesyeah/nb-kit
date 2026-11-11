@@ -129,6 +129,12 @@ if [ "$ACTION" = gui ]; then
     fi
     [ -n "$GUI_PY" ] || die "$(t cli.gui_manual)"
   fi
+  # a menu entry, so the desktop shows the nbkit icon in the taskbar (it matches the window by the app id);
+  # rewritten each time, so it follows this folder if it moves
+  desktop="${XDG_DATA_HOME:-$HOME/.local/share}/applications/io.github.gaesyeah.nbkit.desktop"
+  mkdir -p "$(dirname "$desktop")"
+  printf '[Desktop Entry]\nType=Application\nName=nbkit\nComment=%s\nExec=bash "%s/nbkit.sh" gui\nIcon=%s\nTerminal=false\nCategories=Development;\nStartupWMClass=nbkit\n' \
+    "$(t cli.desktop_comment)" "$NBKIT_DIR" "$NBKIT_DIR/lib/gui/icons/hicolor/scalable/apps/io.github.gaesyeah.nbkit.svg" > "$desktop"
   # in its own session: the terminal is free at once, and closing the window ends it; messages go to a log
   log="${XDG_CACHE_HOME:-$HOME/.cache}/nbkit/gui.log"
   mkdir -p "$(dirname "$log")"

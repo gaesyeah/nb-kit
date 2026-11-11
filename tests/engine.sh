@@ -224,9 +224,13 @@ contains "help shows the interface" "$out" "nbkit.sh gui"
 # shellcheck disable=SC1091
 if (source "$NBKIT_DIR/lib/gui.sh"; gui_python >/dev/null); then
   start=$SECONDS
-  out="$(HOME="$H" XDG_CACHE_HOME="" DISPLAY="" WAYLAND_DISPLAY="" timeout 20 bash "$NBKIT_DIR/nbkit.sh" gui </dev/null 2>&1)"; rc=$?
+  out="$(HOME="$H" DISPLAY="" WAYLAND_DISPLAY="" timeout 20 bash "$NBKIT_DIR/nbkit.sh" gui </dev/null 2>&1)"; rc=$?
   check "nbkit.sh gui gives the terminal back at once" test "$rc" = 0 -a $((SECONDS - start)) -lt 10
   contains "and says where its messages go" "$out" "Interface opened (messages in ~/.cache/nbkit/gui.log)"
+  d="$H/.local/share/applications/io.github.gaesyeah.nbkit.desktop"
+  check "it adds the menu entry, with the nbkit icon, for the taskbar" grep -q "^Icon=$NBKIT_DIR/lib/gui/icons/hicolor/scalable/apps/io.github.gaesyeah.nbkit.svg\$" "$d"
+  check "the icon exists" test -s "$NBKIT_DIR/lib/gui/icons/hicolor/scalable/apps/io.github.gaesyeah.nbkit.svg"
+  check "the entry opens this nbkit" grep -qx "Exec=bash \"$NBKIT_DIR/nbkit.sh\" gui" "$d"
 fi
 out="$(bash "$NBKIT_DIR/src/build.sh" --help 2>&1)"; rc=$?
 check "build.sh --help exits with 0" test "$rc" = 0

@@ -93,6 +93,7 @@ cli.need_backup=%s precisa do arquivo do backup (veja: status --json)
 cli.not_a_backup=%s não é um backup de nenhum módulo deste userdir
 cli.gui_missing=A interface gráfica precisa do PyGObject, do GTK 4 e do VTE para GTK 4.
 cli.gui_started=Interface aberta (mensagens em %s)
+cli.desktop_comment=Módulos para o NetBeans: verificações de JSF e o tema One Dark Pro Mix
 cli.gui_packages=a interface gráfica (PyGObject, GTK 4, VTE)
 cli.gui_manual=instale o PyGObject, o GTK 4 e o VTE para GTK 4 e rode de novo (Debian/Ubuntu: python3-gi gir1.2-gtk-4.0 gir1.2-vte-3.91; Fedora: python3-gobject gtk4 vte291-gtk4; Arch: python-gobject gtk4 vte4; openSUSE: python3-gobject typelib-1_0-Gtk-4_0 typelib-1_0-Vte-3_91)
 cli.menu_quit=Sair

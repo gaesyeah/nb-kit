@@ -56,7 +56,7 @@ It needs GTK 4 and VTE for GTK 4 (through PyGObject). If they are missing, nbkit
 | `bash nbkit.sh install [module...] [userdir]` | Installs or updates (no module: all) |
 | `bash nbkit.sh uninstall [module...] [userdir]` | Removes (no module: all installed) |
 | `bash nbkit.sh check [userdir]` | With NetBeans open, checks that everything loaded |
-| `bash nbkit.sh gui [userdir]` | Opens the graphical interface |
+| `bash nbkit.sh gui [userdir]` | Opens the graphical interface, and adds nbkit to the applications menu (with its icon in the taskbar) |
 | `bash nbkit.sh status [--json] [userdir]` | What is installed; `--json` for programs (the interface uses it) |
 | `bash nbkit.sh restore <backup>` | Goes back to a backup (the files are listed by `status --json`) |
 | `bash nbkit.sh delete-backup <backup>` | Deletes a backup |

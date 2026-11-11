@@ -136,6 +136,8 @@ def actions(w):
     check('the clear button is a small broom icon, no text',
           w.clear_button.get_icon_name() == 'nbkit-broom-symbolic' and not w.clear_button.get_label()
           and Gtk.IconTheme.get_for_display(w.get_display()).has_icon('nbkit-broom-symbolic'))
+    check('the window has the nbkit icon', w.get_icon_name() == app.APP_ID
+          and Gtk.IconTheme.get_for_display(w.get_display()).has_icon(app.APP_ID))
 
     default = Gtk.ProgressBar().measure(Gtk.Orientation.VERTICAL, -1)[0]
     check('the progress bar is 50% taller than the theme one, with room for the step inside',

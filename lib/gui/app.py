@@ -24,6 +24,8 @@ from gui import model  # noqa: E402
 # the program name: VTE uses it for the systemd scope of each command it runs (without it GLib warns)
 GLib.set_prgname('nbkit')
 GLib.set_application_name('nbkit')
+# also the name of the icon (lib/gui/icons) and of the .desktop file that nbkit.sh gui writes
+APP_ID = 'io.github.gaesyeah.nbkit'
 
 
 def system_prefers_dark():
@@ -128,9 +130,10 @@ class Window(Gtk.ApplicationWindow):
         self.result.set_hexpand(True)
         self.result_row = Gtk.Box(spacing=6)
         self.result_row.append(self.result)
-        # the broom is our own icon (lib/gui/icons, themes have none); in a hicolor folder so GTK paints it in the
-        # text color, like the theme icons
+        # our own icons (lib/gui/icons): the window's and the broom (themes have none); in a hicolor folder so GTK
+        # paints the broom in the text color, like the theme icons
         Gtk.IconTheme.get_for_display(self.get_display()).add_search_path(os.path.join(model.ROOT, 'lib', 'gui', 'icons'))
+        self.set_icon_name(APP_ID)
         small = []
         for icon, name, tip, callback in (
                 ('edit-copy-symbolic', 'gui.copy', 'gui.tip_copy', lambda _b: self.copy_all()),
@@ -578,7 +581,7 @@ class Window(Gtk.ApplicationWindow):
                                      license_type=Gtk.License.MIT_X11, website=model.REPO + '#readme',
                                      website_label=model.REPO.replace('https://', ''),
                                      authors=['Gabriel Goes Santos Rios'],
-                                     copyright='© 2026 Gabriel Goes Santos Rios', logo_icon_name='utilities-terminal')
+                                     copyright='© 2026 Gabriel Goes Santos Rios', logo_icon_name=APP_ID)
         self.about.present()
 
     # ---------- closing ----------
@@ -592,7 +595,7 @@ class Window(Gtk.ApplicationWindow):
 
 
 def main():
-    app = Gtk.Application(application_id='io.github.gaesyeah.nbkit', flags=Gio.ApplicationFlags.NON_UNIQUE)
+    app = Gtk.Application(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
     userdir = sys.argv[1] if len(sys.argv) > 1 else None
     apply_dark_preference()
     app.connect('activate', lambda a: Window(userdir, application=a).present())
