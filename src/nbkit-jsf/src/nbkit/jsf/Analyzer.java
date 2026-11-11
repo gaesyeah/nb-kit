@@ -497,6 +497,12 @@ public final class Analyzer {
                     report("el.scope", Severity.ERROR, pos, s.x.off(r.b), Msg.t("el.scope", r.name, where));
                     continue;
                 }
+                File bundle = bundleInView(r.name);
+                if (bundle != null) {
+                    String from = file.getParentFile().toPath().relativize(bundle.toPath()).toString();
+                    report("el.unknown", Severity.WARNING, pos, s.x.off(r.b), Msg.t("el.bundle.included", r.name, from));
+                    continue;
+                }
                 if (!ws.beansKnown) {
                     continue;
                 }
@@ -508,6 +514,42 @@ public final class Analyzer {
             enumCompare(s);
             readonly(s);
         }
+    }
+
+    // f:loadBundle puts its var in the request while the view is built, so one in any file of the view (the page,
+    // its templates, the files it includes) reaches the EL evaluated when the page is drawn. The first file that
+    // declares it, when every page that uses this file has one; null otherwise
+    File bundleInView(String name) {
+        File first = null;
+        for (File root : ws.rootViews(file)) {
+            File f = bundleBelow(root, name, new HashSet<>());
+            if (f == null) {
+                return null;
+            }
+            if (first == null) {
+                first = f;
+            }
+        }
+        return first;
+    }
+
+    File bundleBelow(File f, String name, Set<File> seen) {
+        Workspace.FileFacts ff = seen.add(f) ? ws.facts(f) : null;
+        if (ff == null) {
+            return null;
+        }
+        for (Decl d : decls(ff.doc)) {
+            if (d.name.equals(name) && d.kind.equals("f:loadBundle")) {
+                return f;
+            }
+        }
+        for (Workspace.Inc in : ff.edges) {
+            File r = in.target == null ? null : bundleBelow(in.target, name, seen);
+            if (r != null) {
+                return r;
+            }
+        }
+        return null;
     }
 
     Set<String> allNamesAt(Site s, String attrName, int pos) {
@@ -1416,7 +1458,12 @@ public final class Analyzer {
                     // MyFaces since 2.1.11, MYFACES-3665). In a template or included file it is not read: error
                     boolean onlyMetadata = !d.elements().isEmpty() && d.elements().stream().allMatch(c -> c.is("f", "metadata"))
                             && d.children.stream().noneMatch(c -> c instanceof Xml.Text && !((Xml.Text) c).raw.isBlank());
-                    if (n != null && !(onlyMetadata && ws.incoming(in.from).isEmpty()) && !inserts.contains(n.value.trim())) {
+                    // empty: nothing is lost, it just does nothing
+                    boolean empty = d.elements().isEmpty()
+                            && d.children.stream().noneMatch(c -> c instanceof Xml.Text && !((Xml.Text) c).raw.isBlank());
+                    if (n != null && empty && !inserts.contains(n.value.trim())) {
+                        report("tpl.define", Severity.WARNING, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.empty", n.value.trim()));
+                    } else if (n != null && !empty && !(onlyMetadata && ws.incoming(in.from).isEmpty()) && !inserts.contains(n.value.trim())) {
                         String hint = closest(n.value.trim(), inserts);
                         report("tpl.define", Severity.ERROR, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.name", n.value.trim()) + Msg.hint(hint));
                     }
