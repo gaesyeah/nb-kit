@@ -14,7 +14,7 @@ from toml_data import need as need_key
 
 def say(text):
     """bash that prints a warning in the terminal"""
-    print(f'printf "%s\\n" {shlex.quote(text)} >&2')
+    print(f'printf "%s%s%s\\n" "$Y" {shlex.quote(text)} "$N" >&2')
 
 def message(e):
     key, values, place, line = e.args

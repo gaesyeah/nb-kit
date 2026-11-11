@@ -68,7 +68,12 @@ lint_python() {
   p="$(pyflakes_cmd)" || { t test.skipped_tool pyflakes; echo; return 3; }
   "$p" -m pyflakes lib/*.py lib/themes/*.py lib/tools/*.py lib/gui/*.py tests/python/*.py && echo "  ${G}ok${N}    $(t test.no_warnings)"
 }
-python_tests() { "$PY" -m unittest discover -s tests/python -t tests/python; }
+# unittest's own "OK" / "FAILED" lines, in green and red like the rest
+python_tests() {
+  "$PY" -m unittest discover -s tests/python -t tests/python 2>&1 \
+    | sed -e "s/^OK/${G}OK${N}/" -e "s/^\(FAILED\|FAIL:\|ERROR:\)/${R}\1${N}/"
+  return "${PIPESTATUS[0]}"
+}
 jsf_tests() {
   has_jdk || { t test.skipped_tool "JDK 17+"; echo; return 3; }
   bash tests/jsf.sh

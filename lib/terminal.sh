@@ -5,7 +5,7 @@
 if [ -t 1 ]; then B=$'\e[1m'; BL=$'\e[1;34m'; G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; D=$'\e[2m'; N=$'\e[0m'
 else B=; BL=; G=; Y=; R=; D=; N=; fi
 # the Python parts of the modules (e.g. check) use the same colors
-export NBKIT_G="$G" NBKIT_R="$R" NBKIT_D="$D" NBKIT_N="$N"
+export NBKIT_G="$G" NBKIT_Y="$Y" NBKIT_R="$R" NBKIT_D="$D" NBKIT_N="$N"
 
 # ---------- language ----------
 # lang/<id>.lang: one "key=value" per line, # for comments. Values are printf formats (%s, \n) and may use

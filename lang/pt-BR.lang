@@ -202,8 +202,8 @@ theme.step_restore=Restaurando o backup de %s
 # partes em Python do motor (cópia do perfil, mescla, conferência)
 theme.no_netbeans=não achei a instalação do NetBeans. Rode de novo com NB_HOME=/caminho/do/netbeans (a pasta que tem platform/, ide/, java/...).
 theme.no_base_colors=não achei as cores do %s na instalação do NetBeans.
-theme.tokens_missing=Aviso: esta versão do NetBeans não tem alguns tokens que o módulo usa; essas regras vão parar de pintar:
-theme.old_java=Aviso: o NetBeans roda com Java %s; o módulo exige Java 17 ou mais novo e vai ficar desativado (as cores do perfil continuam funcionando).
+theme.tokens_missing=esta versão do NetBeans não tem alguns tokens que o módulo usa; essas regras vão parar de pintar:
+theme.old_java=o NetBeans roda com Java %s; o módulo exige Java 17 ou mais novo e vai ficar desativado (as cores do perfil continuam funcionando).
 theme.profile_copied=%s arquivos de cores do %s copiados (%s linguagens), %s cores substituídas pelo tema
 theme.no_tty_font=(sem terminal para perguntar: usando a do tema)
 theme.font_carried=fonte do editor levada para o perfil novo: %s

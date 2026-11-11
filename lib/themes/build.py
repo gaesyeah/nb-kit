@@ -126,7 +126,7 @@ for (mime, typ), d in over.items():
 for folder, types in types_by_dir.items():
     write_types(folder, types)
 langs = len({m for m, *_ in base})
-print('\u2713 ' + T('theme.profile_copied', len(base), BASE_NAME, langs, len(used)))
+print(os.environ.get('NBKIT_G', '') + '\u2713' + os.environ.get('NBKIT_N', '') + ' ' + T('theme.profile_copied', len(base), BASE_NAME, langs, len(used)))
 
 # ---------- 4. Font ----------
 font = json.loads(FONTJSON) if FONTJSON else None      # font you used in the base profile

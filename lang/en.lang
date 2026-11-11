@@ -202,8 +202,8 @@ theme.step_restore=Restoring the backup of %s
 # Python parts of the engine (profile copy, merge, check)
 theme.no_netbeans=could not find the NetBeans installation. Run again with NB_HOME=/path/to/netbeans (the folder that has platform/, ide/, java/...).
 theme.no_base_colors=could not find the %s colors in the NetBeans installation.
-theme.tokens_missing=Warning: this NetBeans version lacks some tokens the module uses; those rules will stop painting:
-theme.old_java=Warning: NetBeans runs with Java %s; the module needs Java 17 or newer and will stay disabled (the profile colors keep working).
+theme.tokens_missing=this NetBeans version lacks some tokens the module uses; those rules will stop painting:
+theme.old_java=NetBeans runs with Java %s; the module needs Java 17 or newer and will stay disabled (the profile colors keep working).
 theme.profile_copied=%s color files of %s copied (%s languages), %s colors replaced by the theme
 theme.no_tty_font=(no terminal to ask: using the theme's)
 theme.font_carried=editor font carried over to the new profile: %s

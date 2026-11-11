@@ -95,7 +95,7 @@ for a in "$@"; do
       if [ -n "${MOD_FN[$a]:-}" ]; then SEL+=("$a")
       elif [ -d "$a" ]; then UD="$(cd "$a" && pwd)"      # the path as you see it (~/... stays ~/... with links)
       elif [ -f "$a" ]; then BKF="$(readlink -f "$a")"
-      else t cli.unknown_arg "$a" >&2; echo >&2; echo >&2; usage >&2; exit 1; fi ;;
+      else echo "${R}$(t cli.unknown_arg "$a")${N}" >&2; echo >&2; usage >&2; exit 1; fi ;;
   esac
 done
 
@@ -318,7 +318,7 @@ do_check() {
   fi
   echo
   if [ $worst = 0 ]; then echo "${G}$(t cli.all_good)${N}"; exit 0; fi
-  t cli.problems_above; echo
+  echo "${R}$(t cli.problems_above)${N}"
   if [ ${#fix[@]} -gt 0 ] && [ $INTERACTIVE = 1 ]; then
     echo
     if ask_yn "$(t cli.ask_reinstall)" Y; then echo; exec env NBKIT_TTY=1 NBKIT_CLOSE=1 bash "$SELF" install "${fix[@]}" "$UD"; fi

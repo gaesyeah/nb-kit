@@ -58,7 +58,7 @@ for path in sorted(glob.glob(os.path.join(sys.argv[1], '*', 'tool.toml'))):
     try:
         values = read_tool(folder)
     except ToolError as e:
-        print(f'printf "%s\\n" {q(T("tool.invalid", os.path.basename(folder), str(e)))} >&2')
+        print(f'printf "%s%s%s\\n" "$Y" {q(T("tool.invalid", os.path.basename(folder), str(e)))} "$N" >&2')
         continue
     print('tool_register ' + ' '.join(q(str(v)) for v in values))
     if os.path.isfile(os.path.join(folder, 'tool.sh')):

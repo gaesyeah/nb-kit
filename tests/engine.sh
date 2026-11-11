@@ -286,6 +286,15 @@ HOME="$H" PATH="$WORK/bin:$PATH" bash "$NBKIT_DIR/nbkit.sh" uninstall one-dark-p
 check "and uninstalling leaves it" grep -qx 'term.fontFamily=Hack' "$TP"
 rm -rf "${WORK:?}/bin"
 
+echo "Colors in a terminal"
+new_home "$H"
+# in a terminal (script): every ✓ in green, every error in red; in a pipe or a file, no colors at all
+tty_out() { HOME="$H" timeout 120 script -qec "bash '$NBKIT_DIR/nbkit.sh' $*" /dev/null </dev/null 2>&1 | tr -d '\r'; }
+out="$(tty_out install)"
+check "every ✓ of the install is green" test -z "$(grep '✓' <<<"$out" | grep -v $'\e\\[32m✓')"
+contains "an unknown argument is red" "$(tty_out bogus)" $'\e[31mUnknown argument: bogus'
+lacks "without a terminal there are no colors" "$(nbkit status)" $'\e['
+
 echo "Without a command and without a terminal"
 new_home "$H"
 before="$(fingerprint "$H")"

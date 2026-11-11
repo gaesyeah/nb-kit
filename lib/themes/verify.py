@@ -9,6 +9,11 @@ import sys
 from nbinstall import Jars, base_profile
 from text import T
 
+
+def warn(text):
+    """the same "      ! ..." line as warn in lib/terminal.sh"""
+    print('      ' + os.environ.get('NBKIT_Y', '') + '!' + os.environ.get('NBKIT_N', '') + ' ' + text)
+
 # lexer classes and the token names the coloring module (nbkit-colors) looks for
 NEEDED = {
     'Java': ('org/netbeans/api/java/lexer/JavaTokenId.class',
@@ -59,14 +64,14 @@ def main():
         die(T('theme.no_base_colors', os.environ.get('NBKIT_THEME_BASE_NAME', 'FlatLaf Dark')))
     problems = missing_tokens(jars)
     if problems:
-        print(T('theme.tokens_missing'))
-        print('\n'.join(f'  {lang}: {", ".join(names)}' for lang, names in problems))
+        warn(T('theme.tokens_missing'))
+        print('\n'.join(f'          {lang}: {", ".join(names)}' for lang, names in problems))
     log = os.path.join(ud, 'var', 'log', 'messages.log')
     if os.path.exists(log):
         with open(log, errors='replace') as f:
             m = re.search(r'Java; VM; Vendor\s*=\s*(\d+)', f.read())
         if m and int(m.group(1)) < 17:
-            print(T('theme.old_java', m.group(1)))
+            warn(T('theme.old_java', m.group(1)))
 
 
 if __name__ == '__main__':
