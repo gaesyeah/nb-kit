@@ -660,7 +660,7 @@ public final class Analyzer {
     /** walks the chain; returns the final type (or null). Reports missing members. */
     String walk(Site s, El.Ref r, int upto, boolean reportMissing) {
         String cur = beanType(r.name);
-        boolean methodAttr = s.attr != null && METHOD_ATTRS.contains(s.attr.name) && isJsfLib(s.el) && s.x.whole && r.chain.size() > 0;
+        boolean methodAttr = s.attr != null && METHOD_ATTRS.contains(s.attr.name) && isJsfLib(s.el) && s.x.whole && r.chain.size() > 0 && !r.nested;
         for (int k = 0; k < upto && k < r.chain.size(); k++) {
             El.Member m = r.chain.get(k);
             if (cur == null || m.name == null || !ws.classes.complete(cur) || dynamicType(cur)) {
@@ -789,7 +789,8 @@ public final class Analyzer {
             return;
         }
         El.Expr x = s.x;
-        boolean single = x.whole && x.refs.size() == 1 && x.refs.get(0).pureLvalue;
+        // the references inside its brackets (list[i]) do not count: the value is still the outer one
+        boolean single = x.whole && x.refs.stream().filter(r -> !r.nested).count() == 1 && x.refs.get(0).pureLvalue;
         if (!single) {
             boolean literalOnly = x.refs.isEmpty() && x.whole;
             report("el.readonly", Severity.ERROR, x.start, x.end, Msg.t(literalOnly ? "el.readonly.literal" : "el.readonly.expr", tag(s.el)));

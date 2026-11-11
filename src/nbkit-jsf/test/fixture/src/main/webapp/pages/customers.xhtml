@@ -44,6 +44,11 @@
       <h:outputText value="#{_itemStatus.index}: #{item.name}"/>
     </comp:slides>
     <h:outputText value="#{_item}"/><!--E:el.unknown-->
+    <!-- names used only inside the arguments of a method or in brackets: they count as used, and are checked -->
+    <ui:param name="suffix" value="x"/>
+    <ui:param name="position" value="#{1}"/>
+    <h:outputText value="#{customerVM.format('a'.concat(suffix))} #{customerVM.items[position]}"/>
+    <h:outputText value="#{customerVM.format(nope)}"/><!--E:el.unknown-->
     <c:set var="local" value="1"/>
     <h:outputText value="#{local}"/>
     <c:set var="noUse" value="1"/><!--W:unused-->

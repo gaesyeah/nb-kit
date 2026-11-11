@@ -61,6 +61,8 @@ public final class El {
         /** the whole chain is just name.prop.prop (no call, operator or dynamic index) and it is the only content */
         public boolean pureLvalue;
         public int tokIndex, tokEnd;
+        /** inside the arguments or brackets of another reference: bean.m(this) or list[this] */
+        public boolean nested;
     }
 
     public static final class Lambda {
@@ -255,6 +257,7 @@ public final class El {
             lambdaScopes.add(new int[]{startTok, k, e.lambdas.size() - 1});
         }
         int last = ts.size() - 1;
+        int outerEnd = -1; // end of the last reference that is not nested
         for (int i = 0; i < last; i++) {
             Tok t = ts.get(i);
             if (t.t != T.ID || paramTok.contains(i) || KEYWORDS.contains(t.s)) {
@@ -341,8 +344,13 @@ public final class El {
             }
             r.tokEnd = j;
             r.pureLvalue = pure && i == 0 && j == last;
+            r.nested = i < outerEnd;
+            if (!r.nested) {
+                outerEnd = j;
+            }
             e.refs.add(r);
-            i = j - 1;
+            // no jump over the chain: the names inside its arguments and brackets, bean.m(other) or list[other], are
+            // references too (the member names after "." are skipped above)
         }
     }
 
