@@ -35,11 +35,14 @@ cp "$J"/res/nbkit/jsf/Bundle*.properties "$W/nbkit/nbkit/jsf/"
 compile -cp "$W/nbkit" -d "$W/run" "$J/test/RunFixture.java"
 check "analyzer and sample project compile" test -f "$W/run/RunFixture.class"
 
-for l in en pt; do
-  out="$("$JAVA" -Duser.language=$l -Dstdout.encoding=UTF-8 -cp "$W/nbkit:$W/run" RunFixture \
-    "$J/test/fixture" "$W/app" "$W/api.jar" "$W/primefaces.jar" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"
-  n="$(grep -c ' ok ' <<<"$out")"
-  if [ "$(tail -1 <<<"$out")" = "ALL OK" ]; then pass "every expected warning, and nothing else ($n checks, language: $l)"
-  else fail "every expected warning, and nothing else (language: $l)" "$(grep -E 'EXTRA|MISSING|DIFFERENCES' <<<"$out")"; fi
+# fixture-resolver: a project with its own EL resolver, which changes every unknown name of the project
+for fx in fixture fixture-resolver; do
+  for l in en pt; do
+    out="$("$JAVA" -Duser.language=$l -Dstdout.encoding=UTF-8 -cp "$W/nbkit:$W/run" RunFixture \
+      "$J/test/$fx" "$W/app" "$W/api.jar" "$W/primefaces.jar" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"
+    n="$(grep -c ' ok ' <<<"$out")"
+    if [ "$(tail -1 <<<"$out")" = "ALL OK" ]; then pass "$fx: every expected warning, and nothing else ($n checks, language: $l)"
+    else fail "$fx: every expected warning, and nothing else (language: $l)" "$(grep -E 'EXTRA|MISSING|DIFFERENCES' <<<"$out")"; fi
+  done
 done
 finish

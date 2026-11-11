@@ -39,7 +39,8 @@ public final class Workspace {
     public final Map<String, Bean> beans = new ConcurrentHashMap<>();
     public final Set<String> facesVars = new HashSet<>();
     public final Set<String> navOutcomes = new HashSet<>();
-    public boolean customElResolver;
+    /** class of an EL resolver of the project itself (names it provides cannot be seen), or null */
+    public String customElResolver;
     public boolean skipComments;
     public boolean omnifaces;
     public boolean beansKnown;
@@ -235,7 +236,7 @@ public final class Workspace {
         componentClasses.clear();
         subtypes.clear();
         concrete.clear();
-        customElResolver = false;
+        customElResolver = null;
         Map<String, List<String>> annotationMeta = new HashMap<>();
         List<ClassModel.ClassInfo> candidates = new ArrayList<>();
         boolean[] any = {false};
@@ -375,7 +376,7 @@ public final class Workspace {
             }
             for (String v : texts(d, "el-resolver")) {
                 if (!v.contains("springframework") && !v.contains("primefaces") && !v.contains("omnifaces")) {
-                    customElResolver = true;
+                    customElResolver = v.trim();
                 }
             }
             NodeList comps = d.getElementsByTagNameNS("*", "component");

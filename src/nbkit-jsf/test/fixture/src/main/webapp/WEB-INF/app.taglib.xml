@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<facelet-taglib xmlns="https://jakarta.ee/xml/ns/jakartaee" version="4.0">
+  <namespace>http://example.com/app</namespace>
+  <tag><tag-name>box</tag-name><source>tags/box.xhtml</source><attribute><name>title</name></attribute></tag>
+</facelet-taglib>

@@ -100,6 +100,7 @@ public final class Analyzer {
     final class Graph {
         final Map<File, List<Inc>> incoming = new HashMap<>();
         boolean dynamic;
+        final List<Inc> dyn = new ArrayList<>();
         final Map<File, Set<File>> composedCache = new HashMap<>();
         final Map<File, Set<File>> rootsCache = new HashMap<>();
 
@@ -116,6 +117,7 @@ public final class Analyzer {
                 for (Inc in : f.edges) {
                     if (in.dynamic) {
                         dynamic = true;
+                        dyn.add(in);
                     } else if (in.target != null) {
                         incoming.computeIfAbsent(in.target, k -> new ArrayList<>()).add(in);
                     }
@@ -125,6 +127,44 @@ public final class Analyzer {
 
         List<Inc> in(File f) {
             return incoming.getOrDefault(f, List.of());
+        }
+
+        // the dynamic includes whose src, with each EL as a wildcard, can name f: the literal folder before the first
+        // EL is resolved like a static include (/ from each webroot, otherwise from the including file's folder)
+        List<Inc> dynIn(File f) {
+            List<Inc> r = new ArrayList<>();
+            for (Inc in : dyn) {
+                String src = in.path.replaceFirst("\\?.*$", "");
+                int el = src.length();
+                Matcher first = Pattern.compile("[#$]\\{").matcher(src);
+                if (first.find()) {
+                    el = first.start();
+                }
+                int cut = src.lastIndexOf('/', el) + 1;
+                List<File> bases = new ArrayList<>();
+                if (src.startsWith("/")) {
+                    bases.addAll(ws.webroots);
+                } else {
+                    bases.add(in.from.getAbsoluteFile().getParentFile());
+                }
+                StringBuilder re = new StringBuilder();
+                Matcher m = Pattern.compile("[#$]\\{[^}]*}").matcher(src);
+                int last = cut;
+                while (m.find()) {
+                    re.append(Pattern.quote(src.substring(last, m.start()))).append(".*");
+                    last = m.end();
+                }
+                re.append(Pattern.quote(src.substring(last)));
+                for (File base : bases) {
+                    java.nio.file.Path dir = base.getAbsoluteFile().toPath().resolve(src.substring(src.startsWith("/") ? 1 : 0, cut)).normalize();
+                    java.nio.file.Path file = f.getAbsoluteFile().toPath().normalize();
+                    if (file.startsWith(dir) && dir.relativize(file).toString().replace('\\', '/').matches(re.toString())) {
+                        r.add(in);
+                        break;
+                    }
+                }
+            }
+            return r;
         }
 
         Set<File> composed(File root) {
@@ -319,8 +359,7 @@ public final class Analyzer {
         }
         Ext r = new Ext();
         if (!guard.add(f)) {
-            r.complete = false;
-            return r;
+            return r; // a cycle: the other includers of the file bring their names
         }
         FileFacts x = ws.facts(f);
         if (x == null || x.composite) {
@@ -329,38 +368,47 @@ public final class Analyzer {
         }
         Set<String> tagAttrs = ws.tagFiles.get(f);
         if (tagAttrs != null) {
-            // tag file: the attributes of whoever uses the tag become variables
+            // tag file: the declared attributes and every attribute its usages pass become variables
             r.names.addAll(tagAttrs);
-            r.complete = false;
+            for (File u : ws.xhtmlFiles()) {
+                FileFacts uf = ws.facts(u);
+                if (uf == null) {
+                    continue;
+                }
+                for (Xml.Element e : uf.doc.all) {
+                    Map<String, File> lib = e.ns == null ? null : ws.tagSources.get(e.ns.trim());
+                    if (lib != null && f.equals(lib.get(e.local))) {
+                        for (Xml.Attr a : e.attrs) {
+                            r.names.add(a.name);
+                        }
+                    }
+                }
+            }
             extCache.put(f, r);
             return r;
         }
-        List<Inc> inc = g.in(f);
-        if (inc.isEmpty()) {
-            r.complete = pageLike(x);
-        } else {
-            r.complete = !g.dynamic;
-            for (Inc in : inc) {
-                FileFacts from = ws.facts(in.from);
-                if (from == null) {
-                    r.complete = false;
-                    continue;
-                }
-                for (Xml.Element p : in.el.elements()) {
-                    if (p.is("ui", "param") && p.value("name") != null) {
-                        r.names.add(p.value("name").trim());
-                    }
-                }
-                for (Decl d : decls(from.doc)) {
-                    if (d.scope == FILE && !d.passed || visible(d, in.el, null, in.el.start)) {
-                        r.names.add(d.name);
-                    }
-                }
-                r.names.addAll(from.bindings);
-                Ext up = ext(in.from, guard);
-                r.names.addAll(up.names);
-                r.complete &= up.complete;
+        List<Inc> inc = new ArrayList<>(g.in(f));
+        inc.addAll(g.dynIn(f));
+        for (Inc in : inc) {
+            FileFacts from = ws.facts(in.from);
+            if (from == null) {
+                r.complete = false;
+                continue;
             }
+            for (Xml.Element p : in.el.elements()) {
+                if (p.is("ui", "param") && p.value("name") != null) {
+                    r.names.add(p.value("name").trim());
+                }
+            }
+            for (Decl d : decls(from.doc)) {
+                if (d.scope == FILE && !d.passed || visible(d, in.el, null, in.el.start)) {
+                    r.names.add(d.name);
+                }
+            }
+            r.names.addAll(from.bindings);
+            Ext up = ext(in.from, guard);
+            r.names.addAll(up.names);
+            r.complete &= up.complete;
         }
         extCache.put(f, r);
         return r;
@@ -544,10 +592,13 @@ public final class Analyzer {
                 if (!ws.beansKnown) {
                     continue;
                 }
-                boolean sure = ext.complete && !ws.customElResolver;
+                if (!ext.complete) {
+                    continue;
+                }
+                boolean sure = ws.customElResolver == null;
                 String hint = closest(r.name, allNamesAt(s, attrName, pos));
                 report("el.unknown", sure ? Severity.ERROR : Severity.WARNING, pos, s.x.off(r.b),
-                        Msg.t(sure ? "el.unknown" : "el.unknown.maybe", r.name) + Msg.hint(hint));
+                        (sure ? Msg.t("el.unknown", r.name) : Msg.t("el.unknown.resolver", r.name, ws.customElResolver)) + Msg.hint(hint));
             }
             enumCompare(s);
             readonly(s);
@@ -1427,12 +1478,10 @@ public final class Analyzer {
         if (x.composite) {
             return Tri.UNKNOWN; // whoever uses the component decides
         }
-        List<Inc> inc = g.in(f);
+        List<Inc> inc = new ArrayList<>(g.in(f));
+        inc.addAll(g.dynIn(f));
         if (inc.isEmpty()) {
             return pageLike(x) ? Tri.FALSE : Tri.UNKNOWN;
-        }
-        if (g.dynamic) {
-            return Tri.UNKNOWN;
         }
         List<Tri> rs = new ArrayList<>();
         for (Inc in : inc) {
