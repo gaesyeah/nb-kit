@@ -447,6 +447,41 @@ public final class Analyzer {
         }
     }
 
+    /** e has a cc:<local> somewhere inside */
+    static boolean encloses(Xml.Element e, String local) {
+        for (Xml.Node n : e.children) {
+            if (n instanceof Xml.Element && (((Xml.Element) n).is("cc", local) || encloses((Xml.Element) n, local))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** the name is a variable that a composite component around e gives to its children: a loop (var, varStatus...)
+     * around its cc:insertChildren, where what the page writes inside the tag is rendered */
+    boolean fromComponentLoop(Xml.Element e, String name) {
+        for (Xml.Element a = e; a != null; a = a.parent) {
+            File c = a.ns == null ? null : ws.compositeFile(a.ns, a.local);
+            Xml.Doc cd = c == null ? null : ws.doc(c);
+            if (cd == null) {
+                continue;
+            }
+            for (Xml.Element ins : cd.all) {
+                if (!ins.is("cc", "insertChildren")) {
+                    continue;
+                }
+                for (Xml.Element up = ins.parent; up != null; up = up.parent) {
+                    for (Xml.Attr at : up.attrs) {
+                        if (isVarAttr(at.name) && at.value.trim().equals(name)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     // ---------- name and type rules (1 to 6, 19) ----------
 
     void names() {
@@ -501,6 +536,9 @@ public final class Analyzer {
                 if (bundle != null) {
                     String from = file.getParentFile().toPath().relativize(bundle.toPath()).toString();
                     report("el.unknown", Severity.WARNING, pos, s.x.off(r.b), Msg.t("el.bundle.included", r.name, from));
+                    continue;
+                }
+                if (fromComponentLoop(s.el, r.name)) {
                     continue;
                 }
                 if (!ws.beansKnown) {
@@ -849,6 +887,10 @@ public final class Analyzer {
                 if (d.scope == FILE && d.kind.equals("c:set")) {
                     continue; // with scope: may be read in another page or in Java
                 }
+            }
+            // a loop around cc:insertChildren: the variable is for what the page writes inside the component
+            if (!usedElsewhere && ff.composite && encloses(d.el, "insertChildren")) {
+                usedElsewhere = true;
             }
             if (!usedElsewhere) {
                 int a = d.attr.offset(0), b = d.attr.offset(d.attr.value.length());

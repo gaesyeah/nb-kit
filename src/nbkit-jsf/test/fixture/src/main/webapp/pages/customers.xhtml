@@ -38,6 +38,12 @@
     <h:outputText id="1invalid" value="2"/><!--E:id.invalid-->
     <h:inputText value="#{customerVM.customer.name}" required="true"><f:ajax event="blurr"/></h:inputText><!--E:ajax.event-->
     <comp:field label="a"><f:ajax event="changed"/></comp:field>
+    <!-- names that the component's loop around cc:insertChildren gives to what the page writes inside it -->
+    <comp:slides items="#{customerVM.items}">
+      <ui:param name="item" value="#{_item}"/>
+      <h:outputText value="#{_itemStatus.index}: #{item.name}"/>
+    </comp:slides>
+    <h:outputText value="#{_item}"/><!--E:el.unknown-->
     <c:set var="local" value="1"/>
     <h:outputText value="#{local}"/>
     <c:set var="noUse" value="1"/><!--W:unused-->
