@@ -86,16 +86,29 @@ ask_yn() {
 }
 
 # ---------- interactive terminal: arrow key menu, spinner, header ----------
-# arrow key menu; result in MENU_IDX (-1 = left with Esc or q). MENU_HINT changes the legend.
+# arrow key menu; result in MENU_IDX (-1 = left with Esc or q). MENU_HINT changes the legend; MENU_TIPS (one per
+# option, like the tooltips of the interface) shows what the chosen one does, on a line of its own
 menu() {
-  local -a o=("$@"); local n=$# i=${MENU_START:-0} j k rest
+  local -a o=("$@") tips=(); local n=$# i=${MENU_START:-0} j k rest l=0 tip
   [ "$i" -lt "$n" ] || i=0
+  # each tip folded to the width of the terminal, all with as many lines as the longest one, so the menu keeps
+  # its height while the cursor moves (a line wrapped by the terminal would break the redrawing)
+  if [ ${#MENU_TIPS[@]} -gt 0 ]; then
+    for ((j = 0; j < n; j++)); do
+      tips[j]="$(printf '%s' "${MENU_TIPS[j]:-}" | fold -s -w $(( $(tput cols 2>/dev/null || echo 80) - 4 )))"
+      k=$(printf '%s\n' "${tips[j]}" | wc -l); [ "$k" -gt $l ] && l=$k
+    done
+  fi
   printf '\e[?25l'; trap 'printf "\e[?25h\n"; exit 130' INT
   while :; do
     for ((j = 0; j < n; j++)); do
       if [ $j -eq $i ]; then printf '\r\e[K  %s> %s%s\n' "$BL$B" "${o[j]}" "$N"
       else printf '\r\e[K    %s\n' "${o[j]}"; fi
     done
+    if [ $l -gt 0 ]; then
+      tip="${tips[i]}"
+      for ((j = 0; j < l; j++)); do printf '\r\e[K  %s%s%s\n' "$D" "${tip%%$'\n'*}" "$N"; [[ "$tip" == *$'\n'* ]] && tip="${tip#*$'\n'}" || tip=""; done
+    fi
     printf '\r\e[K  %s%s%s' "$D" "${MENU_HINT:-$(t cli.menu_hint)}" "$N"
     IFS= read -rsn1 k </dev/tty || k=q
     if [ "$k" = $'\e' ]; then
@@ -108,9 +121,11 @@ menu() {
       '') break ;;
       q) i=-1; break ;;
     esac
-    printf '\r\e[%dA' "$n"
+    printf '\r\e[%dA' $((n + l))
   done
   printf '\r\e[K\e[?25h'; trap 'exit 130' INT
+  # the tip lines go too: the cursor ends right below the options, as without tips
+  for ((j = 0; j < l; j++)); do printf '\e[1A\r\e[K'; done
   MENU_IDX=$i
 }
 

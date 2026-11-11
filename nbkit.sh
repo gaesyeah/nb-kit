@@ -399,7 +399,20 @@ if [ $MENU = 1 ]; then
       opts+=("$(t cli.menu_build)"); acts+=(build)
     fi
     opts+=("$(t cli.menu_quit)"); acts+=(quit)
+    # what each option does, below the menu (the same texts as the tooltips of the interface, where they fit)
+    MENU_TIPS=()
+    for a in "${acts[@]}"; do
+      case "$a" in
+        install) k=cli.tip_install ;;
+        reinstall) k=cli.tip_reinstall ;;
+        uninstall) k=cli.tip_uninstall ;;
+        quit) k="" ;;
+        *) k="gui.tip_${a//-/_}" ;;
+      esac
+      MENU_TIPS+=("${k:+$(t "$k")}")
+    done
     menu "${opts[@]}"
+    MENU_TIPS=()
     [ "$MENU_IDX" -lt 0 ] && { echo; exit 0; }
     act="${acts[$MENU_IDX]}"
     MENU_START=$MENU_IDX

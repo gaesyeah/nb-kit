@@ -314,6 +314,10 @@ menu_items() {
 items="$(menu_items "$NBKIT_DIR/nbkit.sh")"
 contains "by subject: the modules, nbkit itself, development, quit" "$items" \
   "Reinstall|Uninstall|Backups|Put nbkit on the system|Run the tests|Build the modules|Quit"
+# below the menu, what the chosen option does (the tooltips of the interface): ↓ moves to the next one
+out="$(printf '\033[B\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh'" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+contains "below the menu, what the chosen option does" "$out" "Installs the same version again"
+contains "and it follows the cursor" "$out" "Removes modules and gives NetBeans back"
 HOME="$H" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null >/dev/null 2>&1
 contains "once nbkit is on the system, updating and taking it out take its place" "$(menu_items "$NBKIT_DIR/nbkit.sh")" \
   "Reinstall|Uninstall|Backups|Update nbkit|Take nbkit out of the system|Run the tests|Build the modules|Quit"
