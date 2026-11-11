@@ -50,13 +50,14 @@ code-folding-border                        = "#c5c5c5"
 coverage-covered                           = "on #203d49"
 coverage-uncovered                         = "on #53232a"
 
-# annotations: error and warning underlines
+# annotations: error and warning underlines, and the blue notes of the nbkit JSF checks
 [annotations]
 org-netbeans-modules-cnd-cpp-parser_annotation_err            = "wave #c24038"
 org-netbeans-modules-web-core-syntax-JspParserErrorAnnotation = "wave #c24038"
 PHPError                                                      = "wave #c24038"
 PHPNotice                                                     = "wave #d19a66"
 PHPWarning                                                    = "wave #d19a66"
+nbkit-jsf-origin                                              = "on #2b3442 wave #61afef"
 CurrentPC                                                     = "on #53562a"
 CurrentPCLinePart                                             = "on #53562a"
 CallSite                                                      = "on #415849"

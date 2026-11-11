@@ -21,7 +21,7 @@ public class RunFixture {
             List<Rules.Problem> ps = Analyzer.run(ws, f, text, Rules.ALL_ON);
             String[] lines = text.split("\n", -1);
             Set<String> expected = new TreeSet<>(), got = new TreeSet<>();
-            Pattern m = Pattern.compile("<!--((?:[EW]:[\\w.]+\\s*)+)-->");
+            Pattern m = Pattern.compile("<!--((?:[EWI]:[\\w.]+\\s*)+)-->");
             for (int i = 0; i < lines.length; i++) {
                 Matcher mm = m.matcher(lines[i]);
                 while (mm.find()) for (String x : mm.group(1).trim().split("\\s+")) expected.add((i + 1) + " " + x);
@@ -32,7 +32,7 @@ public class RunFixture {
             for (Rules.Problem p : ps) {
                 int line = 1;
                 while (line < lines.length && starts[line] <= p.start) line++;
-                String k = line + " " + (p.severity == Rules.Severity.ERROR ? "E:" : "W:") + p.rule;
+                String k = line + " " + p.severity.name().charAt(0) + ":" + p.rule;
                 got.add(k);
                 msgs.put(k, p.message + "  «" + text.substring(p.start, Math.min(p.end, text.length())).replace("\n", " ") + "»");
             }

@@ -195,8 +195,13 @@ final class Watcher implements DocumentListener {
             Workspace ws = Workspace.get(f, classpath(f));
             List<Rules.Problem> ps = Analyzer.run(ws, f, text[0], Settings::enabled);
             List<ErrorDescription> eds = new ArrayList<>();
+            List<Rules.Problem> notes = new ArrayList<>();
             int len = d.getLength();
             for (Rules.Problem p : ps) {
+                if (p.severity == Rules.Severity.INFO) {
+                    notes.add(p);
+                    continue;
+                }
                 try {
                     Position s = d.createPosition(Math.min(p.start, len));
                     Position e = d.createPosition(Math.min(p.end, len));
@@ -207,7 +212,8 @@ final class Watcher implements DocumentListener {
                 }
             }
             HintsController.setErrors(d, LAYER, eds);
-            debug("analysis done, " + eds.size() + " warning(s) " + ps.stream().map(p -> p.rule).toList(), d);
+            OriginNotes.set(d, notes);
+            debug("analysis done, " + eds.size() + " warning(s), " + notes.size() + " note(s) " + ps.stream().map(p -> p.rule).toList(), d);
             if (edited) {
                 edited = false;
                 // a template or include changed: the other open files may depend on it

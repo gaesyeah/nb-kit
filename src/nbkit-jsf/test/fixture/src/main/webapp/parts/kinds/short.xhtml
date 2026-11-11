@@ -1,4 +1,8 @@
-<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets">
-  <h:outputText value="#{kindLabel}"/>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui">
+  <h:outputText value="#{kindLabel}"/><!--I:origin-->
+  <h:outputText value="#{kindPanel.id}" title="#{msg['hello']}"/><!--I:origin-->
+  <p:commandButton value="ok" update="kindBox"/><!--I:origin-->
+  <p:commandButton value="ok" type="button" onclick="PF('kindDialog').show()"/><!--I:origin-->
   <h:outputText value="#{kindMissing}"/><!--E:el.unknown-->
+  <p:commandButton value="ok" update="kindNoId" onclick="PF('kindNoWidget').show()"/><!--E:id.missing W:js.widgetvar-->
 </ui:composition>

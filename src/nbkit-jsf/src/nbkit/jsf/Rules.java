@@ -10,7 +10,8 @@ public final class Rules {
     private Rules() {
     }
 
-    public enum Severity { ERROR, WARNING }
+    /** INFO: nothing wrong, it only says where a name or id comes from when that is in another file */
+    public enum Severity { ERROR, WARNING, INFO }
 
     public static final class Problem {
         public final String rule;
@@ -28,7 +29,7 @@ public final class Rules {
 
         @Override
         public String toString() {
-            return (severity == Severity.ERROR ? "ERROR " : "WARNING ") + rule + " [" + start + "-" + end + "] " + message;
+            return severity + " " + rule + " [" + start + "-" + end + "] " + message;
         }
     }
 
@@ -66,6 +67,7 @@ public final class Rules {
         ALL.put("xml.entity", Msg.t("rule.xml.entity"));
         ALL.put("sec.escape", Msg.t("rule.sec.escape"));
         ALL.put("el.immediate", Msg.t("rule.el.immediate"));
+        ALL.put("origin", Msg.t("rule.origin"));
     }
 
     public static final Predicate<String> ALL_ON = r -> true;

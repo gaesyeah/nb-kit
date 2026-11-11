@@ -1,16 +1,16 @@
 <ui:composition template="/WEB-INF/templates/main.xhtml" xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:ui="jakarta.faces.facelets" xmlns:c="jakarta.tags.core" xmlns:p="http://primefaces.org/ui" xmlns:comp="jakarta.faces.composite/comp">
-  <ui:param name="title" value="Customers"/>
+  <ui:param name="title" value="Customers"/><!--I:origin-->
   <ui:param name="notUsed" value="x"/><!--W:unused-->
   <h:outputText value="lost"/><!--E:tpl.define-->
   <ui:define name="content">
-    <h:outputText value="#{customerVM.title} #{msg['hello']} #{reportService.name} #{defaultCustomer.name} #{freshBean}"/>
+    <h:outputText value="#{customerVM.title} #{msg['hello']} #{reportService.name} #{defaultCustomer.name} #{freshBean}"/><!--I:origin-->
     <h:outputText value="#{customerVn.title}"/><!--E:el.unknown-->
     <h:outputText value="#{customerVM.titl}"/><!--E:el.member-->
     <h:outputText value="#{customerVM.customer.namee}"/><!--E:el.member-->
     <h:outputText value="#{customerVM.map.anyKey} #{customerVM.items.size()} #{customerVM.format('a')}"/>
     <h:outputText value="#{customerVM.save}"/><!--E:el.kind-->
     <p:commandButton value="x" action="#{customerVM.title}"/><!--E:el.kind-->
-    <p:commandButton value="x" action="#{customerVM.delete(customerVM.customer)}" update="table msgs @form"/>
+    <p:commandButton value="x" action="#{customerVM.delete(customerVM.customer)}" update="table msgs @form"/><!--I:origin-->
     <p:commandButton value="x" update="@from"/><!--E:id.keyword-->
     <p:commandButton value="x" update="tablee"/><!--E:id.missing-->
     <p:commandButton value="x" update="panel"/><!--W:id.rendered-->
@@ -29,7 +29,7 @@
       <p:ajax event="rowSelecte"/><!--E:ajax.event-->
       <p:column><h:outputText value="#{row.name}"/></p:column>
       <c:if test="#{row.name != null}"><h:outputText value="a"/></c:if><!--E:jstl.iteration-->
-      <ui:include src="/pages/fragment.xhtml"><ui:param name="item" value="#{row}"/><ui:param name="outerLabel" value="x"/><ui:param name="leftover" value="1"/></ui:include><!--W:unused-->
+      <ui:include src="/pages/fragment.xhtml"><ui:param name="item" value="#{row}"/><ui:param name="outerLabel" value="x"/><ui:param name="leftover" value="1"/></ui:include><!--W:unused I:origin-->
     </p:dataTable>
     <h:outputText value="#{row.name}"/><!--E:el.scope-->
     <c:forEach items="#{customerVM.items}" var="x"><h:inputText id="repeated" value="#{x.name}"/></c:forEach><!--E:id.duplicate-->
@@ -40,8 +40,8 @@
     <comp:field label="a"><f:ajax event="changed"/></comp:field>
     <!-- names that the component's loop around cc:insertChildren gives to what the page writes inside it -->
     <comp:slides items="#{customerVM.items}">
-      <ui:param name="item" value="#{_item}"/>
-      <h:outputText value="#{_itemStatus.index}: #{item.name}"/>
+      <ui:param name="item" value="#{_item}"/><!--I:origin-->
+      <h:outputText value="#{_itemStatus.index}: #{item.name}"/><!--I:origin-->
     </comp:slides>
     <h:outputText value="#{_item}"/><!--E:el.unknown-->
     <!-- names used only inside the arguments of a method or in brackets: they count as used, and are checked -->

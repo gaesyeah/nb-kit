@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" version="1.1" viewBox="0 0 16 16">
+  <!-- nbkit JSF note: same build as the NetBeans error and warning glyphs (flat fill, inner edge at 33%, white sign) -->
+  <circle cx="8.5" cy="7.5" r="7.5" fill="#3f8ee3"/>
+  <circle cx="8.5" cy="7.5" r="7" fill="none" stroke="#000" stroke-width="1" opacity=".33"/>
+  <circle cx="8.5" cy="3.9" r="1.05" fill="#fff"/>
+  <rect x="7.6" y="5.9" width="1.8" height="6.2" rx=".5" fill="#fff"/>
+</svg>

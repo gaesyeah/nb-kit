@@ -1,10 +1,13 @@
-<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" template="/WEB-INF/templates/main.xhtml">
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui" template="/WEB-INF/templates/main.xhtml">
   <ui:define name="content">
+    <h:panelGroup id="kindBox" binding="#{kindPanel}"/>
+    <p:dialog widgetVar="kindDialog"/>
     <ui:include src="/parts/kinds/#{customerVM.title}.xhtml">
-      <ui:param name="kindLabel" value="x"/>
+      <ui:param name="kindLabel" value="x"/><!--I:origin-->
+      <ui:param name="kindUnused" value="x"/><!--W:unused-->
     </ui:include>
     <ui:include src="../parts/rel/#{customerVM.title}.xhtml">
-      <ui:param name="relLabel" value="x"/>
+      <ui:param name="relLabel" value="x"/><!--I:origin-->
     </ui:include>
   </ui:define>
 </ui:composition>

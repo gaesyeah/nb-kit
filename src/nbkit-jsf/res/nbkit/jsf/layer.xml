@@ -2,6 +2,9 @@
 <!DOCTYPE filesystem PUBLIC "-//NetBeans//DTD Filesystem 1.2//EN" "http://www.netbeans.org/dtds/filesystem-1_2.dtd">
 <filesystem>
     <folder name="Editors">
+        <folder name="AnnotationTypes">
+            <file name="nbkit-jsf-origin.xml" url="origin-annotation.xml"/>
+        </folder>
         <folder name="text">
             <folder name="xhtml">
                 <file name="nbkit-jsf-nb-JsfLayerFactory.instance"/>

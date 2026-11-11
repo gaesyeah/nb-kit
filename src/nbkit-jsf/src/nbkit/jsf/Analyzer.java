@@ -99,8 +99,8 @@ public final class Analyzer {
 
     final class Graph {
         final Map<File, List<Inc>> incoming = new HashMap<>();
-        boolean dynamic;
-        final List<Inc> dyn = new ArrayList<>();
+        // the files each dynamic include (src with EL) can bring in
+        final Map<Inc, List<File>> dynTargets = new HashMap<>();
         final Map<File, Set<File>> composedCache = new HashMap<>();
         final Map<File, Set<File>> rootsCache = new HashMap<>();
 
@@ -116,8 +116,14 @@ public final class Analyzer {
                 }
                 for (Inc in : f.edges) {
                     if (in.dynamic) {
-                        dynamic = true;
-                        dyn.add(in);
+                        List<File> ts = new ArrayList<>();
+                        for (File y : all) {
+                            if (canName(in, y)) {
+                                ts.add(y);
+                                incoming.computeIfAbsent(y, k -> new ArrayList<>()).add(in);
+                            }
+                        }
+                        dynTargets.put(in, ts);
                     } else if (in.target != null) {
                         incoming.computeIfAbsent(in.target, k -> new ArrayList<>()).add(in);
                     }
@@ -129,42 +135,39 @@ public final class Analyzer {
             return incoming.getOrDefault(f, List.of());
         }
 
-        // the dynamic includes whose src, with each EL as a wildcard, can name f: the literal folder before the first
-        // EL is resolved like a static include (/ from each webroot, otherwise from the including file's folder)
-        List<Inc> dynIn(File f) {
-            List<Inc> r = new ArrayList<>();
-            for (Inc in : dyn) {
-                String src = in.path.replaceFirst("\\?.*$", "");
-                int el = src.length();
-                Matcher first = Pattern.compile("[#$]\\{").matcher(src);
-                if (first.find()) {
-                    el = first.start();
-                }
-                int cut = src.lastIndexOf('/', el) + 1;
-                List<File> bases = new ArrayList<>();
-                if (src.startsWith("/")) {
-                    bases.addAll(ws.webroots);
-                } else {
-                    bases.add(in.from.getAbsoluteFile().getParentFile());
-                }
-                StringBuilder re = new StringBuilder();
-                Matcher m = Pattern.compile("[#$]\\{[^}]*}").matcher(src);
-                int last = cut;
-                while (m.find()) {
-                    re.append(Pattern.quote(src.substring(last, m.start()))).append(".*");
-                    last = m.end();
-                }
-                re.append(Pattern.quote(src.substring(last)));
-                for (File base : bases) {
-                    java.nio.file.Path dir = base.getAbsoluteFile().toPath().resolve(src.substring(src.startsWith("/") ? 1 : 0, cut)).normalize();
-                    java.nio.file.Path file = f.getAbsoluteFile().toPath().normalize();
-                    if (file.startsWith(dir) && dir.relativize(file).toString().replace('\\', '/').matches(re.toString())) {
-                        r.add(in);
-                        break;
-                    }
+        /** the files an include brings in: its target, or every file a dynamic src can name */
+        List<File> targets(Inc in) {
+            return in.dynamic ? dynTargets.getOrDefault(in, List.of()) : in.target == null ? List.of() : List.of(in.target);
+        }
+
+        // a dynamic src, with each EL as a wildcard, can name f: the literal folder before the first EL is resolved
+        // like a static include (/ from each webroot, otherwise from the including file's folder)
+        // shortcut: a ../ written after an EL is not normalized; resolve it if a project needs it
+        boolean canName(Inc in, File f) {
+            String src = in.path.replaceFirst("\\?.*$", "");
+            int el = src.length();
+            Matcher first = Pattern.compile("[#$]\\{").matcher(src);
+            if (first.find()) {
+                el = first.start();
+            }
+            int cut = src.lastIndexOf('/', el) + 1;
+            StringBuilder re = new StringBuilder();
+            Matcher m = Pattern.compile("[#$]\\{[^}]*}").matcher(src);
+            int last = cut;
+            while (m.find()) {
+                re.append(Pattern.quote(src.substring(last, m.start()))).append(".*");
+                last = m.end();
+            }
+            re.append(Pattern.quote(src.substring(last)));
+            List<File> bases = src.startsWith("/") ? ws.webroots : List.of(in.from.getAbsoluteFile().getParentFile());
+            java.nio.file.Path file = f.getAbsoluteFile().toPath().normalize();
+            for (File base : bases) {
+                java.nio.file.Path dir = base.getAbsoluteFile().toPath().resolve(src.substring(src.startsWith("/") ? 1 : 0, cut)).normalize();
+                if (file.startsWith(dir) && dir.relativize(file).toString().replace('\\', '/').matches(re.toString())) {
+                    return true;
                 }
             }
-            return r;
+            return false;
         }
 
         Set<File> composed(File root) {
@@ -181,9 +184,7 @@ public final class Analyzer {
                         continue;
                     }
                     for (Inc in : x.edges) {
-                        if (in.target != null) {
-                            todo.add(in.target);
-                        }
+                        todo.addAll(targets(in));
                     }
                     // composite components used
                     for (Xml.Element e : x.doc.all) {
@@ -347,7 +348,79 @@ public final class Analyzer {
 
     static final class Ext {
         final Set<String> names = new HashSet<>();
+        final Map<String, List<String>> from = new HashMap<>();
         boolean complete = true;
+
+        void add(String name, String origin) {
+            names.add(name);
+            List<String> l = from.computeIfAbsent(name, k -> new ArrayList<>());
+            if (origin != null && !l.contains(origin)) {
+                l.add(origin);
+            }
+        }
+    }
+
+    // ---------- where names and ids come from (the blue notes) ----------
+
+    /** "pages/a.xhtml, line 12 (ui:param)": the file from its webroot, the line of the element and what it is */
+    String origin(File f, Xml.Element e, String what) {
+        File w = ws.webrootOf(f);
+        String path = w == null ? f.getName() : w.getAbsoluteFile().toPath().relativize(f.getAbsoluteFile().toPath()).toString().replace('\\', '/');
+        Xml.Doc d = f.equals(file) ? doc : ws.doc(f);
+        String place = e == null || d == null ? path : Msg.t("origin.place", path, d.line(e.start));
+        return what == null ? place : place + " (" + what + ")";
+    }
+
+    /** a blue note: nothing is wrong, it only says where the thing comes from */
+    void note(int a, int b, String key, String name, List<String> origins) {
+        if (origins == null || origins.isEmpty()) {
+            return;
+        }
+        String more = origins.size() > 1 ? Msg.t("origin.more", origins.size() - 1) : "";
+        report("origin", Severity.INFO, a, b, Msg.t(key, name, origins.get(0), more));
+    }
+
+    static String what(Decl d) {
+        return d.kind.contains(":") ? d.kind : d.el.name + " " + d.kind;
+    }
+
+    /** the element of f whose EL first uses name (shortcut: a text search, enough to point at a line) */
+    static Xml.Element useIn(Xml.Doc d, String name) {
+        Pattern p = Pattern.compile("[#$]\\{[^}]*(?<![\\w.])" + Pattern.quote(name) + "(?!\\w)");
+        for (Xml.Element e : d.all) {
+            for (Xml.Attr a : e.attrs) {
+                if (p.matcher(a.value).find()) {
+                    return e;
+                }
+            }
+            for (Xml.Node n : e.children) {
+                if (n instanceof Xml.Text && p.matcher(((Xml.Text) n).raw).find()) {
+                    return e;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** where a name passed to t (and the files it brings in) is used, or null */
+    String usedAt(File t, String name) {
+        for (File x : g.composed(t)) {
+            FileFacts y = ws.facts(x);
+            if (y != null && y.usedNames.contains(name)) {
+                Xml.Element e = useIn(y.doc, name);
+                return origin(x, e, null);
+            }
+        }
+        return null;
+    }
+
+    static Xml.Element withAttr(Xml.Doc d, String attr, String value) {
+        for (Xml.Element e : d.all) {
+            if (e.value(attr) != null && e.value(attr).trim().equals(value)) {
+                return e;
+            }
+        }
+        return null;
     }
 
     final Map<File, Ext> extCache = new HashMap<>();
@@ -379,7 +452,7 @@ public final class Analyzer {
                     Map<String, File> lib = e.ns == null ? null : ws.tagSources.get(e.ns.trim());
                     if (lib != null && f.equals(lib.get(e.local))) {
                         for (Xml.Attr a : e.attrs) {
-                            r.names.add(a.name);
+                            r.add(a.name, origin(u, e, e.name));
                         }
                     }
                 }
@@ -387,9 +460,7 @@ public final class Analyzer {
             extCache.put(f, r);
             return r;
         }
-        List<Inc> inc = new ArrayList<>(g.in(f));
-        inc.addAll(g.dynIn(f));
-        for (Inc in : inc) {
+        for (Inc in : g.in(f)) {
             FileFacts from = ws.facts(in.from);
             if (from == null) {
                 r.complete = false;
@@ -397,17 +468,24 @@ public final class Analyzer {
             }
             for (Xml.Element p : in.el.elements()) {
                 if (p.is("ui", "param") && p.value("name") != null) {
-                    r.names.add(p.value("name").trim());
+                    r.add(p.value("name").trim(), origin(in.from, p, "ui:param"));
                 }
             }
             for (Decl d : decls(from.doc)) {
                 if (d.scope == FILE && !d.passed || visible(d, in.el, null, in.el.start)) {
-                    r.names.add(d.name);
+                    r.add(d.name, origin(in.from, d.el, what(d)));
                 }
             }
-            r.names.addAll(from.bindings);
+            for (String b : from.bindings) {
+                r.add(b, origin(in.from, useIn(from.doc, b), "binding"));
+            }
             Ext up = ext(in.from, guard);
-            r.names.addAll(up.names);
+            for (String n : up.names) {
+                for (String o : up.from.getOrDefault(n, List.of())) {
+                    r.add(n, o);
+                }
+                r.names.add(n);
+            }
             r.complete &= up.complete;
         }
         extCache.put(f, r);
@@ -425,6 +503,7 @@ public final class Analyzer {
     List<Site> sites = new ArrayList<>();
     List<Decl> decls;
     Set<String> globals = new HashSet<>();
+    final Map<String, List<String>> globalFrom = new HashMap<>();
     Ext ext;
 
     void go() {
@@ -439,6 +518,9 @@ public final class Analyzer {
         globals.addAll(IMPLICIT);
         globals.addAll(ws.beans.keySet());
         globals.addAll(ws.facesVars);
+        for (String v : ws.facesVars) {
+            globalFrom.computeIfAbsent(v, k -> new ArrayList<>()).add(Msg.t("origin.faces"));
+        }
         if (ws.omnifaces) {
             globals.add("now");
             globals.add("startup");
@@ -448,6 +530,15 @@ public final class Analyzer {
                 FileFacts x = ws.facts(f);
                 if (x != null) {
                     globals.addAll(x.bindings);
+                    if (!f.equals(file)) {
+                        for (String b : x.bindings) {
+                            String o = origin(f, useIn(x.doc, b), "binding");
+                            List<String> l = globalFrom.computeIfAbsent(b, k -> new ArrayList<>());
+                            if (!l.contains(o)) {
+                                l.add(o);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -507,7 +598,7 @@ public final class Analyzer {
 
     /** the name is a variable that a composite component around e gives to its children: a loop (var, varStatus...)
      * around its cc:insertChildren, where what the page writes inside the tag is rendered */
-    boolean fromComponentLoop(Xml.Element e, String name) {
+    String fromComponentLoop(Xml.Element e, String name) {
         for (Xml.Element a = e; a != null; a = a.parent) {
             File c = a.ns == null ? null : ws.compositeFile(a.ns, a.local);
             Xml.Doc cd = c == null ? null : ws.doc(c);
@@ -521,13 +612,13 @@ public final class Analyzer {
                 for (Xml.Element up = ins.parent; up != null; up = up.parent) {
                     for (Xml.Attr at : up.attrs) {
                         if (isVarAttr(at.name) && at.value.trim().equals(name)) {
-                            return true;
+                            return origin(c, up, up.name + " " + at.name);
                         }
                     }
                 }
             }
         }
-        return false;
+        return null;
     }
 
     // ---------- name and type rules (1 to 6, 19) ----------
@@ -561,6 +652,10 @@ public final class Analyzer {
                     continue;
                 }
                 if (globals.contains(r.name) || ext.names.contains(r.name)) {
+                    if (!ff.bindings.contains(r.name)) {
+                        List<String> os = ext.from.get(r.name);
+                        note(pos, s.x.off(r.b), "origin.name", r.name, os != null && !os.isEmpty() ? os : globalFrom.get(r.name));
+                    }
                     types(s, r);
                     continue;
                 }
@@ -586,7 +681,9 @@ public final class Analyzer {
                     report("el.unknown", Severity.WARNING, pos, s.x.off(r.b), Msg.t("el.bundle.included", r.name, from));
                     continue;
                 }
-                if (fromComponentLoop(s.el, r.name)) {
+                String loop = fromComponentLoop(s.el, r.name);
+                if (loop != null) {
+                    note(pos, s.x.off(r.b), "origin.name", r.name, List.of(loop));
                     continue;
                 }
                 if (!ws.beansKnown) {
@@ -898,56 +995,42 @@ public final class Analyzer {
             if (d.attr.name.equals("var") && Set.of("p", "pe").contains(Ns.lib(d.el.ns))) {
                 continue; // PrimeFaces uses the var internally (field, sortBy, filterBy...)
             }
-            boolean usedElsewhere = false;
-            if (d.passed) {
-                Inc inc = null;
-                for (Inc in : ff.edges) {
-                    if (in.el == d.el.parent) {
-                        inc = in;
+            // where the files this one brings in use it: a blue note on the declaration
+            List<String> uses = new ArrayList<>();
+            List<Inc> into = new ArrayList<>();
+            for (Inc in : ff.edges) {
+                // passed (ui:param inside the include), a template client's ui:param, or reached by the declaration
+                boolean own = in.el == d.el.parent;
+                if (d.passed ? own : own && d.kind.equals("ui:param") || !d.passed && reaches(d, in.el)) {
+                    into.add(in);
+                }
+            }
+            boolean wrongPath = false;
+            for (Inc in : into) {
+                wrongPath |= in.el == d.el.parent && !in.dynamic && in.target == null;
+                for (File t : g.targets(in)) {
+                    String at = usedAt(t, d.name);
+                    if (at != null && !uses.contains(at)) {
+                        uses.add(at);
                     }
                 }
-                if (inc == null || inc.target == null) {
-                    continue; // dynamic include or wrong path: no way to know
-                }
-                usedElsewhere = g.usedIn(inc.target).contains(d.name);
-            } else {
-                // inside some include reached by the declaration
-                for (Inc in : ff.edges) {
-                    if (in.dynamic) {
-                        if (reaches(d, in.el)) {
-                            usedElsewhere = true; // no way to know
-                        }
-                        continue;
-                    }
-                    if (in.target != null && reaches(d, in.el) && g.usedIn(in.target).contains(d.name)) {
-                        usedElsewhere = true;
-                    }
-                }
-                // ui:param of a template client: the template uses it
-                if (d.kind.equals("ui:param") && d.el.parent != null && d.el.parent.value("template") != null) {
-                    Inc t = null;
-                    for (Inc in : ff.edges) {
-                        if (in.el == d.el.parent) {
-                            t = in;
-                        }
-                    }
-                    if (t == null || t.target == null) {
-                        continue;
-                    }
-                    usedElsewhere |= g.usedIn(t.target).contains(d.name);
-                }
-                if (d.scope == FILE && d.kind.equals("c:set")) {
-                    continue; // with scope: may be read in another page or in Java
-                }
+            }
+            if (!uses.isEmpty()) {
+                note(d.attr.offset(0), d.attr.offset(d.attr.value.length()), "origin.used", d.name, uses);
+                continue;
+            }
+            if (wrongPath || d.passed && into.isEmpty()) {
+                continue; // wrong path: tpl.path already says so
+            }
+            if (d.scope == FILE && d.kind.equals("c:set")) {
+                continue; // with scope: may be read in another page or in Java
             }
             // a loop around cc:insertChildren: the variable is for what the page writes inside the component
-            if (!usedElsewhere && ff.composite && encloses(d.el, "insertChildren")) {
-                usedElsewhere = true;
+            if (ff.composite && encloses(d.el, "insertChildren")) {
+                continue;
             }
-            if (!usedElsewhere) {
-                int a = d.attr.offset(0), b = d.attr.offset(d.attr.value.length());
-                report("unused", Severity.WARNING, a, b, Msg.t("unused.declared", d.name, d.kind));
-            }
+            int a = d.attr.offset(0), b = d.attr.offset(d.attr.value.length());
+            report("unused", Severity.WARNING, a, b, Msg.t("unused.declared", d.name, d.kind));
         }
     }
 
@@ -1074,7 +1157,7 @@ public final class Analyzer {
             if (!messagesChecked && !ff.composite && ws.tagFiles.get(file) == null && isInput(e) && hasValidation(e)) {
                 messagesChecked = true;
                 Set<File> roots = g.roots(file);
-                boolean any = false, known = !roots.isEmpty() && !g.dynamic;
+                boolean any = false, known = !roots.isEmpty();
                 for (File r : roots) {
                     for (File f : g.composed(r)) {
                         FileFacts x = ws.facts(f);
@@ -1224,16 +1307,25 @@ public final class Analyzer {
                 u.widgetVars.addAll(x.widgetVars);
                 u.dynamicIds |= x.dynamicIds;
                 u.dynamicWv |= x.dynamicWidgetVars;
-                for (Inc in : x.edges) {
-                    if (in.dynamic) {
-                        u.dynamicIds = u.dynamicWv = true;
+            }
+            r.add(u);
+        }
+        return r;
+    }
+
+    /** the other files of the view (every page that uses this one) that have the id or widgetVar */
+    List<String> elsewhere(String attr, String value, Predicate<FileFacts> has) {
+        List<String> r = new ArrayList<>();
+        for (File root : g.roots(file)) {
+            for (File f : g.composed(root)) {
+                FileFacts x = ws.facts(f);
+                if (!f.equals(file) && x != null && has.test(x)) {
+                    String o = origin(f, withAttr(x.doc, attr, value), null);
+                    if (!r.contains(o)) {
+                        r.add(o);
                     }
                 }
             }
-            if (!pageLike(ws.facts(root))) {
-                u.dynamicIds = u.dynamicWv = true; // fragment nobody includes: no way to be sure
-            }
-            r.add(u);
         }
         return r;
     }
@@ -1340,6 +1432,9 @@ public final class Analyzer {
             if (!found && !dynamic) {
                 report("js.widgetvar", Severity.WARNING, off.applyAsInt(m.start(2)), off.applyAsInt(m.end(2)),
                         Msg.t("js.widgetvar", wv));
+            } else if (found && !ff.widgetVars.contains(wv)) {
+                note(off.applyAsInt(m.start(2)), off.applyAsInt(m.end(2)), "origin.widgetvar", wv,
+                        elsewhere("widgetVar", wv, x -> x.widgetVars.contains(wv)));
             }
         }
     }
@@ -1404,6 +1499,8 @@ public final class Analyzer {
                 report("id.missing", dynamic ? Severity.WARNING : Severity.ERROR, a0, a1, Msg.t("id.missing", last) + Msg.hint(hint));
             } else if (missingIn > 0 && !dynamic) {
                 report("id.missing", Severity.WARNING, a0, a1, Msg.t("id.missing.some", last));
+            } else if (missingIn == 0 && !ff.ids.contains(last)) {
+                note(a0, a1, "origin.id", last, elsewhere("id", last, x -> x.ids.contains(last)));
             } else if (a.name.equals("update") || a.name.equals("render")) {
                 Xml.Element target = localIds.get(last);
                 if (target != null && target.value("rendered") != null && target.value("rendered").contains("{")) {
@@ -1478,8 +1575,7 @@ public final class Analyzer {
         if (x.composite) {
             return Tri.UNKNOWN; // whoever uses the component decides
         }
-        List<Inc> inc = new ArrayList<>(g.in(f));
-        inc.addAll(g.dynIn(f));
+        List<Inc> inc = g.in(f);
         if (inc.isEmpty()) {
             return pageLike(x) ? Tri.FALSE : Tri.UNKNOWN;
         }
