@@ -38,9 +38,9 @@ O CLI mostra o status de cada módulo e só as opções que fazem sentido. Use �
 - **Instalar ou atualizar:** escolha "Todos" ou um módulo.
 - **Reinstalar** e **Desinstalar:** também por módulo.
 - **Conferir se carregou no NetBeans:** confere cada módulo instalado.
-- **Rodar os testes** e **Compilar os módulos:** só aparecem num clone do repositório (veja "Testes" e "Compilar os jars").
-- **Atualizar o nbkit** e **Tirar o nbkit do sistema:** só aparecem depois que o nbkit está no sistema (veja "nbkit no sistema").
 - **Backups:** só aparece quando existe algum. Enter restaura, Del apaga, Esc volta, e restaurar e apagar pedem confirmação.
+- **Colocar o nbkit no sistema:** o mesmo que `install-self` (veja "nbkit no sistema"); depois que ele está lá, **Atualizar o nbkit** e **Tirar o nbkit do sistema** ficam no lugar.
+- **Rodar os testes** e **Compilar os módulos:** só aparecem num clone do repositório (veja "Testes" e "Compilar os jars").
 
 Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File > Exit, então o NetBeans pergunta sobre arquivos não salvos e processos rodando como sempre. No fim, oferece abrir o NetBeans e confere sozinho se tudo carregou (se você disser não, ele diz como conferir depois). Se algo falhar no meio, ou se você apertar Ctrl+C, tudo volta como estava.
 
@@ -50,7 +50,7 @@ Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File 
 bash nbkit/nbkit.sh gui
 ```
 
-Uma janela com as mesmas opções: os módulos com o status e os botões (ferramentas primeiro, depois temas), instalar ou atualizar, reinstalar e desinstalar todos de uma vez, o userdir, Backups (restaurar ou apagar cada um), Verificar e, num clone, Rodar os testes e Compilar os módulos. Embaixo, um terminal roda o próprio CLI, então você vê o mesmo progresso, as mesmas cores e mensagens, com a barra de progresso acima dele (o passo dentro dela). O que muda fora da janela (o NetBeans aberto ou fechado, o CLI num terminal) aparece sozinho. Para copiar dele: selecione e aperte Ctrl+Shift+C, ou use o botão direito; sem seleção, copia tudo; o botão de copiar ao lado do resultado sempre copia tudo, sem selecionar. O botão de vassoura ao lado dele limpa o terminal, e cada botão explica o que faz quando o mouse passa por cima. Depois que o nbkit está no sistema (`install-self`), dois botões na ponta esquerda da barra de título atualizam e tiram ele.
+Uma janela com as mesmas opções: os módulos com o status e os botões (ferramentas primeiro, depois temas), instalar ou atualizar, reinstalar e desinstalar todos de uma vez, o userdir, Backups (restaurar ou apagar cada um), Verificar e, num clone, Rodar os testes e Compilar os módulos. Embaixo, um terminal roda o próprio CLI, então você vê o mesmo progresso, as mesmas cores e mensagens, com a barra de progresso acima dele (o passo dentro dela). O que muda fora da janela (o NetBeans aberto ou fechado, o CLI num terminal) aparece sozinho. Para copiar dele: selecione e aperte Ctrl+Shift+C, ou use o botão direito; sem seleção, copia tudo; o botão de copiar ao lado do resultado sempre copia tudo, sem selecionar. O botão de vassoura ao lado dele limpa o terminal, e cada botão explica o que faz quando o mouse passa por cima. Na ponta esquerda da barra de título, um botão de download coloca o nbkit no sistema (`install-self`); depois que ele está lá, o mesmo botão atualiza e um botão de lixeira ao lado tira ele.
 
 Toda pergunta do CLI também aparece como diálogo. Dá para responder nele ou digitando no terminal: o diálogo fecha sozinho. A senha do sudo, quando precisa, é digitada no terminal; a interface nunca vê a senha. Fechar a janela no meio de uma ação aperta Ctrl+C por você, então tudo volta como estava.
 
@@ -62,7 +62,7 @@ Precisa do GTK 4 e do VTE para GTK 4 (pelo PyGObject). Se faltarem, o nbkit ofer
 bash nbkit/nbkit.sh install-self
 ```
 
-Instala o nbkit para o seu usuário, sem root e igual em qualquer distro: uma cópia em `~/.local/share/nbkit` (a pasta baixada pode ser apagada), o comando `nbkit` em `~/.local/bin` (assim `nbkit` e `nbkit gui` funcionam em qualquer terminal) e um atalho no menu de aplicativos, com o ícone do nbkit na barra de tarefas. Se o `~/.local/bin` ainda não estiver no seu PATH, ele diz como adicionar (bash, zsh ou fish). O `nbkit update-self` baixa o release mais novo numa pasta temporária, instala por cima da cópia e apaga o download (mesmo se falhar ou você apertar Ctrl+C), e o `nbkit uninstall-self` tira tudo isso; os módulos continuam no NetBeans (o `nbkit uninstall` remove eles). Depois de instalado, os dois também aparecem no menu ("Atualizar o nbkit", "Tirar o nbkit do sistema") e na interface, como os dois botões na ponta esquerda da barra de título.
+Instala o nbkit para o seu usuário, sem root e igual em qualquer distro: uma cópia em `~/.local/share/nbkit` (a pasta baixada pode ser apagada), o comando `nbkit` em `~/.local/bin` (assim `nbkit` e `nbkit gui` funcionam em qualquer terminal) e um atalho no menu de aplicativos, com o ícone do nbkit na barra de tarefas. Se o `~/.local/bin` ainda não estiver no seu PATH, ele diz como adicionar (bash, zsh ou fish). O `nbkit update-self` baixa o release mais novo numa pasta temporária, instala por cima da cópia e apaga o download (mesmo se falhar ou você apertar Ctrl+C), e o `nbkit uninstall-self` tira tudo isso; os módulos continuam no NetBeans (o `nbkit uninstall` remove eles). Os três também estão no menu ("Colocar o nbkit no sistema", depois "Atualizar o nbkit" e "Tirar o nbkit do sistema") e na interface, como os botões na ponta esquerda da barra de título.
 
 ### Sem o menu
 

@@ -38,9 +38,9 @@ The CLI shows the status of each module and only the options that make sense. Us
 - **Install or update:** choose "All" or one module.
 - **Reinstall** and **Uninstall:** also per module.
 - **Check that it loaded in NetBeans:** checks each installed module.
-- **Run the tests** and **Build the modules:** only show up in a clone of the repository (see "Tests" and "Building the jars").
-- **Update nbkit** and **Take nbkit out of the system:** only show up once nbkit is on the system (see "nbkit on your system").
 - **Backups:** only shows up when there is one. Enter restores, Del deletes, Esc goes back, and both restore and delete ask for confirmation.
+- **Put nbkit on the system:** the same as `install-self` (see "nbkit on your system"); once it is there, **Update nbkit** and **Take nbkit out of the system** take its place.
+- **Run the tests** and **Build the modules:** only show up in a clone of the repository (see "Tests" and "Building the jars").
 
 If NetBeans is open, nbkit offers to close it the same way as File > Exit, so NetBeans asks about unsaved files and running processes as usual. At the end, it offers to open NetBeans and checks by itself that everything loaded (if you say no, it tells you how to check later). If something fails midway, or if you press Ctrl+C, everything goes back to how it was.
 
@@ -50,7 +50,7 @@ If NetBeans is open, nbkit offers to close it the same way as File > Exit, so Ne
 bash nbkit/nbkit.sh gui
 ```
 
-A window with the same options: the modules with their status and buttons (tools first, then themes), install or update, reinstall and uninstall all at once, the userdir, Backups (restore or delete each one), Check and, in a clone, Run the tests and Build the modules. At the bottom, a terminal runs the CLI itself, so you see the same progress, colors and messages, with the progress bar above it (the step inside it). What changes outside the window (NetBeans opened or closed, the CLI in a terminal) shows up by itself. To copy from it: select and press Ctrl+Shift+C, or right-click; without a selection, it copies everything; the copy button beside the result always copies all of it, without selecting. The broom button beside it empties the terminal, and every button explains itself when the mouse is over it. Once nbkit is on the system (`install-self`), two buttons at the left end of the title bar update it and take it out.
+A window with the same options: the modules with their status and buttons (tools first, then themes), install or update, reinstall and uninstall all at once, the userdir, Backups (restore or delete each one), Check and, in a clone, Run the tests and Build the modules. At the bottom, a terminal runs the CLI itself, so you see the same progress, colors and messages, with the progress bar above it (the step inside it). What changes outside the window (NetBeans opened or closed, the CLI in a terminal) shows up by itself. To copy from it: select and press Ctrl+Shift+C, or right-click; without a selection, it copies everything; the copy button beside the result always copies all of it, without selecting. The broom button beside it empties the terminal, and every button explains itself when the mouse is over it. At the left end of the title bar, a download button puts nbkit on the system (`install-self`); once it is there, the same button updates it and a trash button beside it takes it out.
 
 Every question of the CLI also shows up as a dialog. You can answer there or type in the terminal: the dialog closes by itself. The sudo password, when needed, is typed in the terminal; the interface never sees it. Closing the window in the middle of an action presses Ctrl+C for you, so everything goes back to how it was.
 
@@ -62,7 +62,7 @@ It needs GTK 4 and VTE for GTK 4 (through PyGObject). If they are missing, nbkit
 bash nbkit/nbkit.sh install-self
 ```
 
-Installs nbkit for your user, with no root and the same on any distro: a copy in `~/.local/share/nbkit` (the downloaded folder can go), the `nbkit` command in `~/.local/bin` (so `nbkit` and `nbkit gui` work in any terminal) and an entry in the applications menu, with the nbkit icon in the taskbar. If `~/.local/bin` is not in your PATH yet, it says how to add it (bash, zsh or fish). `nbkit update-self` downloads the latest release into a temporary folder, installs it over the copy and deletes the download (even if it fails or you press Ctrl+C), and `nbkit uninstall-self` takes all of that out; the modules stay in NetBeans (`nbkit uninstall` removes them). Once installed, both also show up in the menu ("Update nbkit", "Take nbkit out of the system") and in the interface, as the two buttons at the left end of the title bar.
+Installs nbkit for your user, with no root and the same on any distro: a copy in `~/.local/share/nbkit` (the downloaded folder can go), the `nbkit` command in `~/.local/bin` (so `nbkit` and `nbkit gui` work in any terminal) and an entry in the applications menu, with the nbkit icon in the taskbar. If `~/.local/bin` is not in your PATH yet, it says how to add it (bash, zsh or fish). `nbkit update-self` downloads the latest release into a temporary folder, installs it over the copy and deletes the download (even if it fails or you press Ctrl+C), and `nbkit uninstall-self` takes all of that out; the modules stay in NetBeans (`nbkit uninstall` removes them). The three are also in the menu ("Put nbkit on the system", then "Update nbkit" and "Take nbkit out of the system") and in the interface, as the buttons at the left end of the title bar.
 
 ### Without the menu
 

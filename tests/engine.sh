@@ -286,6 +286,22 @@ HOME="$H" PATH="$WORK/bin:$PATH" bash "$NBKIT_DIR/nbkit.sh" uninstall one-dark-p
 check "and uninstalling leaves it" grep -qx 'term.fontFamily=Hack' "$TP"
 rm -rf "${WORK:?}/bin"
 
+echo "The menu"
+new_home "$H"
+nbkit install >/dev/null
+# the options of the menu in a terminal (script), then Esc to quit; one line, in order
+menu_items() {
+  printf '\033' | HOME="$H" timeout 30 script -qec "bash '$1'" /dev/null 2>&1 | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' \
+    | tr -d '\r' | sed -n 's/^  [> ] \([A-Z]\)/\1/p' | sed 's/ (.*//' | paste -sd '|'
+}
+items="$(menu_items "$NBKIT_DIR/nbkit.sh")"
+contains "by subject: the modules, nbkit itself, development, quit" "$items" \
+  "Reinstall|Uninstall|Backups|Put nbkit on the system|Run the tests|Build the modules|Quit"
+HOME="$H" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null >/dev/null 2>&1
+contains "once nbkit is on the system, updating and taking it out take its place" "$(menu_items "$NBKIT_DIR/nbkit.sh")" \
+  "Reinstall|Uninstall|Backups|Update nbkit|Take nbkit out of the system|Run the tests|Build the modules|Quit"
+HOME="$H" bash "$NBKIT_DIR/nbkit.sh" uninstall-self </dev/null >/dev/null 2>&1
+
 echo "nbkit on the system (install-self)"
 new_home "$H"
 SD="$H/.local/share/nbkit"

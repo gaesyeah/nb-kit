@@ -113,6 +113,7 @@ class Commands(unittest.TestCase):
         self.assertEqual(model.command('uninstall', '/u', 'jsf'), n + ['uninstall', 'jsf', '/u'])
         self.assertEqual(model.command('install', '/u', ['a', 'b']), n + ['install', 'a', 'b', '/u'])
         # nbkit itself: no userdir
+        self.assertEqual(model.command('install-self', '/u'), n + ['install-self'])
         self.assertEqual(model.command('update-self', '/u'), n + ['update-self'])
         self.assertEqual(model.command('uninstall-self', '/u'), n + ['uninstall-self'])
         self.assertEqual(model.command('check', '/u'), n + ['check', '/u'])

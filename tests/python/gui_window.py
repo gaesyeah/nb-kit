@@ -137,13 +137,22 @@ def actions(w):
           w.clear_button.get_icon_name() == 'nbkit-broom-symbolic' and not w.clear_button.get_label()
           and Gtk.IconTheme.get_for_display(w.get_display()).has_icon('nbkit-broom-symbolic'))
     header_start = lambda b: b.get_parent() is not None and b.compute_bounds(w)[1].get_x() < w.get_width() / 2
-    check('update and take out nbkit stay hidden while nbkit is not on the system',
-          not w.st.get('self_installed') and not any(b.get_visible() for b in w.self_buttons))
+    download, trash = w.self_buttons
+    started = []
+    w.start = lambda action, target=None: started.append(action)     # what the click would run
+    download.emit('clicked')
+    check('while nbkit is not on the system, the download button puts it there (the trash stays hidden)',
+          not w.st.get('self_installed') and download.get_visible() and header_start(download) and not trash.get_visible()
+          and 'install-self' in download.get_tooltip_text() and started == ['install-self'], started)
     w.show_status(dict(w.st, self_installed=True))
     wait(lambda: False, 0.3)
-    check('once on the system, they show up at the left end of the title bar',
+    download.emit('clicked')
+    trash.emit('clicked')
+    del w.start
+    check('once on the system, the same button updates it and the trash takes it out, at the left end of the title bar',
           all(b.get_visible() and header_start(b) for b in w.self_buttons)
-          and [b.get_child().get_icon_name() for b in w.self_buttons] == ['nbkit-update-symbolic', 'nbkit-trash-symbolic'])
+          and [b.get_child().get_icon_name() for b in w.self_buttons] == ['nbkit-update-symbolic', 'nbkit-trash-symbolic']
+          and 'latest release' in download.get_tooltip_text() and started[1:] == ['update-self', 'uninstall-self'], started)
     square = w.self_buttons + [w.refresh_button]
     theme = Gtk.IconTheme.get_for_display(w.get_display())
     check('their icons and the refresh one come with nbkit (same look on any theme)',

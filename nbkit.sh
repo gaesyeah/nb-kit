@@ -379,20 +379,22 @@ if [ $MENU = 1 ]; then
     if [ ${#pending[@]} -gt 0 ]; then
       if [ ${#installed[@]} = 0 ]; then opts+=("$(t cli.menu_install)"); else opts+=("$(t cli.menu_install_update)"); fi; acts+=(install)
     fi
+    # by subject: the modules, nbkit itself, development (only in a clone), quit
     if [ ${#current[@]} -gt 0 ]; then opts+=("$(t cli.menu_reinstall)"); acts+=(reinstall); fi
+    if [ ${#installed[@]} -gt 0 ]; then opts+=("$(t cli.menu_uninstall)"); acts+=(uninstall); fi
     if can_check; then opts+=("$(t cli.menu_check)"); acts+=(check); fi
     nbk="$(all_backups | wc -l)"
     if [ "$nbk" -gt 0 ]; then opts+=("$(t cli.menu_backups "$nbk")"); acts+=(backups); fi
-    if [ ${#installed[@]} -gt 0 ]; then opts+=("$(t cli.menu_uninstall)"); acts+=(uninstall); fi
-    # only in a clone of the repository (the release zip has no tests/)
-    if [ -f "$NBKIT_DIR/tests/run.sh" ]; then
-      opts+=("$(t cli.menu_test)"); acts+=(test)
-      opts+=("$(t cli.menu_build)"); acts+=(build)
-    fi
-    # nbkit itself, once installed on the system (install-self)
     if self_installed; then
       opts+=("$(t cli.menu_update_self)"); acts+=(update-self)
       opts+=("$(t cli.menu_uninstall_self)"); acts+=(uninstall-self)
+    else
+      opts+=("$(t cli.menu_install_self)"); acts+=(install-self)
+    fi
+    # the release zip has no tests/
+    if [ -f "$NBKIT_DIR/tests/run.sh" ]; then
+      opts+=("$(t cli.menu_test)"); acts+=(test)
+      opts+=("$(t cli.menu_build)"); acts+=(build)
     fi
     opts+=("$(t cli.menu_quit)"); acts+=(quit)
     menu "${opts[@]}"
@@ -403,6 +405,7 @@ if [ $MENU = 1 ]; then
     case "$act" in
       quit) echo; exit 0 ;;
       test) echo; echo; exec bash "$NBKIT_DIR/tests/run.sh" ;;
+      install-self) echo; echo; install_self; exit 0 ;;
       update-self) echo; echo; update_self; exit 0 ;;
       uninstall-self)
         echo; echo

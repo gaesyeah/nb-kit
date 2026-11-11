@@ -151,13 +151,15 @@ class Window(Gtk.ApplicationWindow):
         self.refresh_button.connect('clicked', lambda _b: self.refresh())
         header.pack_end(self.about_button)
         header.pack_end(self.refresh_button)
-        # nbkit itself, at the left end, once it is on the system (install-self): update it, take it out
+        # nbkit itself, at the left end: the download button puts it on the system (install-self) and, once it is
+        # there, updates it; the trash takes it out
         self.self_buttons = []
-        for icon, name, tip, action in (('nbkit-update-symbolic', 'gui.update_self', 'gui.tip_update_self', 'update-self'),
+        for icon, name, tip, action in (('nbkit-update-symbolic', 'gui.install_self', 'gui.tip_install_self', None),
                                         ('nbkit-trash-symbolic', 'gui.uninstall_self', 'gui.tip_uninstall_self', 'uninstall-self')):
             b = SquareButton(icon, name, tip)
             b.set_visible(False)
-            b.connect('clicked', lambda _b, a=action: self.start(a))
+            b.connect('clicked', lambda _b, a=action: self.start(
+                a or ('update-self' if self.st.get('self_installed') else 'install-self')))
             header.pack_start(b)
             self.self_buttons.append(b)
         self.set_titlebar(header)
@@ -365,8 +367,12 @@ class Window(Gtk.ApplicationWindow):
         else:
             self.notice.set_text('')
         self.notice.set_visible(bool(self.notice.get_text()))
-        for b in self.self_buttons:
-            b.set_visible(bool(self.st.get('self_installed')))
+        installed = bool(self.st.get('self_installed'))
+        download, trash = self.self_buttons
+        download.set_visible(True)
+        download.set_tooltip_text(T('gui.tip_update_self' if installed else 'gui.tip_install_self'))
+        download.update_property([Gtk.AccessibleProperty.LABEL], [T('gui.update_self' if installed else 'gui.install_self')])
+        trash.set_visible(installed)
         self.build_content()
 
     def fill_userdirs(self):

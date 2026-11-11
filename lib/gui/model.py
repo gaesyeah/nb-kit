@@ -127,7 +127,7 @@ def command(action, userdir=None, target=None):
         argv += target
     elif target:
         argv.append(target)
-    if userdir and verb not in ('test', 'build', 'update-self', 'uninstall-self'):
+    if userdir and verb not in ('test', 'build', 'install-self', 'update-self', 'uninstall-self'):
         argv.append(userdir)
     return argv
 
