@@ -286,7 +286,8 @@ echo "NetBeans open, with ~/.netbeans as a link"
 # as on machines where the home folder is elsewhere: NetBeans says the userdir one way, the interface another
 new_home "$WORK/real"
 rm -rf "$H"; mkdir -p "$H"; ln -s "$WORK/real/.netbeans" "$H/.netbeans"
-bash -c 'sleep 60; :' org.netbeans.Main --userdir "$H/.netbeans/31" &
+# its own output elsewhere: a process left behind would hold the pipe of whoever reads the tests (tee)
+bash -c 'sleep 60; :' org.netbeans.Main --userdir "$H/.netbeans/31" </dev/null >/dev/null 2>&1 &
 fake=$!
 sleep 0.3
 for ud in "$H/.netbeans/31" "$WORK/real/.netbeans/31"; do
@@ -295,6 +296,6 @@ for ud in "$H/.netbeans/31" "$WORK/real/.netbeans/31"; do
 done
 out="$(HOME="$H" bash "$NBKIT_DIR/nbkit.sh" check "$H/.netbeans/31" </dev/null 2>&1)"
 contains "a userdir given through the link keeps its ~ path" "$out" "userdir  ~/.netbeans/31"
-kill "$fake" 2>/dev/null; wait "$fake" 2>/dev/null
+pkill -P "$fake" 2>/dev/null; kill "$fake" 2>/dev/null; wait "$fake" 2>/dev/null
 
 finish
