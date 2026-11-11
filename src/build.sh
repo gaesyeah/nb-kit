@@ -84,7 +84,9 @@ build() {
   # the classpath goes in a javac @file: with hundreds of jars in a long folder (Flatpak) it is bigger than what
   # a single command line argument may have ("Argument list too long")
   printf -- '-cp\n"%s"\n' "$CP" > "$TMP/$name.classpath"
-  "$JAVAC" --release 17 -encoding UTF-8 -nowarn -d "$dir" @"$TMP/$name.classpath" "${java[@]}"
+  # -proc:none: the NetBeans jars carry annotation processors nbkit does not use, some built for a newer Java than
+  # the JDK here ("compiled by a more recent version of the Java Runtime"); javac would load them all
+  "$JAVAC" --release 17 -proc:none -encoding UTF-8 -nowarn -d "$dir" @"$TMP/$name.classpath" "${java[@]}"
   cp -r "$SRC/$name/res/." "$dir/"
   rm -f "$out"
   (cd "$dir" && "$JAR" cfm "$out" "$SRC/$name/manifest.mf" .)

@@ -252,6 +252,14 @@ if command -v javac >/dev/null 2>&1; then
   for i in $(seq 1500); do : > "$L/modules/org-netbeans-modules-some-long-module-name-$i.jar"; done
   out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"
   lacks "build.sh compiles with a classpath of hundreds of long paths" "$out" "Argument list too long"
+  # the NetBeans jars bring annotation processors, some built for a newer Java than the JDK here: javac must not
+  # load them (a javac that writes down its arguments and fails, so build.sh stops before touching the jars)
+  mkdir -p "$WORK/jdk/bin"
+  printf '#!/bin/sh\n[ "$1" = -version ] && { echo "javac 17.0.12"; exit 0; }\necho "javac args: $*"; exit 1\n' > "$WORK/jdk/bin/javac"
+  printf '#!/bin/sh\nexit 0\n' > "$WORK/jdk/bin/jar"
+  chmod +x "$WORK/jdk/bin/javac" "$WORK/jdk/bin/jar"
+  out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdk" bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"
+  contains "build.sh does not load the annotation processors of the NetBeans jars" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
   rm -rf "$L"
   out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/no-jdk" bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"; rc=$?
   contains "build.sh without a JDK says it needs one" "$out" "needs a JDK 17 or newer"

@@ -47,6 +47,10 @@ public final class Workspace {
     public final Map<String, Map<String, String>> tagTypes = new HashMap<>();
     /** component-type -> class */
     public final Map<String, String> componentClasses = new HashMap<>();
+    /** type -> classes and interfaces that extend or implement it directly (from the scan of every class) */
+    private final Map<String, List<String>> subtypes = new HashMap<>();
+    /** classes that can be the object itself (not interfaces, not abstract) */
+    private final Set<String> concrete = new HashSet<>();
     public final Events events;
     /** tag files of the project itself (taglib.xml with source): file -> declared attributes */
     public final Map<File, Set<String>> tagFiles = new HashMap<>();
@@ -157,6 +161,24 @@ public final class Workspace {
         return w;
     }
 
+    /** the classes that can be the object behind a value of this type: itself if concrete, plus every concrete
+     * subclass or implementation in the classpath */
+    public List<String> implementations(String type) {
+        List<String> r = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        List<String> todo = new ArrayList<>(List.of(type));
+        while (!todo.isEmpty()) {
+            String t = todo.remove(0);
+            if (seen.add(t)) {
+                if (concrete.contains(t)) {
+                    r.add(t);
+                }
+                todo.addAll(subtypes.getOrDefault(t, List.of()));
+            }
+        }
+        return r;
+    }
+
     // ---------- scan (beans, faces-config, web.xml, taglibs) ----------
 
     private String signature() {
@@ -211,6 +233,8 @@ public final class Workspace {
         navOutcomes.clear();
         tagTypes.clear();
         componentClasses.clear();
+        subtypes.clear();
+        concrete.clear();
         customElResolver = false;
         Map<String, List<String>> annotationMeta = new HashMap<>();
         List<ClassModel.ClassInfo> candidates = new ArrayList<>();
@@ -219,6 +243,15 @@ public final class Workspace {
             any[0] = true;
             try {
                 ClassModel.ClassInfo c = ClassModel.read(b, false);
+                if (c.superName != null) {
+                    subtypes.computeIfAbsent(c.superName, k -> new ArrayList<>()).add(c.name);
+                }
+                for (String i : c.interfaces) {
+                    subtypes.computeIfAbsent(i, k -> new ArrayList<>()).add(c.name);
+                }
+                if (!c.isInterface() && (c.access & 0x0400) == 0) {
+                    concrete.add(c.name);
+                }
                 if (c.isAnnotation()) {
                     List<String> l = new ArrayList<>();
                     for (ClassModel.Annotation a : c.annotations) {

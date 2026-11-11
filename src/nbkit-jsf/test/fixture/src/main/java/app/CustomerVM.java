@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 public class CustomerVM {
   private Customer customer = new Customer();
   public Customer getCustomer() { return customer; }
+  public Contact getContact() { return new ContactRecord(); }
   public java.util.List<Customer> getItems() { return null; }
   public java.util.Map<String,String> getMap() { return null; }
   public String save() { return null; }

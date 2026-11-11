@@ -18,6 +18,10 @@
     <h:inputText value="#{customerVM.customer.name}"/>
     <h:inputText value="#{customerVM.customer.code}"/><!--E:el.readonly-->
     <h:inputText value="#{customerVM.format('a')}"/><!--E:el.readonly-->
+    <!-- declared as an interface: the implementations decide (EL writes on the object that arrives) -->
+    <h:inputText value="#{customerVM.contact.phone}"/>
+    <h:inputText value="#{customerVM.contact.email}"/><!--W:el.readonly-->
+    <h:inputText value="#{customerVM.contact.note}"/><!--E:el.readonly-->
     <h:outputText rendered="#{customerVM.customer.status eq 'ACTIVEE'}" value="a"/><!--E:el.enum-->
     <h:outputText rendered="#{customerVM.customer.status eq 'ACTIVE' and customerVM.customer.active}" value="a"/>
     <p:dataTable id="table" var="row" value="#{customerVM.items}" rowKey="#{row.name}" varStatus="st"><!--W:unused-->

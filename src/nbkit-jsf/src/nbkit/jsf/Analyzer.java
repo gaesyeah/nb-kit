@@ -767,9 +767,34 @@ public final class Analyzer {
             return;
         }
         ClassModel.Members mm = ws.classes.members(owner);
-        if (mm.getters.containsKey(last.name) && !mm.setters.contains(last.name)) {
-            report("el.readonly", Severity.ERROR, x.off(last.a), x.off(last.b), Msg.t("el.readonly.setter", last.name, cap(last.name), ClassModel.display(owner)));
+        if (!mm.getters.containsKey(last.name) || mm.setters.contains(last.name)) {
+            return;
         }
+        // an interface or abstract class is never the object itself: EL writes on the object that arrives, so the
+        // implementations decide (all with the setter: fine; some: depends on which one arrives; none: lost)
+        ClassModel.ClassInfo oc = ws.classes.get(owner);
+        if (oc != null && (oc.isInterface() || (oc.access & 0x0400) != 0)) {
+            List<String> without = new ArrayList<>();
+            int with = 0;
+            for (String impl : ws.implementations(owner)) {
+                if (!ws.classes.complete(impl)) {
+                    return;
+                }
+                if (ws.classes.members(impl).setters.contains(last.name)) {
+                    with++;
+                } else {
+                    without.add(ClassModel.display(impl));
+                }
+            }
+            if (with > 0) {
+                if (!without.isEmpty()) {
+                    report("el.readonly", Severity.WARNING, x.off(last.a), x.off(last.b),
+                            Msg.t("el.readonly.some", last.name, cap(last.name), ClassModel.display(owner), String.join(", ", without)));
+                }
+                return;
+            }
+        }
+        report("el.readonly", Severity.ERROR, x.off(last.a), x.off(last.b), Msg.t("el.readonly.setter", last.name, cap(last.name), ClassModel.display(owner)));
     }
 
     // ---------- unused ----------

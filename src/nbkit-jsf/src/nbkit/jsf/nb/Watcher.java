@@ -28,7 +28,10 @@ import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.util.RequestProcessor;
 
-/** Follows an open xhtml file: analyzes on open, on edit and when other project files change. */
+/**
+ * Follows an open xhtml file: analyzes on open, on edit and when other project files change. To see what it does,
+ * create the file ~/.cache/nbkit/jsf-debug: while it exists, each step goes to messages.log ("nbkit JSF debug").
+ */
 final class Watcher implements DocumentListener {
 
     private static final Logger LOG = Logger.getLogger("nbkit.jsf");
@@ -42,6 +45,15 @@ final class Watcher implements DocumentListener {
     private volatile boolean edited;
     private String lastSignature = "";
 
+    private static final File DEBUG = new File(System.getProperty("user.home"), ".cache/nbkit/jsf-debug");
+
+    static void debug(String what, Document d) {
+        if (DEBUG.exists()) {
+            File f = d == null ? null : file(d);
+            LOG.log(Level.INFO, "nbkit JSF debug: {0}: {1}", new Object[]{f == null ? "(no file)" : f.getName(), what});
+        }
+    }
+
     private Watcher(Document d) {
         doc = new WeakReference<>(d);
         task = RP.create(this::run);
@@ -49,8 +61,10 @@ final class Watcher implements DocumentListener {
 
     static void attach(Document d) {
         if (d == null || ALL.containsKey(d)) {
+            debug("already followed", d);
             return;
         }
+        debug("follows the document", d);
         Watcher w = new Watcher(d);
         ALL.put(d, w);
         d.addDocumentListener(w);
@@ -120,12 +134,14 @@ final class Watcher implements DocumentListener {
 
     @Override
     public void insertUpdate(DocumentEvent e) {
+        debug("edit received (insert)", e.getDocument());
         edited = true;
         task.schedule(700);
     }
 
     @Override
     public void removeUpdate(DocumentEvent e) {
+        debug("edit received (remove)", e.getDocument());
         edited = true;
         task.schedule(700);
     }
@@ -153,13 +169,16 @@ final class Watcher implements DocumentListener {
     private void run() {
         Document d = doc.get();
         if (d == null) {
+            debug("analysis skipped: the document is gone", null);
             return;
         }
         try {
             File f = file(d);
             if (f == null) {
+                debug("analysis skipped: no file", d);
                 return;
             }
+            debug("analysis starts", d);
             String[] text = new String[1];
             d.render(() -> {
                 try {
@@ -169,6 +188,7 @@ final class Watcher implements DocumentListener {
                 }
             });
             if (text[0] == null) {
+                debug("analysis skipped: text not read", d);
                 return;
             }
             lastSignature = signature(f);
@@ -187,6 +207,7 @@ final class Watcher implements DocumentListener {
                 }
             }
             HintsController.setErrors(d, LAYER, eds);
+            debug("analysis done, " + eds.size() + " warning(s) " + ps.stream().map(p -> p.rule).toList(), d);
             if (edited) {
                 edited = false;
                 // a template or include changed: the other open files may depend on it
