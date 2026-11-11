@@ -32,6 +32,7 @@ cli.cancelled=Cancelado. Nada foi alterado.
 cli.nb_open_close_it=O NetBeans está aberto. Feche ele para continuar
 cli.nb_closed=NetBeans fechado
 cli.core_corrupt=o módulo base foi corrompido ao copiar o nbkit.
+cli.busy=outro nbkit já está mexendo neste userdir (%s): espere ele terminar e tente de novo.
 cli.interrupted={Y}Interrompido.{N} Voltando tudo como estava...
 cli.stopped_error={R}Parou com erro{N} (código %s). Voltando tudo como estava...
 cli.nothing_changed_nb={G}✓{N} nada foi alterado no NetBeans.

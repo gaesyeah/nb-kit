@@ -339,6 +339,20 @@ contains "(it needs the internet)" "$out" "updating needs the internet"
 HOME="$H" "$H/.local/bin/nbkit" uninstall-self </dev/null >/dev/null 2>&1
 rm -rf "$WORK/rel" "$WORK/bad" "$WORK/tmp"
 
+echo "One change at a time in a userdir"
+new_home "$H"
+before="$(fingerprint "$H")"
+mkdir -p "$WORK/run"
+# another nbkit in the middle of a change: it holds the userdir lock while this one runs
+lock="$WORK/run/nbkit-$(printf %s "$U" | md5sum | cut -c1-16).lock"
+out="$(XDG_RUNTIME_DIR="$WORK/run" flock "$lock" bash -c 'HOME="$1" bash "$2" install </dev/null 2>&1' _ "$H" "$NBKIT_DIR/nbkit.sh")"; rc=$?
+check "with another nbkit changing the userdir, install stops" test "$rc" = 1
+contains "and says why" "$out" "another nbkit is already changing this userdir"
+check "(it changed nothing)" test "$before" = "$(fingerprint "$H")"
+out="$(XDG_RUNTIME_DIR="$WORK/run" nbkit install)"; rc=$?
+check "once the other is done, it installs" test "$rc" = 0
+rm -rf "$WORK/run"
+
 echo "NetBeans open, with ~/.netbeans as a link"
 # as on machines where the home folder is elsewhere: NetBeans says the userdir one way, the interface another
 new_home "$WORK/real"

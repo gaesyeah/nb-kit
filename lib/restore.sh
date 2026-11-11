@@ -25,8 +25,15 @@ mod_rollback_extra() {
   local id
   for id in "${MODS[@]}"; do mod_call "$id" rollback || true; done
 }
+# one change at a time in a userdir (two windows, or the window and a terminal): the second one stops before
+# touching anything; the lock goes with the process, or in after_change once the change is done
+lock_userdir() {
+  exec 9>"${XDG_RUNTIME_DIR:-/tmp}/nbkit-$(printf %s "$UD" | md5sum | cut -c1-16).lock"
+  flock -n 9 || die "$(t cli.busy "${UD/#$HOME/\~}")"
+}
 snapshot() {
   local id p have=()
+  lock_userdir
   SNAPPATHS=(nbkit modules/nbkit-core.jar config/Modules/nbkit-core.xml)
   for id in "$@"; do
     while IFS= read -r p; do [ -n "$p" ] && SNAPPATHS+=("$p"); done < <(mod_call "$id" paths)

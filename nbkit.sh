@@ -262,6 +262,7 @@ do_uninstall() {
 
 # after install/uninstall: open NetBeans and, after an install, check by itself
 after_change() {
+  exec 9>&-                       # the change is done: the lock goes (NetBeans opened here must not keep it)
   if [ $INTERACTIVE != 1 ]; then
     if [ "$1" = install ]; then t cli.check_later "$ME"; else t cli.open_nb; fi
     echo

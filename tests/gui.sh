@@ -31,5 +31,18 @@ for scenario in actions closing dark decline laptop small; do
     | grep -v -e 'libEGL warning' -e 'Unable to acquire session bus' -e '>16bit keyvals' -e '^$'
   [ "${PIPESTATUS[0]}" = 0 ] || rc=1
 done
+# one window: opening nbkit again only brings the open one to the front (needs a session bus, as on a desktop)
+if command -v dbus-run-session >/dev/null 2>&1; then
+  echo "One window at a time"
+  new_home "$WORK/home"
+  out="$(PATH="$WORK/bin:$PATH" HOME="$WORK/home" GSETTINGS_BACKEND=memory GDK_BACKEND=x11 NO_AT_BRIDGE=1 \
+    dbus-run-session -- xvfb-run -a -s "-screen 0 1920x1080x24" bash -c '
+      "$0" "$1" & first=$!; sleep 5
+      timeout 20 "$0" "$1"; echo "second=$?"
+      kill "$first" && echo "first=alive"; wait "$first"' "$GUI_PY" "$NBKIT_DIR/lib/gui/app.py" 2>&1 </dev/null)"
+  contains "opening nbkit again opens no second window (it returns at once)" "$out" "second=0"
+  contains "and the first window stays open" "$out" "first=alive"
+  finish || rc=1
+fi
 if [ -e "$WORK/launched" ]; then fail "no NetBeans of the machine was opened by the tests"; rc=1; fi
 exit $rc

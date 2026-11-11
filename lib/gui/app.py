@@ -671,10 +671,12 @@ class Window(Gtk.ApplicationWindow):
 
 
 def main():
-    app = Gtk.Application(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
+    # one window: opening nbkit again brings the open one to the front (two windows could change the same userdir
+    # at once); without a session bus GTK cannot tell, and each run gets its own window
+    app = Gtk.Application(application_id=APP_ID)
     userdir = sys.argv[1] if len(sys.argv) > 1 else None
     apply_dark_preference()
-    app.connect('activate', lambda a: Window(userdir, application=a).present())
+    app.connect('activate', lambda a: (a.get_active_window() or Window(userdir, application=a)).present())
     return app.run([sys.argv[0]])
 
 

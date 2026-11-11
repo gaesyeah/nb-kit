@@ -32,6 +32,7 @@ cli.cancelled=Cancelled. Nothing was changed.
 cli.nb_open_close_it=NetBeans is open. Close it to continue
 cli.nb_closed=NetBeans closed
 cli.core_corrupt=the base module got corrupted while copying nbkit.
+cli.busy=another nbkit is already changing this userdir (%s): wait for it to finish and try again.
 cli.interrupted={Y}Interrupted.{N} Putting everything back as it was...
 cli.stopped_error={R}Stopped with an error{N} (code %s). Putting everything back as it was...
 cli.nothing_changed_nb={G}✓{N} nothing was changed in NetBeans.
