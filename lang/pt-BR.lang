@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Erro:
-cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                  menu: mostra o status e o que dá pra fazer\n  bash %s gui                              interface gráfica\n  bash %s install [módulo...] [userdir]    instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir]  remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                  depois de abrir o NetBeans: confere se tudo carregou\n  bash %s status [--json] [userdir]        o que está instalado (--json: para programas)\n  bash %s restore <backup>                 volta para um backup\n  bash %s delete-backup <backup>           apaga um backup\n  bash %s test                             roda os testes (só no repositório)\n  bash %s build                            compila os módulos de src/ (src/build.sh --help)\n  bash %s --help                           esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
+cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                  menu: mostra o status e o que dá pra fazer\n  bash %s gui                              interface gráfica\n  bash %s install-self                     instala o nbkit para você: o comando nbkit e o atalho no menu\n  bash %s uninstall-self                   tira isso (os módulos continuam no NetBeans)\n  bash %s update-self                      atualiza essa cópia para o release mais novo\n  bash %s install [módulo...] [userdir]    instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir]  remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                  depois de abrir o NetBeans: confere se tudo carregou\n  bash %s status [--json] [userdir]        o que está instalado (--json: para programas)\n  bash %s restore <backup>                 volta para um backup\n  bash %s delete-backup <backup>           apaga um backup\n  bash %s test                             roda os testes (só no repositório)\n  bash %s build                            compila os módulos de src/ (src/build.sh --help)\n  bash %s --help                           esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
 cli.theme_label=Tema %s
 cli.no_modules_dir=pasta modules/ não encontrada ao lado de %s. Baixe a pasta nbkit inteira.
 cli.no_modules=nenhum módulo em %s.
@@ -94,6 +94,18 @@ cli.not_a_backup=%s não é um backup de nenhum módulo deste userdir
 cli.gui_missing=A interface gráfica precisa do PyGObject, do GTK 4 e do VTE para GTK 4.
 cli.gui_started=Interface aberta (mensagens em %s)
 cli.desktop_comment=Módulos para o NetBeans: verificações de JSF e o tema One Dark Pro Mix
+cli.self_installed=nbkit instalado em %s: rode nbkit (ou nbkit gui) em qualquer terminal, ou abra pelo menu de aplicativos. Para atualizar: nbkit update-self.
+cli.self_path=~/.local/bin ainda não está no seu PATH: abra um terminal novo (ou entre de novo na sessão); se o nbkit continuar não encontrado, adicione. bash ou zsh: echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc (ou ~/.zshrc). fish: fish_add_path ~/.local/bin
+cli.self_not_ours=%s já existe e não é um nbkit: nada foi alterado.
+cli.self_removed=nbkit tirado do sistema (o comando nbkit, o atalho no menu e a cópia).
+cli.self_modules_kept=Os módulos continuam no NetBeans: para tirar eles também, rode nbkit uninstall antes.
+cli.menu_update_self=Atualizar o nbkit (o release mais novo)
+cli.menu_uninstall_self=Tirar o nbkit do sistema
+cli.ask_uninstall_self=Tirar o nbkit do sistema (o comando nbkit, o atalho no menu e a cópia)?
+cli.self_offline=atualizar precisa de internet (o NBKIT_OFFLINE está ligado).
+cli.self_downloading=baixando o release mais novo...
+cli.self_download_failed=não deu para baixar ou abrir %s. Confira a conexão, ou baixe o zip à mão e rode o install-self dele.
+cli.self_up_to_date=o nbkit já está na versão mais nova (v%s).
 cli.gui_packages=a interface gráfica (PyGObject, GTK 4, VTE)
 cli.gui_manual=instale o PyGObject, o GTK 4 e o VTE para GTK 4 e rode de novo (Debian/Ubuntu: python3-gi gir1.2-gtk-4.0 gir1.2-vte-3.91; Fedora: python3-gobject gtk4 vte291-gtk4; Arch: python-gobject gtk4 vte4; openSUSE: python3-gobject typelib-1_0-Gtk-4_0 typelib-1_0-Vte-3_91)
 cli.menu_quit=Sair
@@ -306,7 +318,15 @@ gui.tip_test=Roda os testes automáticos do nbkit. Para quem altera o código do
 gui.tip_build=Gera de novo os módulos do NetBeans que o nbkit instala (os arquivos .jar) a partir do código Java em src/. Só é preciso depois de alterar esse código
 gui.tip_restore=Volta o NetBeans para como estava quando este backup foi feito
 gui.tip_delete=Apaga este arquivo de backup
+gui.refresh=Atualizar
 gui.tip_refresh=Lê de novo o que está instalado (a janela também faz isso sozinha a cada poucos segundos)
+gui.tip_userdir=O userdir do NetBeans (a pasta de configurações dele) onde os módulos entram; com mais de um NetBeans, escolha qual aqui
 gui.tip_about=Versão, licença e endereço do projeto
 gui.tip_copy=Copia toda a saída do terminal (o Ctrl+Shift+C copia só o texto selecionado, se houver)
 gui.tip_clear=Apaga a saída das ações mostrada no terminal
+gui.update_self=Atualizar o nbkit
+gui.uninstall_self=Tirar o nbkit do sistema
+gui.tip_update_self=Atualiza o nbkit para o release mais novo (a cópia instalada com install-self)
+gui.tip_uninstall_self=Tira o nbkit do sistema: o comando nbkit, o atalho no menu e a cópia. Os módulos continuam no NetBeans
+gui.self_updated=O nbkit foi atualizado: feche esta janela e abra de novo para usar a versão nova.
+gui.self_removed=O nbkit foi tirado do sistema: esta janela fecha em instantes.

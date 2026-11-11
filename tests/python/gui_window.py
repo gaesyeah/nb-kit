@@ -126,7 +126,7 @@ def actions(w):
           and w.backups_button.get_cursor().get_name() == 'not-allowed')
     check('the module buttons are not inside a list (they keep the normal button look)',
           not any(isinstance(p, Gtk.ListBoxRow) for p in ancestors(w.rows['jsf']['buttons']['install'])))
-    tips = [b for b in w.action_buttons + [w.refresh_button, w.about_button, w.copy_button, w.clear_button] if not b.get_tooltip_text()]
+    tips = [b for b in w.action_buttons + [w.refresh_button, w.about_button, w.copy_button, w.clear_button, w.userdir_drop] + w.self_buttons if not b.get_tooltip_text()]
     check('every button explains itself on hover (tooltip)', not tips, [b.get_label() for b in tips])
     check('the tooltip of "Build the modules" says what is built and when', 'src/' in w.dev.get_last_child().get_tooltip_text())
     height = lambda x: x.measure(Gtk.Orientation.VERTICAL, -1)[1]
@@ -136,6 +136,51 @@ def actions(w):
     check('the clear button is a small broom icon, no text',
           w.clear_button.get_icon_name() == 'nbkit-broom-symbolic' and not w.clear_button.get_label()
           and Gtk.IconTheme.get_for_display(w.get_display()).has_icon('nbkit-broom-symbolic'))
+    header_start = lambda b: b.get_parent() is not None and b.compute_bounds(w)[1].get_x() < w.get_width() / 2
+    check('update and take out nbkit stay hidden while nbkit is not on the system',
+          not w.st.get('self_installed') and not any(b.get_visible() for b in w.self_buttons))
+    w.show_status(dict(w.st, self_installed=True))
+    wait(lambda: False, 0.3)
+    check('once on the system, they show up at the left end of the title bar',
+          all(b.get_visible() and header_start(b) for b in w.self_buttons)
+          and [b.get_child().get_icon_name() for b in w.self_buttons] == ['nbkit-update-symbolic', 'nbkit-trash-symbolic'])
+    square = w.self_buttons + [w.refresh_button]
+    theme = Gtk.IconTheme.get_for_display(w.get_display())
+    check('their icons and the refresh one come with nbkit (same look on any theme)',
+          w.refresh_button.get_child().get_icon_name() == 'nbkit-refresh-symbolic'
+          and all(theme.has_icon(b.get_child().get_icon_name()) for b in square))
+    size = lambda b: (b.get_width(), b.get_height())
+    check('they look like About (not flat icon buttons) and are square, as tall as About',
+          all(not b.has_css_class('image-button') and size(b) == (w.about_button.get_height(),) * 2 for b in square),
+          [size(b) for b in square] + [w.about_button.get_height()])
+    css = Gtk.CssProvider()
+    css.load_from_data(b'button.nbkit-test-tall { min-height: 40px; }', -1)
+    Gtk.StyleContext.add_provider_for_display(w.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
+    w.about_button.add_css_class('nbkit-test-tall')
+    check('and they stay square when About ends up taller (a theme that lays the bar out later)',
+          wait(lambda: w.about_button.get_height() >= 40 and all(size(b) == (w.about_button.get_height(),) * 2 for b in square if b.get_visible()), 3),
+          [size(b) for b in square] + [w.about_button.get_height()])
+    w.about_button.remove_css_class('nbkit-test-tall')
+    Gtk.StyleContext.remove_provider_for_display(w.get_display(), css)
+    w.action, st = 'uninstall-self', w.st
+    w.st = dict(st, self_installed=True, self_running=True)
+    w.finish(0)
+    check('answering no to taking nbkit out leaves the window as it was',
+          not w.notice.get_visible() and w.self_buttons[0].get_sensitive())
+    nbkit, closed = app.model.NBKIT, []
+    app.model.NBKIT = nbkit + '.gone'
+    w.close = lambda: closed.append(1)          # the real one would end the test
+    w.st = dict(st, self_installed=True, self_running=True)
+    w.finish(0)
+    app.model.NBKIT = nbkit
+    check('taken out while running from that copy, the window says so and does nothing else',
+          w.notice.get_visible() and 'taken out' in w.notice.get_text() and not w.top.get_sensitive()
+          and not any(b.get_visible() for b in w.self_buttons))
+    check('and it closes by itself a moment later', wait(lambda: closed, app.Window.CLOSE_AFTER_REMOVED + 5))
+    del w.close
+    w.top.set_sensitive(True)
+    w.refresh_button.set_visible(True)
+    w.show_status(dict(st, self_installed=False))
     check('the window has the nbkit icon', w.get_icon_name() == app.APP_ID
           and Gtk.IconTheme.get_for_display(w.get_display()).has_icon(app.APP_ID))
 

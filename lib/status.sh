@@ -32,8 +32,10 @@ can_check() {
 json_bool() { if "$@"; then echo true; else echo false; fi; }
 status_json() {
   local d id s inst sep="" f first
-  printf '{"version":%s,"lang":%s,"clone":%s,"userdirs":[' "$(json_str "$NBKIT_VERSION")" "$(json_str "$NBKIT_LANG")" \
-    "$(json_bool test -f "$NBKIT_DIR/tests/run.sh")"
+  # self_installed: nbkit is on the system (install-self); self_running: and this is that copy
+  printf '{"version":%s,"lang":%s,"clone":%s,"self_installed":%s,"self_running":%s,"userdirs":[' "$(json_str "$NBKIT_VERSION")" \
+    "$(json_str "$NBKIT_LANG")" "$(json_bool test -f "$NBKIT_DIR/tests/run.sh")" "$(json_bool self_installed)" \
+    "$(json_bool test "$NBKIT_DIR" = "$(readlink -f "$SELF_DEST")")"
   for d in ${UDS[@]+"${UDS[@]}"}; do
     printf '%s{"path":%s,"name":%s,"has_nbkit":%s}' "$sep" "$(json_str "$d")" "$(json_str "NetBeans ${d##*/}")" \
       "$(json_bool test -e "$d/modules/nbkit-core.jar")"

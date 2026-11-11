@@ -57,7 +57,7 @@ export PYTHONPATH="$NBKIT_DIR/lib${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYT
 
 usage() {
   local ids; ids="$(printf '%s ' "${MODS[@]}")"
-  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
+  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
 }
 
 # ---------- the parts of the CLI (lib/) ----------
@@ -71,6 +71,8 @@ source "$NBKIT_DIR/lib/restore.sh"
 source "$NBKIT_DIR/lib/backups.sh"
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/status.sh"
+# shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/selfinstall.sh"
 
 # ---------- loads the modules (themes first) ----------
 [ -d "$NBKIT_DIR/modules" ] && [ -d "$NBKIT_DIR/lib" ] || die "$(t cli.no_modules_dir "$ME")"
@@ -85,7 +87,7 @@ ACTION=""; UD=""; SEL=(); JSON=0; BKF=""
 for a in "$@"; do
   case "$a" in
     -h|--help|help) usage; exit 0 ;;
-    install|uninstall|check|status|restore|delete-backup|gui|test|build)
+    install|uninstall|check|status|restore|delete-backup|gui|test|build|install-self|uninstall-self|update-self)
       [ -z "$ACTION" ] && ACTION="$a" || die "$(t cli.repeated_command "$a")" ;;
     --json) JSON=1 ;;
     all|todos) SEL=("${MODS[@]}") ;;
@@ -111,6 +113,15 @@ if [ "$ACTION" = test ]; then
 fi
 # rebuilds the NetBeans modules from src/ (see src/build.sh)
 if [ "$ACTION" = build ]; then exec bash "$NBKIT_DIR/src/build.sh"; fi
+# nbkit itself on the system (lib/selfinstall.sh): needs no NetBeans
+if [ "$ACTION" = install-self ]; then header; install_self; exit 0; fi
+if [ "$ACTION" = update-self ]; then header; update_self; exit 0; fi
+if [ "$ACTION" = uninstall-self ]; then
+  header
+  # with a terminal to answer (the menu, the interface): asks first
+  if [ $INTERACTIVE = 1 ]; then ask_yn "$(t cli.ask_uninstall_self)" N || { t cli.nothing_changed; echo; exit 0; }; fi
+  uninstall_self; exit 0
+fi
 
 # ---------- graphical interface (lib/gui): GTK 4 and VTE through PyGObject ----------
 if [ "$ACTION" = gui ]; then
@@ -130,11 +141,8 @@ if [ "$ACTION" = gui ]; then
     [ -n "$GUI_PY" ] || die "$(t cli.gui_manual)"
   fi
   # a menu entry, so the desktop shows the nbkit icon in the taskbar (it matches the window by the app id);
-  # rewritten each time, so it follows this folder if it moves
-  desktop="${XDG_DATA_HOME:-$HOME/.local/share}/applications/io.github.gaesyeah.nbkit.desktop"
-  mkdir -p "$(dirname "$desktop")"
-  printf '[Desktop Entry]\nType=Application\nName=nbkit\nComment=%s\nExec=bash "%s/nbkit.sh" gui\nIcon=%s\nTerminal=false\nCategories=Development;\nStartupWMClass=nbkit\n' \
-    "$(t cli.desktop_comment)" "$NBKIT_DIR" "$NBKIT_DIR/lib/gui/icons/hicolor/scalable/apps/io.github.gaesyeah.nbkit.svg" > "$desktop"
+  # rewritten each time, so it follows this folder if it moves; once installed, it stays on the installed one
+  if ! self_installed || [ "$NBKIT_DIR" = "$(readlink -f "$SELF_DEST")" ]; then write_desktop "$NBKIT_DIR"; fi
   # in its own session: the terminal is free at once, and closing the window ends it; messages go to a log
   log="${XDG_CACHE_HOME:-$HOME/.cache}/nbkit/gui.log"
   mkdir -p "$(dirname "$log")"
@@ -380,6 +388,11 @@ if [ $MENU = 1 ]; then
       opts+=("$(t cli.menu_test)"); acts+=(test)
       opts+=("$(t cli.menu_build)"); acts+=(build)
     fi
+    # nbkit itself, once installed on the system (install-self)
+    if self_installed; then
+      opts+=("$(t cli.menu_update_self)"); acts+=(update-self)
+      opts+=("$(t cli.menu_uninstall_self)"); acts+=(uninstall-self)
+    fi
     opts+=("$(t cli.menu_quit)"); acts+=(quit)
     menu "${opts[@]}"
     [ "$MENU_IDX" -lt 0 ] && { echo; exit 0; }
@@ -389,6 +402,11 @@ if [ $MENU = 1 ]; then
     case "$act" in
       quit) echo; exit 0 ;;
       test) echo; echo; exec bash "$NBKIT_DIR/tests/run.sh" ;;
+      update-self) echo; echo; update_self; exit 0 ;;
+      uninstall-self)
+        echo; echo
+        if ask_yn "$(t cli.ask_uninstall_self)" N; then uninstall_self; else t cli.nothing_changed; echo; fi
+        exit 0 ;;
       build) echo; echo; exec bash "$NBKIT_DIR/src/build.sh" ;;
       check) echo; echo; do_check ;;
       backups)

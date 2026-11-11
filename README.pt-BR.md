@@ -27,12 +27,19 @@ Baixe o [`nbkit.zip`](https://github.com/gaesyeah/nb-kit/releases/latest/downloa
 bash nbkit/nbkit.sh
 ```
 
+Ou clone o repositório e coloque o nbkit no sistema de uma vez (veja "nbkit no sistema"). Rodar os testes e Compilar os módulos só aparecem rodando pelo clone (`bash nb-kit/nbkit.sh` ou `bash nb-kit/nbkit.sh gui`); o comando `nbkit` roda a cópia instalada, que não é um clone:
+
+```bash
+git clone https://github.com/gaesyeah/nb-kit.git && bash nb-kit/nbkit.sh install-self
+```
+
 O CLI mostra o status de cada módulo e só as opções que fazem sentido. Use ↑↓ para navegar, Enter para escolher e Esc para voltar.
 
 - **Instalar ou atualizar:** escolha "Todos" ou um módulo.
 - **Reinstalar** e **Desinstalar:** também por módulo.
 - **Conferir se carregou no NetBeans:** confere cada módulo instalado.
 - **Rodar os testes** e **Compilar os módulos:** só aparecem num clone do repositório (veja "Testes" e "Compilar os jars").
+- **Atualizar o nbkit** e **Tirar o nbkit do sistema:** só aparecem depois que o nbkit está no sistema (veja "nbkit no sistema").
 - **Backups:** só aparece quando existe algum. Enter restaura, Del apaga, Esc volta, e restaurar e apagar pedem confirmação.
 
 Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File > Exit, então o NetBeans pergunta sobre arquivos não salvos e processos rodando como sempre. No fim, oferece abrir o NetBeans e confere sozinho se tudo carregou (se você disser não, ele diz como conferir depois). Se algo falhar no meio, ou se você apertar Ctrl+C, tudo volta como estava.
@@ -43,11 +50,19 @@ Se o NetBeans estiver aberto, o nbkit oferece fechar pelo mesmo caminho do File 
 bash nbkit/nbkit.sh gui
 ```
 
-Uma janela com as mesmas opções: os módulos com o status e os botões (ferramentas primeiro, depois temas), instalar ou atualizar, reinstalar e desinstalar todos de uma vez, o userdir, Backups (restaurar ou apagar cada um), Verificar e, num clone, Rodar os testes e Compilar os módulos. Embaixo, um terminal roda o próprio CLI, então você vê o mesmo progresso, as mesmas cores e mensagens, com a barra de progresso acima dele (o passo dentro dela). O que muda fora da janela (o NetBeans aberto ou fechado, o CLI num terminal) aparece sozinho. Para copiar dele: selecione e aperte Ctrl+Shift+C, ou use o botão direito; sem seleção, copia tudo; o botão de copiar ao lado do resultado sempre copia tudo, sem selecionar. O botão de vassoura ao lado dele limpa o terminal, e cada botão explica o que faz quando o mouse passa por cima.
+Uma janela com as mesmas opções: os módulos com o status e os botões (ferramentas primeiro, depois temas), instalar ou atualizar, reinstalar e desinstalar todos de uma vez, o userdir, Backups (restaurar ou apagar cada um), Verificar e, num clone, Rodar os testes e Compilar os módulos. Embaixo, um terminal roda o próprio CLI, então você vê o mesmo progresso, as mesmas cores e mensagens, com a barra de progresso acima dele (o passo dentro dela). O que muda fora da janela (o NetBeans aberto ou fechado, o CLI num terminal) aparece sozinho. Para copiar dele: selecione e aperte Ctrl+Shift+C, ou use o botão direito; sem seleção, copia tudo; o botão de copiar ao lado do resultado sempre copia tudo, sem selecionar. O botão de vassoura ao lado dele limpa o terminal, e cada botão explica o que faz quando o mouse passa por cima. Depois que o nbkit está no sistema (`install-self`), dois botões na ponta esquerda da barra de título atualizam e tiram ele.
 
 Toda pergunta do CLI também aparece como diálogo. Dá para responder nele ou digitando no terminal: o diálogo fecha sozinho. A senha do sudo, quando precisa, é digitada no terminal; a interface nunca vê a senha. Fechar a janela no meio de uma ação aperta Ctrl+C por você, então tudo volta como estava.
 
 Precisa do GTK 4 e do VTE para GTK 4 (pelo PyGObject). Se faltarem, o nbkit oferece instalar (`python3-gi`, `gir1.2-gtk-4.0` e `gir1.2-vte-3.91` no Debian, Ubuntu e Pop!_OS; os nomes certos no Fedora, Arch e openSUSE). Funciona em qualquer ambiente gráfico (GNOME, KDE, XFCE, Cinnamon, COSMIC) e segue o tema GTK do sistema e a preferência de modo escuro, inclusive no terminal.
+
+### nbkit no sistema (opcional)
+
+```bash
+bash nbkit/nbkit.sh install-self
+```
+
+Instala o nbkit para o seu usuário, sem root e igual em qualquer distro: uma cópia em `~/.local/share/nbkit` (a pasta baixada pode ser apagada), o comando `nbkit` em `~/.local/bin` (assim `nbkit` e `nbkit gui` funcionam em qualquer terminal) e um atalho no menu de aplicativos, com o ícone do nbkit na barra de tarefas. Se o `~/.local/bin` ainda não estiver no seu PATH, ele diz como adicionar (bash, zsh ou fish). O `nbkit update-self` baixa o release mais novo numa pasta temporária, instala por cima da cópia e apaga o download (mesmo se falhar ou você apertar Ctrl+C), e o `nbkit uninstall-self` tira tudo isso; os módulos continuam no NetBeans (o `nbkit uninstall` remove eles). Depois de instalado, os dois também aparecem no menu ("Atualizar o nbkit", "Tirar o nbkit do sistema") e na interface, como os dois botões na ponta esquerda da barra de título.
 
 ### Sem o menu
 
@@ -57,6 +72,9 @@ Precisa do GTK 4 e do VTE para GTK 4 (pelo PyGObject). Se faltarem, o nbkit ofer
 | `bash nbkit.sh uninstall [módulo...] [userdir]` | Remove (sem módulo: todos os instalados) |
 | `bash nbkit.sh check [userdir]` | Com o NetBeans aberto, confere se tudo carregou |
 | `bash nbkit.sh gui [userdir]` | Abre a interface gráfica e adiciona o nbkit ao menu de aplicativos (com o ícone na barra de tarefas) |
+| `bash nbkit.sh install-self` | Instala o nbkit para o seu usuário: o comando `nbkit` e o atalho no menu (veja acima) |
+| `bash nbkit.sh uninstall-self` | Tira isso (os módulos continuam no NetBeans) |
+| `bash nbkit.sh update-self` | Atualiza essa cópia para o release mais novo |
 | `bash nbkit.sh status [--json] [userdir]` | O que está instalado; `--json` para programas (a interface usa) |
 | `bash nbkit.sh restore <backup>` | Volta para um backup (os arquivos aparecem no `status --json`) |
 | `bash nbkit.sh delete-backup <backup>` | Apaga um backup |
@@ -291,6 +309,7 @@ nbkit/
 │   ├── netbeans.sh              userdirs, NetBeans aberto ou fechado, abrir e fechar
 │   ├── restore.sh               ponto de restauração (tudo volta num erro ou Ctrl+C)
 │   ├── backups.sh, status.sh    backups e status (também o "status --json" da interface)
+│   ├── selfinstall.sh           install-self, update-self e uninstall-self (o nbkit no sistema, o atalho no menu)
 │   ├── themes.sh, themes/       motor de temas e as partes em Python dele (veja "Criar um tema")
 │   ├── tools.sh, tools/         motor de ferramentas e a parte em Python dele (veja "Criar uma ferramenta")
 │   ├── text.py, toml_data.py    textos de lang/ e funções para os arquivos TOML, para as partes em Python
@@ -356,6 +375,7 @@ Os testes não substituem abrir o NetBeans: as dicas e as cores na tela ainda pr
 
 - **Cores:** [One Dark Pro](https://github.com/Binaryify/OneDark-Pro), variante Mix. Copyright (c) 2013-2022 Binaryify, licença MIT.
 - **Fonte:** [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), baixada do repositório oficial durante a instalação. Copyright 2020 The JetBrains Mono Project Authors, licença SIL Open Font License 1.1.
+- **Ícones:** os ícones de atualizar, retirar e ler de novo da barra de título vêm do [tema de ícones Adwaita](https://gitlab.gnome.org/GNOME/adwaita-icon-theme) (Projeto GNOME), licença CC BY-SA 3.0 ou LGPL 3.
 - **Apache NetBeans** e **FlatLaf** são licenciados sob Apache 2.0. Os módulos usam as APIs públicas do NetBeans.
 
 Projeto independente, sem vínculo com a Apache Software Foundation, com a JetBrains nem com os autores do One Dark Pro. "Apache NetBeans" é marca registrada da Apache Software Foundation.

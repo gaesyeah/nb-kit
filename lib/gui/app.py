@@ -92,6 +92,48 @@ def framed(rows):
     return frame
 
 
+def mtime(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
+class SquareLayout(Gtk.BinLayout):
+    """The button's own layout, which also tells it the size it got (GTK has no signal for that)."""
+
+    def do_allocate(self, widget, width, height, baseline):
+        Gtk.BinLayout.do_allocate(self, widget, width, height, baseline)
+        widget.allocated(width, height)
+
+
+class SquareButton(Gtk.Button):
+    """An icon button with the raised look of the text buttons, as wide as the bar makes it tall (About's height)."""
+
+    def __init__(self, icon, name, tip):
+        # the icon as a child, not icon_name: an icon_name button gets the image-button class, which many themes
+        # draw flat in the title bar; this one keeps the raised look of About
+        super().__init__(child=Gtk.Image(icon_name=icon), tooltip_text=T(tip))
+        self.add_css_class('nbkit-square')
+        self.update_property([Gtk.AccessibleProperty.LABEL], [T(name)])
+        self.set_cursor_from_name('pointer')
+        self.fixing = False
+        self.set_layout_manager(SquareLayout())
+
+    def allocated(self, width, height):
+        if width != height and not self.fixing:
+            self.fixing = True              # resizing inside an allocation is not allowed: right after it
+            GLib.idle_add(self.fix_width)
+
+    def fix_width(self):
+        # the size request counts the theme's margins too: natural width (with margins) + what is missing
+        self.fixing = False
+        w, h = self.get_width(), self.get_height()
+        if w and h and w != h:
+            self.set_size_request(self.measure(Gtk.Orientation.HORIZONTAL, -1)[1] + h - w, -1)
+        return False
+
+
 class Window(Gtk.ApplicationWindow):
     def __init__(self, userdir=None, **kw):
         super().__init__(title='nbkit', default_width=860, default_height=720, **kw)
@@ -99,22 +141,33 @@ class Window(Gtk.ApplicationWindow):
         self.events = self.run = self.events_path = self.question = None
         self.action_buttons, self.rows = [], {}
         self.poll_id = self.pulse_id = 0
+        self.action = self.nbkit_mtime = None
 
         header = Gtk.HeaderBar()
         self.about_button = Gtk.Button(label=T('gui.about'), tooltip_text=T('gui.tip_about'))
         self.about_button.set_cursor_from_name('pointer')
         self.about_button.connect('clicked', lambda _b: self.show_about())
-        self.refresh_button = Gtk.Button(icon_name='view-refresh-symbolic', tooltip_text=T('gui.tip_refresh'))
+        self.refresh_button = SquareButton('nbkit-refresh-symbolic', 'gui.refresh', 'gui.tip_refresh')
         self.refresh_button.connect('clicked', lambda _b: self.refresh())
         header.pack_end(self.about_button)
         header.pack_end(self.refresh_button)
+        # nbkit itself, at the left end, once it is on the system (install-self): update it, take it out
+        self.self_buttons = []
+        for icon, name, tip, action in (('nbkit-update-symbolic', 'gui.update_self', 'gui.tip_update_self', 'update-self'),
+                                        ('nbkit-trash-symbolic', 'gui.uninstall_self', 'gui.tip_uninstall_self', 'uninstall-self')):
+            b = SquareButton(icon, name, tip)
+            b.set_visible(False)
+            b.connect('clicked', lambda _b, a=action: self.start(a))
+            header.pack_start(b)
+            self.self_buttons.append(b)
         self.set_titlebar(header)
+        # square: as wide as About is tall, known only once the theme has laid it out
 
         # top: userdir, notices, modules, actions; it scrolls when the window is small
         self.top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_top=12, margin_bottom=12,
                            margin_start=14, margin_end=14)
         self.userdir_list = Gtk.StringList()
-        self.userdir_drop = Gtk.DropDown(model=self.userdir_list)
+        self.userdir_drop = Gtk.DropDown(model=self.userdir_list, tooltip_text=T('gui.tip_userdir'))
         self.userdir_drop.connect('notify::selected', self.on_userdir)
         self.notice = label('', 'dim-label', wrap=True)
         self.content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -130,7 +183,8 @@ class Window(Gtk.ApplicationWindow):
         self.result.set_hexpand(True)
         self.result_row = Gtk.Box(spacing=6)
         self.result_row.append(self.result)
-        # our own icons (lib/gui/icons): the window's and the broom (themes have none); in a hicolor folder so GTK
+        # our own icons (lib/gui/icons): the window's, the broom (themes have none) and the title bar ones (Adwaita,
+        # so they look the same on any theme); in a hicolor folder so GTK
         # paints the broom in the text color, like the theme icons
         Gtk.IconTheme.get_for_display(self.get_display()).add_search_path(os.path.join(model.ROOT, 'lib', 'gui', 'icons'))
         self.set_icon_name(APP_ID)
@@ -171,7 +225,8 @@ class Window(Gtk.ApplicationWindow):
                   self.progress_text.measure(Gtk.Orientation.VERTICAL, -1)[1])
         css.load_from_data(b'vte-terminal { padding: 2px 6px 6px 6px; } '
                            b'progressbar.nbkit trough, progressbar.nbkit progress { min-height: %dpx; } '
-                           b'button.nbkit-small { min-height: 0; min-width: 0; padding: 3px; margin: -3px 0; }' % bar)
+                           b'button.nbkit-small { min-height: 0; min-width: 0; padding: 3px; margin: -3px 0; } '
+                           b'button.nbkit-square { min-width: 0; padding-left: 0; padding-right: 0; }' % bar)
         Gtk.StyleContext.add_provider_for_display(self.get_display(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.terminal.connect('child-exited', self.on_child_exited)
         self.add_terminal_copy()
@@ -277,6 +332,7 @@ class Window(Gtk.ApplicationWindow):
     # what changes outside the window (NetBeans opened or closed, the CLI in a terminal) shows up by itself:
     # every few seconds, while idle, status --json runs in the background and the window redraws only if it changed
     WATCH_SECONDS = 3
+    CLOSE_AFTER_REMOVED = 3
 
     def watch(self):
         if not self.busy and self.question is None:
@@ -309,6 +365,8 @@ class Window(Gtk.ApplicationWindow):
         else:
             self.notice.set_text('')
         self.notice.set_visible(bool(self.notice.get_text()))
+        for b in self.self_buttons:
+            b.set_visible(bool(self.st.get('self_installed')))
         self.build_content()
 
     def fill_userdirs(self):
@@ -410,7 +468,9 @@ class Window(Gtk.ApplicationWindow):
         # cursors: loading while an action runs, "not allowed" on what is disabled, a hand on what can be clicked
         self.top.set_cursor_from_name('progress' if busy else None)
         self.clear_button.set_sensitive(not busy)
-        for b in self.action_buttons + [self.refresh_button, self.userdir_drop, self.clear_button]:
+        for b in self.self_buttons:
+            b.set_sensitive(not busy)
+        for b in self.action_buttons + [self.refresh_button, self.userdir_drop, self.clear_button] + self.self_buttons:
             b.set_cursor_from_name('progress' if busy else 'pointer' if b.get_sensitive() else 'not-allowed')
 
     def start(self, action, target=None):
@@ -420,6 +480,8 @@ class Window(Gtk.ApplicationWindow):
         os.close(fd)
         self.events, self.run = model.EventFile(self.events_path), model.Run()
         argv = model.command(action, self.userdir, target)
+        self.action = action
+        self.nbkit_mtime = mtime(model.NBKIT)
         env = [f'{k}={v}' for k, v in model.child_env(self.events_path).items()]
         self.set_busy(True)
         self.result.set_text(T('gui.running'))
@@ -497,7 +559,21 @@ class Window(Gtk.ApplicationWindow):
         if self.closing:
             self.destroy()
             return
+        # this window runs from the copy that was just taken out or replaced: it stays, but says so (going by the
+        # files, not the exit code: answering no, or being up to date, also ends with 0)
+        if self.st.get('self_running') and self.action == 'uninstall-self' and not os.path.exists(model.NBKIT):
+            self.notice.set_text(T('gui.self_removed'))
+            self.notice.set_visible(True)
+            # nothing left to run: the actions go away and the window closes by itself, after a moment to read it
+            self.top.set_sensitive(False)
+            for b in self.self_buttons + [self.refresh_button]:
+                b.set_visible(False)
+            GLib.timeout_add_seconds(self.CLOSE_AFTER_REMOVED, lambda: self.close() or False)
+            return
         self.refresh()
+        if self.st.get('self_running') and self.action == 'update-self' and self.nbkit_mtime != mtime(model.NBKIT):
+            self.notice.set_text(T('gui.self_updated'))
+            self.notice.set_visible(True)
 
     # ---------- questions: a dialog that answers by typing in the terminal ----------
     def ask(self, q):

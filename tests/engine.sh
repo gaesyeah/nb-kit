@@ -286,6 +286,59 @@ HOME="$H" PATH="$WORK/bin:$PATH" bash "$NBKIT_DIR/nbkit.sh" uninstall one-dark-p
 check "and uninstalling leaves it" grep -qx 'term.fontFamily=Hack' "$TP"
 rm -rf "${WORK:?}/bin"
 
+echo "nbkit on the system (install-self)"
+new_home "$H"
+SD="$H/.local/share/nbkit"
+out="$(HOME="$H" PATH="/usr/bin:/bin" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null 2>&1)"; rc=$?
+check "install-self exits with 0" test "$rc" = 0
+check "it copies nbkit to ~/.local/share/nbkit, as in the release zip (no history, no tests)" test -f "$SD/nbkit.sh" -a ! -e "$SD/.git" -a ! -e "$SD/tests"
+check "the nbkit command works from ~/.local/bin" bash -c "HOME='$H' '$H/.local/bin/nbkit' --help | grep -q '^nbkit v'"
+check "the menu entry opens the installed copy" grep -qx "Exec=bash \"$SD/nbkit.sh\" gui" "$H/.local/share/applications/io.github.gaesyeah.nbkit.desktop"
+contains "without ~/.local/bin in the PATH, it says how to add it" "$out" "fish_add_path ~/.local/bin"
+out="$(HOME="$H" DISPLAY="" WAYLAND_DISPLAY="" bash "$NBKIT_DIR/nbkit.sh" gui </dev/null 2>&1)"
+check "a gui run from elsewhere keeps the menu entry on the installed copy" grep -qx "Exec=bash \"$SD/nbkit.sh\" gui" "$H/.local/share/applications/io.github.gaesyeah.nbkit.desktop"
+out="$(HOME="$H" bash "$H/.local/bin/nbkit" uninstall-self </dev/null 2>&1)"; rc=$?
+check "uninstall-self exits with 0" test "$rc" = 0
+check "it takes out the command, the menu entry and the copy" test ! -e "$H/.local/bin/nbkit" -a ! -e "$H/.local/share/applications/io.github.gaesyeah.nbkit.desktop" -a ! -e "$SD"
+mkdir -p "$SD"; echo x > "$SD/mine"
+out="$(HOME="$H" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null 2>&1)"; rc=$?
+check "install-self never writes over a folder that is not an nbkit" test "$rc" = 1 -a -f "$SD/mine"
+rm -rf "$SD"
+check "status --json says when nbkit is not on the system" bash -c "HOME='$H' bash '$NBKIT_DIR/nbkit.sh' status --json </dev/null | grep -q '\"self_installed\":false'"
+HOME="$H" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null >/dev/null 2>&1
+check "and when it is, running from that copy" bash -c "HOME='$H' '$H/.local/bin/nbkit' status --json </dev/null | grep -q '\"self_installed\":true,\"self_running\":true'"
+check "the installed copy is not a clone (no tests, no development section)" test ! -e "$SD/tests"
+# a newer release, served from a file: the zip of a copy with another version
+mkdir -p "$WORK/rel/nbkit"
+tar -C "$NBKIT_DIR" --exclude=./.git -cf - . | tar -C "$WORK/rel/nbkit" -xf -
+sed -i 's/^NBKIT_VERSION=.*/NBKIT_VERSION=9.9.9/' "$WORK/rel/nbkit/nbkit.sh"
+(cd "$WORK/rel" && python3 -c 'import shutil; shutil.make_archive("nbkit", "zip", ".", "nbkit")')
+mkdir -p "$WORK/tmp"
+out="$(HOME="$H" TMPDIR="$WORK/tmp" NBKIT_OFFLINE='' NBKIT_RELEASE_URL="file://$WORK/rel/nbkit.zip" "$H/.local/bin/nbkit" update-self </dev/null 2>&1)"; rc=$?
+check "update-self exits with 0" test "$rc" = 0
+check "and leaves no download behind" test -z "$(ls -A "$WORK/tmp")"
+check "it installs the latest release over the copy" bash -c "HOME='$H' '$H/.local/bin/nbkit' --help | grep -q '^nbkit v9.9.9'"
+out="$(HOME="$H" TMPDIR="$WORK/tmp" NBKIT_OFFLINE='' NBKIT_RELEASE_URL="file://$WORK/rel/nbkit.zip" "$H/.local/bin/nbkit" update-self </dev/null 2>&1)"
+contains "with nothing newer, it says it is up to date" "$out" "already the latest version (v9.9.9)"
+check "(and leaves no download behind)" test -z "$(ls -A "$WORK/tmp")"
+out="$(HOME="$H" TMPDIR="$WORK/tmp" NBKIT_OFFLINE='' NBKIT_RELEASE_URL="file://$WORK/rel/missing.zip" "$H/.local/bin/nbkit" update-self </dev/null 2>&1)"; rc=$?
+check "a failed download stops update-self and leaves nothing behind" test "$rc" = 1 -a -z "$(ls -A "$WORK/tmp")"
+mkdir -p "$WORK/bad/nbkit"; printf 'NBKIT_VERSION=9.9.10\nexit 3\n' > "$WORK/bad/nbkit/nbkit.sh"
+(cd "$WORK/bad" && python3 -c 'import shutil; shutil.make_archive("nbkit", "zip", ".", "nbkit")')
+out="$(HOME="$H" TMPDIR="$WORK/tmp" NBKIT_OFFLINE='' NBKIT_RELEASE_URL="file://$WORK/bad/nbkit.zip" "$H/.local/bin/nbkit" update-self </dev/null 2>&1)"; rc=$?
+check "a release that fails to install stops update-self and leaves nothing behind" test "$rc" != 0 -a -z "$(ls -A "$WORK/tmp")"
+check "(the installed copy stays as it was)" bash -c "HOME='$H' '$H/.local/bin/nbkit' --help | grep -q '^nbkit v9.9.9'"
+# Ctrl+C in the middle of it (the downloaded install-self interrupts the update-self that runs it)
+printf 'NBKIT_VERSION=9.9.11\nkill -INT $PPID\n' > "$WORK/bad/nbkit/nbkit.sh"; rm -f "$WORK/bad/nbkit.zip"
+(cd "$WORK/bad" && python3 -c 'import shutil; shutil.make_archive("nbkit", "zip", ".", "nbkit")')
+out="$(HOME="$H" TMPDIR="$WORK/tmp" NBKIT_OFFLINE='' NBKIT_RELEASE_URL="file://$WORK/bad/nbkit.zip" "$H/.local/bin/nbkit" update-self </dev/null 2>&1)"; rc=$?
+check "Ctrl+C in the middle of update-self leaves nothing behind either" test "$rc" = 130 -a -z "$(ls -A "$WORK/tmp")"
+out="$(HOME="$H" "$H/.local/bin/nbkit" update-self </dev/null 2>&1)"; rc=$?
+check "offline, update-self stops and says why" test "$rc" = 1
+contains "(it needs the internet)" "$out" "updating needs the internet"
+HOME="$H" "$H/.local/bin/nbkit" uninstall-self </dev/null >/dev/null 2>&1
+rm -rf "$WORK/rel" "$WORK/bad" "$WORK/tmp"
+
 echo "NetBeans open, with ~/.netbeans as a link"
 # as on machines where the home folder is elsewhere: NetBeans says the userdir one way, the interface another
 new_home "$WORK/real"
