@@ -105,7 +105,9 @@ if [ -t 0 ] && [ -t 1 ]; then
 fi
 # the questions the theme scripts ask follow the same rule (with arguments and no NBKIT_TTY: no questions)
 export NBKIT_INTERACTIVE=$INTERACTIVE
-[ -n "$ACTION" ] || ACTION=install
+# no command: the menu in a terminal; without one (a pipe, a file, a script) only the status, so nothing changes
+# that was not asked for; modules or a userdir alone still mean install
+if [ -z "$ACTION" ]; then if [ $# -eq 0 ]; then ACTION=status; else ACTION=install; fi; fi
 # tests: they live in the repository, not in the release zip
 if [ "$ACTION" = test ]; then
   [ -f "$NBKIT_DIR/tests/run.sh" ] || die "$(t cli.no_tests)"

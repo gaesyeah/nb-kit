@@ -286,6 +286,14 @@ HOME="$H" PATH="$WORK/bin:$PATH" bash "$NBKIT_DIR/nbkit.sh" uninstall one-dark-p
 check "and uninstalling leaves it" grep -qx 'term.fontFamily=Hack' "$TP"
 rm -rf "${WORK:?}/bin"
 
+echo "Without a command and without a terminal"
+new_home "$H"
+before="$(fingerprint "$H")"
+out="$(HOME="$H" bash "$NBKIT_DIR/nbkit.sh" </dev/null 2>&1)"; rc=$?
+check "it exits with 0" test "$rc" = 0
+contains "it only shows the status" "$out" "not installed"
+check "and changes nothing (it used to install everything)" test "$before" = "$(fingerprint "$H")"
+
 echo "The menu"
 new_home "$H"
 nbkit install >/dev/null
