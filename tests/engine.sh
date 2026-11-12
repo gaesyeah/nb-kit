@@ -229,6 +229,29 @@ check "the old theme files leave FlatLaf Dark" test ! -e "$U/config/Editors/Font
 check "FlatLaf Dark comes back from the old backup" test "$(sha1sum < "$U/$P0")" = "$original"
 check "the old backup is listed first, as the original" test "$(jget "$(nbkit status --json)" "[(b['file'].split('/')[-1][:15], b['original']) for b in d['backups']]")" = "[('onedark-backup-', True), ('nbkit-theme-bac', False)]"
 
+# versions 10 to 17 of the installer also left their colors as your own tweaks of FlatLaf Dark (files from a
+# real userdir: written by a script, with name= first, only colors of the old palette, no font); a tweak NetBeans
+# itself wrote (attributes in alphabetical order) or one with a font is yours and stays
+new_home "$H"
+F0="$U/config/Editors/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml"
+font0="$(cat "$F0")"
+cp -r "$TESTS/fixtures/old-installer/config" "$U/"
+echo "$font0" > "$F0"
+cat > "$U/config/Editors/text/x-java/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml" <<'X'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" "https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">
+<fontscolors>
+    <fontcolor foreColor="ffe5c07b" name="mod-class"/>
+</fontscolors>
+X
+tweak="$(cat "$U/config/Editors/text/x-java/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml")"
+out="$(nbkit install one-dark-pro-mix)"
+check "the old installer's colors leave FlatLaf Dark" test -z "$(cd "$U/config/Editors" && find . -path '*FontsColors/FlatLafDark/*' -name '*.xml' \
+  ! -path './FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml' ! -path './text/x-java/*')"
+contains "and the install says how many" "$out" "12 color files the old installer"
+check "your font in FlatLaf Dark stays" grep -q 'Fira Code' "$U/config/Editors/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml"
+check "a tweak NetBeans wrote stays" test "$(cat "$U/config/Editors/text/x-java/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml")" = "$tweak"
+
 echo "Run from the interface"
 E2="$WORK/outer-events"
 : > "$E2"

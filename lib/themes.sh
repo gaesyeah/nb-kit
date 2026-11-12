@@ -79,6 +79,23 @@ theme_legacy_restore_base() {
   if [ -n "$1" ]; then tar -xzf "$1" -C "$UD" --wildcards 'config/Editors/*' 2>/dev/null || true; fi
 }
 
+# versions 10 to 17 also wrote their colors as your own tweaks of FlatLaf Dark (CustomFontsColors files). Theirs are
+# told from yours by how they were written: by a script (name= first in every entry, NetBeans writes the attributes
+# in alphabetical order), with no font and only colors of the old installer's palette.
+THEME_LEGACY_PALETTE="ff203d49 ff21252b ff282c34 ff2c313c ff2e3440 ff2f3339 ff323842 ff393739 ff3a3a3a ff3b4048 ff3c4049 ff40444b ff404859 ff415849 ff45484f ff474d59 ff495162 ff515a6b ff528bff ff53232a ff53562a ff554941 ff56b6c2 ff61afef ff7f848e ff808080 ff82674f ff9876aa ff98c379 ffa9b7c6 ffabb2bf ffbe5046 ffc24038 ffc5c5c5 ffc678dd ffd19a66 ffe06c75 ffe5c07b ffffef28 ffffffff"
+theme_legacy_custom_out() {
+  local f n=0
+  while IFS= read -r -d '' f; do
+    grep -q '<fontcolor' "$f" || continue
+    grep -q '<font name=' "$f" && continue
+    grep -o '<fontcolor [a-zA-Z]*=' "$f" | grep -qvx '<fontcolor name=' && continue
+    grep -oE '"ff[0-9a-f]{6}"' "$f" | tr -d '"' | grep -qvxF -f <(tr ' ' '\n' <<<"$THEME_LEGACY_PALETTE") && continue
+    rm -f "$f"; n=$((n + 1))
+  done < <(find "$C/Editors" -path "*/FontsColors/$THEME_BASE/$COLORS_PREFIX-*.xml" -print0 2>/dev/null)
+  if [ "$n" -gt 0 ]; then info "$(t theme.legacy_custom_out "$n" "$THEME_BASE_NAME")"; fi
+  return 0
+}
+
 # state files with old names move to the new ones
 theme_migrate() {
   local old
@@ -317,6 +334,7 @@ theme_install() {
   # font you used in the base profile (goes to the new profile)
   FONTJSON="$("$NBKIT_PY" "$THEMES_LIB/font.py" json "$C/Editors/FontsColors/$THEME_BASE/$COLORS_PREFIX-tokenColorings.xml" 2>/dev/null || true)"
   if theme_legacy_inside_base; then theme_legacy_restore_base "$(theme_backups | head -1)"; info "$(t theme.legacy_fixed)"; fi
+  theme_legacy_custom_out
   ok "$(t theme.base_kept "$THEME_BASE_NAME")"
 
   step "$(t theme.step_colors)"

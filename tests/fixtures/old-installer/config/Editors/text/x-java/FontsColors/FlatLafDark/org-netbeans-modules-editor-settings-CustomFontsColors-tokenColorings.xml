@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" "https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">
+<fontscolors>
+    <fontcolor name="literal" foreColor="ffd19a66"/>
+    <fontcolor name="string-escape" foreColor="ff56b6c2"/>
+    <fontcolor name="character-escape" foreColor="ff56b6c2"><font style="bold"/></fontcolor>
+    <fontcolor name="javadoc-tag" foreColor="ff7f848e"><font style="bold"/></fontcolor>
+    <fontcolor name="javadoc-identifier" foreColor="ff7f848e"/>
+    <fontcolor name="html-tag" foreColor="ff7f848e"><font style="italic"/></fontcolor>
+    <fontcolor name="mod-class" foreColor="ffe5c07b"/>
+    <fontcolor name="mod-class-declaration" foreColor="ffe5c07b"><font style="bold"/></fontcolor>
+    <fontcolor name="mod-interface" foreColor="ffe5c07b"/>
+    <fontcolor name="mod-interface-declaration" foreColor="ffe5c07b"><font style="bold"/></fontcolor>
+    <fontcolor name="mod-enum" foreColor="ffe5c07b"/>
+    <fontcolor name="mod-enum-declaration" foreColor="ffe5c07b"><font style="bold"/></fontcolor>
+    <fontcolor name="mod-record-declaration" foreColor="ffe5c07b"><font style="bold"/></fontcolor>
+    <fontcolor name="mod-annotation-type" foreColor="ffe5c07b"/>
+    <fontcolor name="mod-annotation-type-declaration" foreColor="ffe5c07b"><font style="bold"/></fontcolor>
+    <fontcolor name="mod-constructor" foreColor="ffe5c07b"/>
+    <fontcolor name="mod-constructor-declaration" foreColor="ff61afef"><font style="bold"/></fontcolor>
+    <fontcolor name="mod-method" foreColor="ff61afef"><font style="bold"/></fontcolor>
+    <fontcolor name="mod-method-declaration" foreColor="ff61afef"><font style="bold"/></fontcolor>
+    <fontcolor name="mod-field" foreColor="ffe06c75"/>
+    <fontcolor name="mod-field-declaration" foreColor="ffe06c75"/>
+    <fontcolor name="mod-local-variable" foreColor="ffe06c75"/>
+    <fontcolor name="mod-local-variable-declaration" foreColor="ffe06c75"/>
+    <fontcolor name="mod-parameter" foreColor="ffe06c75"/>
+    <fontcolor name="mod-parameter-declaration" foreColor="ffe06c75"/>
+</fontscolors>

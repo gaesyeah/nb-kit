@@ -176,6 +176,7 @@ theme.step_font=Font %s
 theme.step_font_editor=Editor font
 theme.step_base=Checking the %s profile
 theme.legacy_fixed=theme from an old version found in FlatLaf Dark: brought back to the original
+theme.legacy_custom_out=%s color files the old installer had left in %s as if they were your tweaks were removed
 theme.base_kept=original %s kept
 theme.step_colors=Preparing the theme colors
 theme.colors_ready=UI, editor and module categories ready

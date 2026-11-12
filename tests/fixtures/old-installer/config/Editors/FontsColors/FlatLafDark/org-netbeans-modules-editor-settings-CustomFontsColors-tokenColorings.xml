@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" "https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">
+<fontscolors>
+    <fontcolor name="default" foreColor="ffabb2bf" bgColor="ff282c34"/>
+    <fontcolor name="comment" foreColor="ff7f848e"/>
+    <fontcolor name="keyword" foreColor="ffc678dd"/>
+    <fontcolor name="string" foreColor="ff98c379"/>
+    <fontcolor name="char" foreColor="ff98c379"/>
+    <fontcolor name="number" foreColor="ffd19a66"/>
+    <fontcolor name="operator" foreColor="ff56b6c2"/>
+    <fontcolor name="separator" foreColor="ffabb2bf"/>
+    <fontcolor name="identifier" foreColor="ffe06c75"/>
+    <fontcolor name="field" foreColor="ffe06c75"/>
+    <fontcolor name="method" foreColor="ff61afef"><font style="bold"/></fontcolor>
+    <fontcolor name="markup-element" foreColor="ffe06c75"/>
+    <fontcolor name="markup-attribute" foreColor="ffd19a66"/>
+    <fontcolor name="markup-attribute-value" foreColor="ff98c379"/>
+    <fontcolor name="url" foreColor="ff61afef" underline="ff61afef"/>
+    <fontcolor name="whitespace" foreColor="ff40444b"/>
+    <fontcolor name="mark-occurrences" bgColor="ff474d59"/>
+    <fontcolor name="error" waveUnderlined="ffc24038"/>
+    <fontcolor name="warning" waveUnderlined="ffd19a66"/>
+</fontscolors>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" "https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">
+<fontscolors>
+    <fontcolor name="COMMENT_HTML" foreColor="ff7f848e"><font style="bold"/></fontcolor>
+    <fontcolor name="COMMENT_KEYWORD" foreColor="ff7f848e"><font style="bold"/></fontcolor>
+    <fontcolor name="keyword" foreColor="ffc678dd"><font style="bold"/></fontcolor>
+</fontscolors>

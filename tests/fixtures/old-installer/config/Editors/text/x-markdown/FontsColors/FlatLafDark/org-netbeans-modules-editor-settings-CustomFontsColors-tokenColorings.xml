@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" "https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">
+<fontscolors>
+    <fontcolor name="header" foreColor="ffe06c75"><font style="bold"/></fontcolor>
+    <fontcolor name="header2" foreColor="ffe06c75"/>
+    <fontcolor name="header3" foreColor="ffe06c75"/>
+    <fontcolor name="header4" foreColor="ffe06c75"/>
+    <fontcolor name="header5" foreColor="ffe06c75"/>
+    <fontcolor name="header6" foreColor="ffe06c75"/>
+    <fontcolor name="bulletlist" foreColor="ffe06c75"/>
+    <fontcolor name="orderedlist" foreColor="ffe06c75"/>
+    <fontcolor name="emph" foreColor="ffc678dd"><font style="italic"/></fontcolor>
+    <fontcolor name="strong" foreColor="ffd19a66"><font style="bold"/></fontcolor>
+</fontscolors>

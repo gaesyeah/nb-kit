@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fontscolors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.2//EN" "https://netbeans.apache.org/dtds/EditorFontsColors-1_2.dtd">
+<fontscolors>
+    <fontcolor name="xml-doctype" foreColor="ffc678dd"/>
+    <fontcolor name="xml-operator" foreColor="ffabb2bf"/>
+    <fontcolor name="xml-value" foreColor="ff98c379"/>
+    <fontcolor name="xml-pi-start" foreColor="ffabb2bf"/>
+    <fontcolor name="xml-pi-end" foreColor="ffabb2bf"/>
+    <fontcolor name="xml-pi-content" foreColor="ffabb2bf"/>
+</fontscolors>
