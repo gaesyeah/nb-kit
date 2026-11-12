@@ -128,7 +128,21 @@ def actions(w):
           not any(isinstance(p, Gtk.ListBoxRow) for p in ancestors(w.rows['jsf']['buttons']['install'])))
     tips = [b for b in w.action_buttons + [w.refresh_button, w.about_button, w.copy_button, w.clear_button, w.userdir_drop] + w.self_buttons if not b.get_tooltip_text()]
     check('every button explains itself on hover (tooltip)', not tips, [b.get_label() for b in tips])
-    check('the tooltip of "Build the modules" says what is built and when', 'src/' in w.dev.get_last_child().get_tooltip_text())
+    by_name = {b.get_name(): b for b in w.action_buttons}
+    check('the tooltip of "Build the modules" says what is built and when', 'src/' in by_name['build'].get_tooltip_text())
+    check('Analyze JSF project is in the main area, not in development',
+          'analyze' in by_name and by_name['analyze'].get_parent() is not w.dev)
+    items = by_name['analyze'].get_popover().get_child()
+    check('it offers the projects open in NetBeans, then any other folder',
+          items.get_last_child().get_label() == app.T('cli.analyze_other'))
+    debug, first = by_name['debug'], w.dev.get_first_child()
+    check('development: tests and build on top, a line, then the JSF debug (no title of its own)',
+          by_name['test'].get_parent() is first and by_name['build'].get_parent() is first
+          and isinstance(first.get_next_sibling(), Gtk.Separator) and debug.get_parent() is first.get_next_sibling().get_next_sibling())
+    check('the JSF debug is a switch, off, first in its row', isinstance(debug, Gtk.Switch) and not debug.get_active()
+          and debug.get_prev_sibling() is None)
+    check('its label is on the right of the switch', debug.get_next_sibling().get_label() == app.T('gui.debug'))
+    check('then the button that shows its lines', debug.get_next_sibling().get_next_sibling() is by_name['debug-log'])
     height = lambda x: x.measure(Gtk.Orientation.VERTICAL, -1)[1]
     check('Running/Done is as far from the bar as a title from its buttons (the clear button adds no height)',
           w.status_row.get_spacing() == w.content.get_spacing() and height(w.result_row) == height(w.result),

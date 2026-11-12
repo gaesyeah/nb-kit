@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Erro:
-cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                  menu: mostra o status e o que dá pra fazer (sem terminal: só o status)\n  bash %s gui                              interface gráfica\n  bash %s install-self                     instala o nbkit para você: o comando nbkit e o atalho no menu\n  bash %s uninstall-self                   tira isso (os módulos continuam no NetBeans)\n  bash %s update-self                      atualiza essa cópia para o release mais novo\n  bash %s install [módulo...] [userdir]    instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir]  remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                  depois de abrir o NetBeans: confere se tudo carregou\n  bash %s status [--json] [userdir]        o que está instalado (--json: para programas)\n  bash %s restore <backup>                 volta para um backup\n  bash %s delete-backup <backup>           apaga um backup\n  bash %s test                             roda os testes (só no repositório)\n  bash %s build                            compila os módulos de src/ (src/build.sh --help)\n  bash %s --help                           esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
+cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                  menu: mostra o status e o que dá pra fazer (sem terminal: só o status)\n  bash %s gui                              interface gráfica\n  bash %s install-self                     instala o nbkit para você: o comando nbkit e o atalho no menu\n  bash %s uninstall-self                   tira isso (os módulos continuam no NetBeans)\n  bash %s update-self                      atualiza essa cópia para o release mais novo\n  bash %s install [módulo...] [userdir]    instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir]  remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                  depois de abrir o NetBeans: confere se tudo carregou\n  bash %s analyze jsf <projeto>            roda as verificações de JSF em todos os xhtml de um projeto, sem o NetBeans\n  bash %s debug jsf on|off|log [userdir]   debug das verificações de JSF no NetBeans: ligar, desligar, ver as linhas\n  bash %s status [--json] [userdir]        o que está instalado (--json: para programas)\n  bash %s restore <backup>                 volta para um backup\n  bash %s delete-backup <backup>           apaga um backup\n  bash %s test                             roda os testes (só no repositório)\n  bash %s build                            compila os módulos de src/ (src/build.sh --help)\n  bash %s --help                           esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
 cli.theme_label=Tema %s
 cli.no_modules_dir=pasta modules/ não encontrada ao lado de %s. Baixe a pasta nbkit inteira.
 cli.no_modules=nenhum módulo em %s.
@@ -91,6 +91,28 @@ cli.menu_backups=Backups (%s)
 cli.menu_uninstall=Desinstalar
 cli.menu_test=Rodar os testes
 cli.menu_build=Compilar os módulos
+cli.menu_analyze=Analisar um projeto JSF
+cli.analyze_other=Outra pasta...
+cli.analyze_modules=%s módulos com páginas JSF
+cli.analyze_skip=%s não está compilado (sem target/classes): ficou de fora. Compile antes (mvn compile).
+cli.analyze_ask=Pasta do projeto
+cli.analyze_usage=Uso: nbkit analyze jsf <pasta do projeto>
+cli.analyze_no_dir=Pasta não encontrada: %s
+cli.analyze_no_java=Java 17 ou mais novo não encontrado (JAVA_HOME, PATH, /usr/lib/jvm). Instale um JDK ou defina JAVA_HOME.
+cli.analyze_no_classes=%s tem pom.xml mas não tem target/classes: compile o projeto antes (mvn compile). Sem as classes o nbkit não conhece os beans e marcaria todos.
+cli.analyze_maven=Lendo as bibliotecas do projeto (mvn dependency:build-classpath)...
+cli.analyze_no_maven=Sem as bibliotecas do projeto (%s): o que precisa das classes delas não é conferido.
+cli.analyze_maven_missing=Maven (mvn) não encontrado
+cli.analyze_maven_failed=mvn dependency:build-classpath falhou
+cli.menu_debug=Debug do JSF: %s
+cli.menu_debug_log=Ver as linhas do debug do JSF
+cli.debug_state_on=ligado
+cli.debug_state_off=desligado
+cli.debug_on=Debug do JSF ligado: cada passo das verificações no NetBeans vai para o log dele (messages.log); não precisa reiniciar. Para ver: nbkit debug jsf log
+cli.debug_off=Debug do JSF desligado.
+cli.debug_off_now=O debug do JSF está desligado: linhas novas só aparecem depois de ligar (nbkit debug jsf on).
+cli.debug_log_none=Nenhuma linha do debug do JSF.
+cli.debug_usage=Uso: nbkit debug jsf on|off|log [userdir]
 cli.need_backup=%s precisa do arquivo do backup (veja: status --json)
 cli.not_a_backup=%s não é um backup de nenhum módulo deste userdir
 cli.gui_missing=A interface gráfica precisa do PyGObject, do GTK 4 e do VTE para GTK 4.
@@ -326,6 +348,13 @@ gui.tip_backups=Estados do NetBeans guardados antes de instalar: restaure ou apa
 gui.tip_check=Com o NetBeans aberto depois de instalar: confere no log se cada módulo carregou e se o tema está selecionado
 gui.tip_test=Roda os testes automáticos do nbkit. Para quem altera o código do nbkit
 gui.tip_build=Gera de novo os módulos do NetBeans que o nbkit instala (os arquivos .jar) a partir do código Java em src/. Só é preciso depois de alterar esse código
+gui.analyze=Analisar projeto JSF...
+gui.analyze_pick=Pasta do projeto JSF
+gui.debug=Debug do JSF
+gui.debug_log=Ver linhas
+gui.tip_analyze=Roda as verificações de JSF em todos os xhtml de uma pasta de projeto, sem o NetBeans, e lista cada erro, aviso e nota com o que a lâmpada oferece. O projeto precisa estar compilado (target/classes)
+gui.tip_debug=Liga ou desliga o debug do JSF, sem reiniciar. Ligado, o módulo JSF anota cada passo das verificações no log do NetBeans (messages.log): para quando um aviso não aparece ou não some. Depois veja as linhas no botão ao lado
+gui.tip_debug_log=Mostra as últimas linhas do debug do JSF no log do NetBeans deste userdir. Com o debug ligado, os passos conforme acontecem; desligado, as linhas que ficaram de quando estava ligado, até o NetBeans reiniciar e começar um log novo
 gui.tip_restore=Volta o NetBeans para como estava quando este backup foi feito
 gui.tip_delete=Apaga este arquivo de backup
 gui.refresh=Atualizar

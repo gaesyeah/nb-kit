@@ -71,6 +71,8 @@ Instala o nbkit para o seu usuário, sem root e igual em qualquer distro: uma c�
 | `bash nbkit.sh install [módulo...] [userdir]` | Instala ou atualiza (sem módulo: todos) |
 | `bash nbkit.sh uninstall [módulo...] [userdir]` | Remove (sem módulo: todos os instalados) |
 | `bash nbkit.sh check [userdir]` | Com o NetBeans aberto, confere se tudo carregou |
+| `bash nbkit.sh analyze jsf <projeto>` | Roda as verificações de JSF em todos os xhtml de um projeto, sem o NetBeans (veja "Problemas") |
+| `bash nbkit.sh debug jsf on\|off\|log [userdir]` | Debug das verificações de JSF dentro do NetBeans (veja "Problemas") |
 | `bash nbkit.sh gui [userdir]` | Abre a interface gráfica e adiciona o nbkit ao menu de aplicativos (com o ícone na barra de tarefas) |
 | `bash nbkit.sh install-self` | Instala o nbkit para o seu usuário: o comando `nbkit` e o atalho no menu (veja acima) |
 | `bash nbkit.sh uninstall-self` | Tira isso (os módulos continuam no NetBeans) |
@@ -303,6 +305,7 @@ nbkit/
 ├── nbkit.sh                     CLI: argumentos, menu e ações
 ├── lang/                        textos do terminal: pt-BR.lang (referência) e en.lang
 ├── lib/                         código usado pelo CLI
+│   ├── analyze.sh               analyze jsf e debug jsf (as verificações de JSF fora do NetBeans, o debug delas)
 │   ├── terminal.sh              cores, idioma, funções de saída, menu de setas
 │   ├── packages.sh              instala o que falta pelo gerenciador de pacotes (apt, dnf, pacman, zypper)
 │   ├── registry.sh              registro dos módulos e as funções que os motores dividem
@@ -366,6 +369,8 @@ Os testes não substituem abrir o NetBeans: as dicas e as cores na tela ainda pr
 
 - **"não achei a instalação do NetBeans":** rode com `NB_HOME=/caminho/do/netbeans bash nbkit.sh`.
 - **Módulo não carregou:** confira se o NetBeans roda com Java 17 ou mais novo. O `check` mostra qual Java ele está usando.
+- **Um aviso de JSF que não aparece, ou não some:** `nbkit debug jsf on` (não precisa reiniciar), repita o que fez no NetBeans e `nbkit debug jsf log` mostra cada passo das verificações, tirado do log do NetBeans (`messages.log`). No fim, `nbkit debug jsf off`. Na interface: Desenvolvimento > "Debug do JSF" e "Linhas do debug do JSF".
+- **Todos os problemas de JSF de um projeto de uma vez:** `nbkit analyze jsf <pasta do projeto>` roda as mesmas verificações em todos os xhtml, sem o NetBeans, e lista cada erro, aviso e nota com arquivo, linha e coluna, o que o "Trocar por" escreveria e para onde o "Ir para" vai. O projeto precisa estar compilado (`target/classes`); em projeto Maven o nbkit lê as bibliotecas com `mvn dependency:build-classpath`. Na interface: "Analisar projeto JSF...".
 
 ## Licença
 

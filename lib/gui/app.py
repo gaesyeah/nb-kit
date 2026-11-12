@@ -399,19 +399,67 @@ class Window(Gtk.ApplicationWindow):
             for b in (self.backups_button, self.check_button):
                 bar.append(b)
                 self.action_buttons.append(b)
-            self.content.append(bar)
+        else:
+            bar = Gtk.Box(spacing=8)
+        # runs on a project folder, so it needs no userdir: the projects open in NetBeans, or any folder
+        b = Gtk.MenuButton(label=T('gui.analyze'), tooltip_text=T(model.TIP_KEYS['analyze']), name='analyze')
+        pop = Gtk.Popover()
+        items = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        for p in self.st.get('jsf_projects', []):
+            items.append(self.menu_item(p['name'], p['path'], pop, lambda path=p['path']: self.start('analyze', path)))
+        items.append(self.menu_item(T('cli.analyze_other'), None, pop, self.pick_project))
+        pop.set_child(items)
+        b.set_popover(pop)
+        bar.append(b)
+        self.action_buttons.append(b)
+        self.content.append(bar)
         # only in a clone of the repository (the release zip has no tests/)
         self.dev = None
         if self.st.get('clone'):
             self.content.append(label(T('gui.section_dev'), 'heading'))
-            self.dev = Gtk.Box(spacing=8)
+            self.dev = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            row = Gtk.Box(spacing=8)
             for key, act in (('gui.test', 'test'), ('gui.build', 'build')):
                 b = button(T(key), self.start, act, tip=model.TIP_KEYS[act])
                 b.set_name(act)
-                self.dev.append(b)
+                row.append(b)
                 self.action_buttons.append(b)
+            self.dev.append(row)
+            self.dev.append(Gtk.Separator())
+            # the JSF debug below a line: the switch, its label on the right, then the button that shows its lines
+            row = Gtk.Box(spacing=8)
+            sw = Gtk.Switch(active=bool(self.st.get('jsf_debug')), valign=Gtk.Align.CENTER, name='debug',
+                            tooltip_text=T(model.TIP_KEYS['debug']))
+            sw.connect('notify::active', lambda s, _p: self.start('debug', 'on' if s.get_active() else 'off'))
+            row.append(sw)
+            row.append(Gtk.Label(label=T('gui.debug'), tooltip_text=T(model.TIP_KEYS['debug']), margin_end=4))
+            b = button(T('gui.debug_log'), self.start, 'debug-log', tip=model.TIP_KEYS['debug-log'])
+            b.set_name('debug-log')
+            row.append(b)
+            self.dev.append(row)
+            self.action_buttons += [sw, b]
             self.content.append(self.dev)
         self.set_busy(self.busy)
+
+    @staticmethod
+    def menu_item(text, tip, pop, callback):
+        b = Gtk.Button(label=text, tooltip_text=tip, has_frame=False)
+        b.get_child().set_xalign(0)
+        b.set_cursor_from_name('pointer')
+        b.connect('clicked', lambda _b: (pop.popdown(), callback()))
+        return b
+
+    def pick_project(self, *_args):
+        dialog = Gtk.FileDialog(title=T('gui.analyze_pick'), modal=True)
+        dialog.select_folder(self, None, self.on_project)
+
+    def on_project(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result)
+        except GLib.Error:
+            return  # closed without choosing
+        if folder and folder.get_path():
+            self.start('analyze', folder.get_path())
 
     def module_row(self, m):
         row = Gtk.Box(spacing=12, margin_top=8, margin_bottom=8, margin_start=10, margin_end=10)

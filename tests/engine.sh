@@ -445,14 +445,14 @@ menu_items() {
 }
 items="$(menu_items "$NBKIT_DIR/nbkit.sh")"
 contains "by subject: the modules, nbkit itself, development, quit" "$items" \
-  "Reinstall|Uninstall|Backups|Put nbkit on the system|Run the tests|Build the modules|Quit"
+  "Reinstall|Uninstall|Analyze a JSF project|Backups|Put nbkit on the system|Run the tests|Build the modules|JSF debug: off|Show the JSF debug lines|Quit"
 # below the menu, what the chosen option does (the tooltips of the interface): ↓ moves to the next one
 out="$(printf '\033[B\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh'" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
 contains "below the menu, what the chosen option does" "$out" "Installs the same version again"
 contains "and it follows the cursor" "$out" "Removes modules and gives NetBeans back"
 HOME="$H" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null >/dev/null 2>&1
 contains "once nbkit is on the system, updating and taking it out take its place" "$(menu_items "$NBKIT_DIR/nbkit.sh")" \
-  "Reinstall|Uninstall|Backups|Update nbkit|Take nbkit out of the system|Run the tests|Build the modules|Quit"
+  "Reinstall|Uninstall|Analyze a JSF project|Backups|Update nbkit|Take nbkit out of the system|Run the tests|Build the modules|JSF debug: off|Show the JSF debug lines|Quit"
 HOME="$H" bash "$NBKIT_DIR/nbkit.sh" uninstall-self </dev/null >/dev/null 2>&1
 
 echo "nbkit on the system (install-self)"
@@ -537,5 +537,55 @@ done
 out="$(HOME="$H" bash "$NBKIT_DIR/nbkit.sh" check "$H/.netbeans/31" </dev/null 2>&1)"
 contains "a userdir given through the link keeps its ~ path" "$out" "userdir  ~/.netbeans/31"
 pkill -P "$fake" 2>/dev/null; kill "$fake" 2>/dev/null; wait "$fake" 2>/dev/null
+
+echo "JSF debug"
+new_home "$H"
+nbkit debug jsf on >/dev/null
+check "debug jsf on creates the file the module looks for" test -e "$H/.cache/nbkit/jsf-debug"
+contains "status --json says the debug is on" "$(nbkit status --json)" '"jsf_debug":true'
+contains "debug jsf alone says the state" "$(nbkit --lang en debug jsf)" "JSF debug: on"
+out="$(nbkit --lang en debug jsf log "$U")"; rc=$?
+check "debug jsf log with no debug lines in the log exits with 0" test "$rc" = 0
+contains "and says there are none" "$out" "No JSF debug lines."
+echo 'INFO [nbkit.jsf]: nbkit JSF debug: page.xhtml: follows the document' >> "$U/var/log/messages.log"
+out="$(nbkit --lang en debug jsf log)"
+contains "debug jsf log shows the debug lines of the log" "$out" "nbkit JSF debug: page.xhtml: follows the document"
+contains "and says which log they come from" "$out" ".netbeans/31/var/log/messages.log"
+lacks "and only those lines" "$out" "Java Home"
+nbkit debug jsf off >/dev/null
+check "debug jsf off removes the file" test ! -e "$H/.cache/nbkit/jsf-debug"
+contains "status --json says the debug is off" "$(nbkit status --json)" '"jsf_debug":false'
+contains "the log reminds that the debug is off" "$(nbkit --lang en debug jsf log)" "The JSF debug is off"
+echo "Analyze: the projects open in NetBeans"
+P="$H/projects"
+mkdir -p "$P/web app/src/main/webapp" "$P/parent" "$P/web app/src/main/java" "$P/mono/site-ui/src/main/webapp" "$P/mono/lib"
+: > "$P/web app/src/main/webapp/index.xhtml"
+: > "$P/mono/site-ui/src/main/webapp/index.xhtml"
+printf '<project><parent><artifactId>p</artifactId></parent><artifactId>web-app</artifactId><name>Web App</name></project>' > "$P/web app/pom.xml"
+printf '<project><artifactId>mono</artifactId></project>' > "$P/mono/pom.xml"
+printf '<project><artifactId>site-ui</artifactId></project>' > "$P/mono/site-ui/pom.xml"
+printf '<project><artifactId>lib</artifactId></project>' > "$P/mono/lib/pom.xml"
+# not open in NetBeans, but in the same folder as the open ones
+mkdir -p "$P/closed one/src/main/webapp" && : > "$P/closed one/src/main/webapp/a.xhtml"
+mkdir -p "$U/config/Preferences/org/netbeans/modules"
+printf 'openProjectsURLs.1=file:%s/\nopenProjectsURLs.0=file:%s/\nopenProjectsURLs.2=file:%s/gone/\nopenProjectsURLs.3=file:%s/\n' \
+  "$P/parent" "$P/web%20app" "$P" "$P/mono" > "$U/config/Preferences/org/netbeans/modules/projectui.properties"
+contains "status --json lists the JSF projects (pages in them or in modules): the open ones first, then the others beside them, with the name NetBeans shows" \
+  "$(nbkit status --json)" "\"jsf_projects\":[{\"path\":\"$P/web app\",\"name\":\"Web App\"},{\"path\":\"$P/mono\",\"name\":\"mono\"},{\"path\":\"$P/closed one\",\"name\":\"closed one\"}]"
+
+# the list in the menu of the terminal: each project on one line, even in a narrow terminal
+L="$P/a folder with a very long name/that goes on and on/web"
+mkdir -p "$L/src/main/webapp" && : > "$L/src/main/webapp/i.xhtml"
+printf 'openProjectsURLs.0=file:%s/\n' "${L// /%20}" > "$U/config/Preferences/org/netbeans/modules/projectui.properties"
+nbkit install >/dev/null
+out="$(printf '\033[B\033[B\r\033\033' | HOME="$H" timeout 30 script -qec "stty cols 60; bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 \
+  | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+contains "the menu lists the JSF projects to analyze" "$out" "Other folder..."
+contains "a long path is cut at the start, so the line fits" "$out" "… with a very long name/that goes on and on/web"
+check "no line of the list is wider than the terminal" python3 -c 'import sys; sys.exit(any(len(l) > 60 for l in sys.argv[1].splitlines() if l.lstrip(" >").startswith("web ")))' "$out"
+
+out="$(nbkit --lang en debug jsf maybe)"; rc=$?
+check "an unknown debug option fails" test "$rc" = 1
+contains "and shows how to use it" "$out" "Usage: nbkit debug jsf on|off|log [userdir]"
 
 finish

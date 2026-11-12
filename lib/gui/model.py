@@ -97,7 +97,8 @@ def actions(m):
 TIP_KEYS = {'install': 'gui.tip_install', 'update': 'gui.tip_update', 'reinstall': 'gui.tip_reinstall',
             'uninstall': 'gui.tip_uninstall', 'install-all': 'gui.tip_install_all', 'reinstall-all': 'gui.tip_reinstall_all',
             'uninstall-all': 'gui.tip_uninstall_all', 'backups': 'gui.tip_backups', 'check': 'gui.tip_check',
-            'test': 'gui.tip_test', 'build': 'gui.tip_build', 'restore': 'gui.tip_restore', 'delete': 'gui.tip_delete'}
+            'test': 'gui.tip_test', 'build': 'gui.tip_build', 'restore': 'gui.tip_restore', 'delete': 'gui.tip_delete',
+            'analyze': 'gui.tip_analyze', 'debug': 'gui.tip_debug', 'debug-log': 'gui.tip_debug_log'}
 BULK_KEYS = {'install': 'gui.install_all', 'reinstall': 'gui.reinstall_all', 'uninstall': 'gui.uninstall_all'}
 
 
@@ -122,6 +123,11 @@ def bulk(st):
 def command(action, userdir=None, target=None):
     """argv of nbkit.sh for an action; target is the module id (or a list of them) or the backup file"""
     verb = {'update': 'install', 'reinstall': 'install'}.get(action, action)
+    # analyze jsf <project folder>, debug jsf on|off, debug jsf log <userdir>
+    if verb == 'analyze':
+        return ['bash', NBKIT, 'analyze', 'jsf', target]
+    if verb in ('debug', 'debug-log'):
+        return ['bash', NBKIT, 'debug', 'jsf'] + ([target] if verb == 'debug' else ['log'] + ([userdir] if userdir else []))
     argv = ['bash', NBKIT, verb]
     if isinstance(target, list):
         argv += target

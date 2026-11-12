@@ -57,7 +57,7 @@ export PYTHONPATH="$NBKIT_DIR/lib${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYT
 
 usage() {
   local ids; ids="$(printf '%s ' "${MODS[@]}")"
-  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
+  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
 }
 
 # ---------- the parts of the CLI (lib/) ----------
@@ -73,6 +73,8 @@ source "$NBKIT_DIR/lib/backups.sh"
 source "$NBKIT_DIR/lib/status.sh"
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/selfinstall.sh"
+# shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/analyze.sh"
 
 # ---------- loads the modules (themes first) ----------
 [ -d "$NBKIT_DIR/modules" ] && [ -d "$NBKIT_DIR/lib" ] || die "$(t cli.no_modules_dir "$ME")"
@@ -83,6 +85,15 @@ source "$NBKIT_DIR/lib/tools.sh"      # every folder in modules/tools/
 [ ${#MODS[@]} -gt 0 ] || die "$(t cli.no_modules "$NBKIT_DIR/modules")"
 
 # ---------- arguments ----------
+# analyze jsf <project> and debug jsf on|off|log [userdir]: their own arguments (a folder here is not a userdir)
+case "${1:-}" in
+  analyze)
+    [ "${2:-}" = jsf ] && [ $# -le 3 ] || die "$(t cli.analyze_usage)"
+    header; jsf_analyze "${3:-}"; exit $? ;;
+  debug)
+    [ "${2:-}" = jsf ] && [ $# -le 4 ] || die "$(t cli.debug_usage)"
+    jsf_debug "${3:-}" "${4:-}"; exit 0 ;;
+esac
 ACTION=""; UD=""; SEL=(); JSON=0; BKF=""
 for a in "$@"; do
   case "$a" in
@@ -385,6 +396,7 @@ if [ $MENU = 1 ]; then
     if [ ${#current[@]} -gt 0 ]; then opts+=("$(t cli.menu_reinstall)"); acts+=(reinstall); fi
     if [ ${#installed[@]} -gt 0 ]; then opts+=("$(t cli.menu_uninstall)"); acts+=(uninstall); fi
     if can_check; then opts+=("$(t cli.menu_check)"); acts+=(check); fi
+    opts+=("$(t cli.menu_analyze)"); acts+=(analyze)
     nbk="$(all_backups | wc -l)"
     if [ "$nbk" -gt 0 ]; then opts+=("$(t cli.menu_backups "$nbk")"); acts+=(backups); fi
     if self_installed; then
@@ -397,6 +409,9 @@ if [ $MENU = 1 ]; then
     if [ -f "$NBKIT_DIR/tests/run.sh" ]; then
       opts+=("$(t cli.menu_test)"); acts+=(test)
       opts+=("$(t cli.menu_build)"); acts+=(build)
+      if jsf_debug_on; then st="${G}$(jsf_debug_state)${N}"; else st="${D}$(jsf_debug_state)${N}"; fi
+      opts+=("$(t cli.menu_debug "$st")"); acts+=(debug)
+      opts+=("$(t cli.menu_debug_log)"); acts+=(debug-log)
     fi
     opts+=("$(t cli.menu_quit)"); acts+=(quit)
     # what each option does, below the menu (the same texts as the tooltips of the interface, where they fit)
@@ -428,6 +443,40 @@ if [ $MENU = 1 ]; then
         exit 0 ;;
       build) echo; echo; exec bash "$NBKIT_DIR/src/build.sh" ;;
       check) echo; echo; do_check ;;
+      analyze)
+        # the projects open in NetBeans first, then any folder (typed, Tab completes)
+        mapfile -t projs < <(jsf_projects)
+        dir=""
+        if [ ${#projs[@]} -gt 0 ]; then
+          back
+          labels=()
+          # name and path in one line of the terminal: a wrapped line would break the redrawing of the menu
+          cols=$(tput cols 2>/dev/null || echo 80)
+          for p in "${projs[@]}"; do
+            name="${p#*$'\t'}"; path="${p%%$'\t'*}"; path="${path/#$HOME/\~}"; room=$(( cols - 10 - ${#name} ))
+            if [ ${#path} -gt $room ]; then
+              if [ $room -ge 12 ]; then path="…${path: -$(( room - 1 ))}"; else path=""; fi
+            fi
+            labels+=("${name:0:$(( cols - 7 ))}   ${D}${path}${N}")
+          done
+          labels+=("$(t cli.analyze_other)")
+          echo "  ${B}$(t cli.menu_analyze)${N}"
+          MENU_START=0 MENU_HINT="$(t cli.submenu_hint)" menu "${labels[@]}"
+          if [ "$MENU_IDX" -lt 0 ]; then printf '\e[%dA\r\e[J' "$(( ${#labels[@]} + 1 ))"; continue; fi
+          [ "$MENU_IDX" -lt ${#projs[@]} ] && dir="${projs[$MENU_IDX]%%$'\t'*}"
+        fi
+        echo; echo
+        if [ -z "$dir" ]; then
+          read -r -e -p "  $(t cli.analyze_ask): " -i "$PWD/" dir || { echo; exit 0; }
+          echo
+          dir="${dir/#\~/$HOME}"
+        fi
+        rc=0; jsf_analyze "$dir" || rc=$?
+        exit $rc ;;
+      debug)
+        if jsf_debug_on; then jsf_debug off >/dev/null; else jsf_debug on >/dev/null; fi
+        back; continue ;;
+      debug-log) echo; echo; jsf_debug log; exit 0 ;;
       backups)
         browse_backups
         if [ -n "$RESTORE_BK" ]; then echo; echo; do_restore "$RESTORE_ID" "$RESTORE_BK"; fi

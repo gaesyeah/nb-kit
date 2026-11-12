@@ -33,8 +33,8 @@ json_bool() { if "$@"; then echo true; else echo false; fi; }
 status_json() {
   local d id s inst sep="" f first
   # self_installed: nbkit is on the system (install-self); self_running: and this is that copy
-  printf '{"version":%s,"lang":%s,"clone":%s,"self_installed":%s,"self_running":%s,"userdirs":[' "$(json_str "$NBKIT_VERSION")" \
-    "$(json_str "$NBKIT_LANG")" "$(json_bool test -f "$NBKIT_DIR/tests/run.sh")" "$(json_bool self_installed)" \
+  printf '{"version":%s,"lang":%s,"clone":%s,"jsf_debug":%s,"self_installed":%s,"self_running":%s,"userdirs":[' "$(json_str "$NBKIT_VERSION")" \
+    "$(json_str "$NBKIT_LANG")" "$(json_bool test -f "$NBKIT_DIR/tests/run.sh")" "$(json_bool jsf_debug_on)" "$(json_bool self_installed)" \
     "$(json_bool test "$NBKIT_DIR" = "$(readlink -f "$SELF_DEST")")"
   for d in ${UDS[@]+"${UDS[@]}"}; do
     printf '%s{"path":%s,"name":%s,"has_nbkit":%s}' "$sep" "$(json_str "$d")" "$(json_str "NetBeans ${d##*/}")" \
@@ -42,7 +42,12 @@ status_json() {
     sep=,
   done
   if [ -z "$UD" ]; then printf '],"userdir":null,"modules":[],"backups":[]}\n'; return 0; fi
-  printf '],"userdir":%s,"netbeans_running":%s,"can_check":%s,"modules":[' "$(json_str "$UD")" "$(json_bool nb_running)" "$(json_bool can_check)"
+  printf '],"userdir":%s,"netbeans_running":%s,"can_check":%s,"jsf_projects":[' "$(json_str "$UD")" "$(json_bool nb_running)" "$(json_bool can_check)"
+  sep=""
+  while IFS=$'\t' read -r f first; do
+    printf '%s{"path":%s,"name":%s}' "$sep" "$(json_str "$f")" "$(json_str "$first")"; sep=,
+  done < <(jsf_projects)
+  printf '],"modules":['
   sep=""
   for id in "${MODS[@]}"; do
     s="$(mod_status "$id")"

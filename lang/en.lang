@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Error:
-cli.usage=nbkit v%s: modules for NetBeans\n\nUsage:\n  bash %s                                  menu: shows the status and what can be done (without a terminal: only the status)\n  bash %s gui                              graphical interface\n  bash %s install-self                     installs nbkit for you: the nbkit command and the menu entry\n  bash %s uninstall-self                   takes that out (the modules stay in NetBeans)\n  bash %s update-self                      updates that copy to the latest release\n  bash %s install [module...] [userdir]    installs or updates (no module: all)\n  bash %s uninstall [module...] [userdir]  removes (no module: all installed)\n  bash %s check [userdir]                  after opening NetBeans: checks that everything loaded\n  bash %s status [--json] [userdir]        what is installed (--json: for programs)\n  bash %s restore <backup>                 goes back to a backup\n  bash %s delete-backup <backup>           deletes a backup\n  bash %s test                             runs the tests (only in the repository)\n  bash %s build                            builds the modules of src/ (src/build.sh --help)\n  bash %s --help                           this help\n\nModules: %s\nLanguage: --lang pt-BR or --lang en (without it, the system one)\nIf the NetBeans installation is not found: NB_HOME=/path/to/netbeans bash %s\n
+cli.usage=nbkit v%s: modules for NetBeans\n\nUsage:\n  bash %s                                  menu: shows the status and what can be done (without a terminal: only the status)\n  bash %s gui                              graphical interface\n  bash %s install-self                     installs nbkit for you: the nbkit command and the menu entry\n  bash %s uninstall-self                   takes that out (the modules stay in NetBeans)\n  bash %s update-self                      updates that copy to the latest release\n  bash %s install [module...] [userdir]    installs or updates (no module: all)\n  bash %s uninstall [module...] [userdir]  removes (no module: all installed)\n  bash %s check [userdir]                  after opening NetBeans: checks that everything loaded\n  bash %s analyze jsf <project>            runs the JSF checks on every xhtml of a project, without NetBeans\n  bash %s debug jsf on|off|log [userdir]   debug of the JSF checks in NetBeans: turn on, off, see its lines\n  bash %s status [--json] [userdir]        what is installed (--json: for programs)\n  bash %s restore <backup>                 goes back to a backup\n  bash %s delete-backup <backup>           deletes a backup\n  bash %s test                             runs the tests (only in the repository)\n  bash %s build                            builds the modules of src/ (src/build.sh --help)\n  bash %s --help                           this help\n\nModules: %s\nLanguage: --lang pt-BR or --lang en (without it, the system one)\nIf the NetBeans installation is not found: NB_HOME=/path/to/netbeans bash %s\n
 cli.theme_label=Theme %s
 cli.no_modules_dir=modules/ folder not found next to %s. Download the whole nbkit folder.
 cli.no_modules=no module in %s.
@@ -91,6 +91,28 @@ cli.menu_backups=Backups (%s)
 cli.menu_uninstall=Uninstall
 cli.menu_test=Run the tests
 cli.menu_build=Build the modules
+cli.menu_analyze=Analyze a JSF project
+cli.analyze_other=Other folder...
+cli.analyze_modules=%s modules with JSF pages
+cli.analyze_skip=%s is not compiled (no target/classes): skipped. Compile it first (mvn compile).
+cli.analyze_ask=Project folder
+cli.analyze_usage=Usage: nbkit analyze jsf <project folder>
+cli.analyze_no_dir=Folder not found: %s
+cli.analyze_no_java=Java 17 or newer not found (JAVA_HOME, PATH, /usr/lib/jvm). Install a JDK or set JAVA_HOME.
+cli.analyze_no_classes=%s has a pom.xml but no target/classes: compile the project first (mvn compile). Without its classes nbkit does not know the beans and would mark them all.
+cli.analyze_maven=Reading the libraries of the project (mvn dependency:build-classpath)...
+cli.analyze_no_maven=Without the libraries of the project (%s): what needs their classes is not checked.
+cli.analyze_maven_missing=Maven (mvn) not found
+cli.analyze_maven_failed=mvn dependency:build-classpath failed
+cli.menu_debug=JSF debug: %s
+cli.menu_debug_log=Show the JSF debug lines
+cli.debug_state_on=on
+cli.debug_state_off=off
+cli.debug_on=JSF debug on: each step of the checks in NetBeans goes to its log (messages.log); no restart needed. To see it: nbkit debug jsf log
+cli.debug_off=JSF debug off.
+cli.debug_off_now=The JSF debug is off: new lines only come after turning it on (nbkit debug jsf on).
+cli.debug_log_none=No JSF debug lines.
+cli.debug_usage=Usage: nbkit debug jsf on|off|log [userdir]
 cli.need_backup=%s needs the backup file (see: status --json)
 cli.not_a_backup=%s is not a backup of any module of this userdir
 cli.gui_missing=The graphical interface needs PyGObject, GTK 4 and VTE for GTK 4.
@@ -326,6 +348,13 @@ gui.tip_backups=NetBeans states kept before installing: restore or delete each o
 gui.tip_check=With NetBeans open after installing: checks in its log that each module loaded and that the theme is selected
 gui.tip_test=Runs the automatic tests of nbkit. For those who change the code of nbkit
 gui.tip_build=Builds again the NetBeans modules nbkit installs (the .jar files) from the Java code in src/. Only needed after changing that code
+gui.analyze=Analyze JSF project...
+gui.analyze_pick=Folder of the JSF project
+gui.debug=JSF debug
+gui.debug_log=See lines
+gui.tip_analyze=Runs the JSF checks on every xhtml of a project folder, without NetBeans, and lists each error, warning and note with what the lightbulb offers. The project must be compiled (target/classes)
+gui.tip_debug=Turns the JSF debug on or off, no restart needed. While on, the JSF module writes each step of its checks in the NetBeans log (messages.log): for when a warning does not show up or does not go away. Then see them with the button beside it
+gui.tip_debug_log=Shows the latest JSF debug lines of the NetBeans log of this userdir. With the debug on, the steps as they happen; with it off, the lines left from when it was on, until NetBeans restarts and starts a new log
 gui.tip_restore=Brings NetBeans back to how it was when this backup was made
 gui.tip_delete=Deletes this backup file
 gui.refresh=Refresh

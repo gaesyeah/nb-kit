@@ -71,6 +71,41 @@ for fx in fixture fixture-resolver; do
   done
 done
 
+# nbkit analyze jsf <project>: the same checks without NetBeans, on a compiled copy of the sample project
+quiet "$JAR" cf "$W/nbkit-jsf.jar" -C "$W/nbkit" .
+cp -r "$J/test/fixture" "$W/proj"
+mkdir -p "$W/proj/target" && cp -r "$W/app" "$W/proj/target/classes"
+# no Maven here (NBKIT_MVN=false): the libraries go in by hand, as Maven would give them
+analyze() { NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false bash "$NBKIT_DIR/nbkit.sh" --lang en analyze jsf "$@" </dev/null 2>&1; }
+out="$(analyze "$W/proj")"; rc=$?
+check "analyze exits with 0 when it ran" test "$rc" = 0
+contains "analyze lists a problem by file, line and column" "$out" "src/main/webapp/pages/orders.xhtml"
+contains "analyze gives the message and the rule" "$out" "Property 'numbr' does not exist in OrderPagination. Did you mean 'number'?  [el.member]"
+contains "analyze says what Replace with writes" "$out" "Replace with number"
+contains "analyze says where Go to goes" "$out" "Go to src/main/java/app/OrderPagination.java:4"
+contains "analyze says Maven was not used" "$out" "Without the libraries of the project"
+contains "analyze ends with a summary" "$out" "xhtml files,"
+rm -rf "$W/proj/target"
+out="$(analyze "$W/proj")"; rc=$?
+check "analyze refuses a Maven project not compiled" test "$rc" = 1
+contains "and says to compile it" "$out" "compile the project first (mvn compile)"
+out="$(analyze "$W/nowhere")"; rc=$?
+check "analyze refuses a folder that does not exist" test "$rc" = 1
+# a monorepo: a parent with no pages of its own, a module with them and one not compiled
+mkdir -p "$W/mono/lib" && printf '<project/>' > "$W/mono/pom.xml" && printf '<project/>' > "$W/mono/lib/pom.xml"
+cp -r "$J/test/fixture" "$W/mono/site" && mkdir -p "$W/mono/site/target" && cp -r "$W/app" "$W/mono/site/target/classes"
+cp -r "$J/test/fixture" "$W/mono/admin"
+out="$(analyze "$W/mono")"; rc=$?
+contains "a parent is analyzed module by module, only those with JSF pages" "$out" "2 modules with JSF pages"
+contains "each module under its name" "$out" "site"
+contains "with its own problems" "$out" "Property 'numbr' does not exist in OrderPagination"
+contains "a module not compiled is left out, saying so" "$out" "admin is not compiled (no target/classes): skipped"
+check "and then the exit code says something was left out" test "$rc" = 1
+mkdir -p "$W/empty"
+out="$(analyze "$W/empty")"; rc=$?
+check "analyze exits with 2 when there is no xhtml" test "$rc" = 2
+contains "and says where it looked" "$out" "No xhtml file in the web folders"
+
 # NetBeans' JSF support (what colors EL): turned on once by the module, then only asked about (see JsfSupportMark)
 compile -d "$W/mark" "$J/src/nbkit/jsf/nb/JsfSupportMark.java" "$J/test/RunJsfSupportMark.java"
 out="$("$JAVA" -cp "$W/mark" RunJsfSupportMark 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"

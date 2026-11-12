@@ -32,7 +32,8 @@ import org.openide.util.RequestProcessor;
 
 /**
  * Follows an open xhtml file: analyzes on open, on edit and when other project files change. To see what it does,
- * create the file ~/.cache/nbkit/jsf-debug: while it exists, each step goes to messages.log ("nbkit JSF debug").
+ * nbkit debug jsf on (lib/analyze.sh) creates ~/.cache/nbkit/jsf-debug: while it exists, each step goes to
+ * messages.log ("nbkit JSF debug"), and nbkit debug jsf log shows those lines.
  */
 final class Watcher implements DocumentListener {
 

@@ -120,6 +120,12 @@ class Commands(unittest.TestCase):
         self.assertEqual(model.command('restore', '/u', '/u/b.tar.gz'), n + ['restore', '/u/b.tar.gz', '/u'])
         self.assertEqual(model.command('test', '/u'), n + ['test'])
         self.assertEqual(model.command('build', '/u'), n + ['build'])
+        # JSF tools: a project folder is not a userdir; the debug log is the one of the chosen userdir
+        self.assertEqual(model.command('analyze', '/u', '/p'), n + ['analyze', 'jsf', '/p'])
+        self.assertEqual(model.command('debug', '/u', 'on'), n + ['debug', 'jsf', 'on'])
+        self.assertEqual(model.command('debug', '/u', 'off'), n + ['debug', 'jsf', 'off'])
+        self.assertEqual(model.command('debug-log', '/u'), n + ['debug', 'jsf', 'log', '/u'])
+        self.assertEqual(model.command('debug-log', None), n + ['debug', 'jsf', 'log'])
 
     def test_env_of_an_action(self):
         env = model.child_env('/tmp/e')
