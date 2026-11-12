@@ -23,6 +23,8 @@ public final class El {
         public boolean whole;        // the expression takes the whole value (no text around it)
         public List<Tok> toks;
         public List<Ref> refs;
+        /** string literals with a chain after them: 'abc'.concat(x) (their root is a String) */
+        public List<Ref> literals;
         public List<Lambda> lambdas;
 
         public int off(int i) {
@@ -63,6 +65,10 @@ public final class El {
         public int tokIndex, tokEnd;
         /** inside the arguments or brackets of another reference: bean.m(this) or list[this] */
         public boolean nested;
+        /** a literal ('abc'.concat(x), [1, 2].stream(), {1, 2}.size()): name is how it reads */
+        public boolean literal;
+        /** the class of a collection literal: java/util/List, java/util/Set or java/util/Map (null for a string) */
+        public String literalType;
     }
 
     public static final class Lambda {
@@ -208,6 +214,7 @@ public final class El {
         List<Tok> ts = lex(e.text);
         e.toks = ts;
         e.refs = new ArrayList<>();
+        e.literals = new ArrayList<>();
         e.lambdas = new ArrayList<>();
         // lambda parameters: x -> ...  and  (x, y) -> ...
         List<int[]> lambdaScopes = new ArrayList<>(); // [start, end, lambda index]
@@ -305,8 +312,68 @@ public final class El {
             r.a = t.a;
             r.b = t.b;
             r.tokIndex = i;
-            int j = i + 1;
-            boolean pure = true;
+            int[] jp = readChain(ts, i + 1, last, r);
+            int j = jp[0];
+            boolean pure = jp[1] == 1;
+            if (op(ts, j, "=") && !op(ts, j + 1, "=")) {
+                r.assigned = true;
+            }
+            r.tokEnd = j;
+            r.pureLvalue = pure && i == 0 && j == last;
+            r.nested = i < outerEnd;
+            if (!r.nested) {
+                outerEnd = j;
+            }
+            e.refs.add(r);
+            // no jump over the chain: the names inside its arguments and brackets, bean.m(other) or list[other], are
+            // references too (the member names after "." are skipped above)
+        }
+        for (int i = 0; i + 2 < last; i++) {
+            if (ts.get(i).t == T.STR && (op(ts, i + 1, ".") || op(ts, i + 1, "?.")) && ts.get(i + 2).t == T.ID) {
+                Ref r = new Ref();
+                r.literal = true;
+                r.name = ts.get(i).s;
+                r.a = ts.get(i).a;
+                r.b = ts.get(i).b;
+                r.tokIndex = i;
+                r.tokEnd = readChain(ts, i + 1, last, r)[0];
+                e.literals.add(r);
+            }
+            // [1, 2] and {1, 2} / {'a': 1} where an expression starts (not list[0] nor a lambda body in braces)
+            boolean open = op(ts, i, "[") || op(ts, i, "{");
+            boolean starts = i == 0 || ts.get(i - 1).t == T.OP && !op(ts, i - 1, ")") && !op(ts, i - 1, "]") && !op(ts, i - 1, "->");
+            if (open && starts) {
+                String o = ts.get(i).s, c = o.equals("[") ? "]" : "}";
+                int close = matching(ts, i, o, c);
+                if (close > i && close + 2 < ts.size() && (op(ts, close + 1, ".") || op(ts, close + 1, "?.")) && ts.get(close + 2).t == T.ID) {
+                    Ref r = new Ref();
+                    r.literal = true;
+                    boolean map = false;
+                    for (int k = i + 1, depth = 0; k < close; k++) {
+                        if (op(ts, k, "(") || op(ts, k, "[") || op(ts, k, "{")) {
+                            depth++;
+                        } else if (op(ts, k, ")") || op(ts, k, "]") || op(ts, k, "}")) {
+                            depth--;
+                        } else if (depth == 0 && op(ts, k, ":")) {
+                            map = true;
+                        }
+                    }
+                    r.literalType = o.equals("[") ? "java/util/List" : map ? "java/util/Map" : "java/util/Set";
+                    r.name = o.equals("[") ? "[...]" : "{...}";
+                    r.a = ts.get(i).a;
+                    r.b = ts.get(close).b;
+                    r.tokIndex = i;
+                    r.tokEnd = readChain(ts, close + 1, last, r)[0];
+                    e.literals.add(r);
+                }
+            }
+        }
+    }
+
+    /** reads .name, .call(...) and [index] after a root into r.chain; returns {index after them, 1 if no call or index} */
+    static int[] readChain(List<Tok> ts, int j, int last, Ref r) {
+        boolean pure = true;
+        {
             while (j < last) {
                 if ((op(ts, j, ".") || op(ts, j, "?.")) && ts.get(j + 1).t == T.ID) {
                     Member m = new Member();
@@ -339,19 +406,8 @@ public final class El {
                     break;
                 }
             }
-            if (op(ts, j, "=") && !op(ts, j + 1, "=")) {
-                r.assigned = true;
-            }
-            r.tokEnd = j;
-            r.pureLvalue = pure && i == 0 && j == last;
-            r.nested = i < outerEnd;
-            if (!r.nested) {
-                outerEnd = j;
-            }
-            e.refs.add(r);
-            // no jump over the chain: the names inside its arguments and brackets, bean.m(other) or list[other], are
-            // references too (the member names after "." are skipped above)
         }
+        return new int[]{j, pure ? 1 : 0};
     }
 
     private static int matching(List<Tok> ts, int i, String open, String close) {

@@ -581,8 +581,11 @@ nbkit install >/dev/null
 out="$(printf '\033[B\033[B\r\033\033' | HOME="$H" timeout 30 script -qec "stty cols 60; bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 \
   | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
 contains "the menu lists the JSF projects to analyze" "$out" "Other folder..."
+
 contains "a long path is cut at the start, so the line fits" "$out" "… with a very long name/that goes on and on/web"
 check "no line of the list is wider than the terminal" python3 -c 'import sys; sys.exit(any(len(l) > 60 for l in sys.argv[1].splitlines() if l.lstrip(" >").startswith("web ")))' "$out"
+asked="$(printf '\033[B\033[B\r\r' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain how each name of the EL of one file was resolved? [y/N]"
 
 out="$(nbkit --lang en debug jsf maybe)"; rc=$?
 check "an unknown debug option fails" test "$rc" = 1

@@ -135,6 +135,14 @@ def actions(w):
     items = by_name['analyze'].get_popover().get_child()
     check('it offers the projects open in NetBeans, then any other folder',
           items.get_last_child().get_label() == app.T('cli.analyze_other'))
+    started, real_start = [], w.start
+    w.start = lambda *a: started.append(a)
+    w.ask_explain('/p')
+    d = w.explain_dialog
+    check('choosing a project asks: with or without the explanation of a file', d.get_visible())
+    d.get_default_widget().emit('clicked')
+    check('without (the default) analyzes the project', started == [('analyze', '/p')], started)
+    w.start = real_start
     debug, first = by_name['debug'], w.dev.get_first_child()
     check('development: tests and build on top, a line, then the JSF debug (no title of its own)',
           by_name['test'].get_parent() is first and by_name['build'].get_parent() is first

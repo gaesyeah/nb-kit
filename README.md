@@ -72,6 +72,7 @@ Installs nbkit for your user, with no root and the same on any distro: a copy in
 | `bash nbkit.sh uninstall [module...] [userdir]` | Removes (no module: all installed) |
 | `bash nbkit.sh check [userdir]` | With NetBeans open, checks that everything loaded |
 | `bash nbkit.sh analyze jsf <project>` | Runs the JSF checks on every xhtml of a project, without NetBeans (see "Troubleshooting") |
+| `bash nbkit.sh analyze jsf <project> --explain <file>` | Only that file, also saying how each name of its EL was resolved: the type at each step, and where and why the checking stopped |
 | `bash nbkit.sh debug jsf on\|off\|log [userdir]` | Debug of the JSF checks inside NetBeans (see "Troubleshooting") |
 | `bash nbkit.sh gui [userdir]` | Opens the graphical interface, and adds nbkit to the applications menu (with its icon in the taskbar) |
 | `bash nbkit.sh install-self` | Installs nbkit for your user: the `nbkit` command and the menu entry (see above) |

@@ -61,6 +61,7 @@ public final class Analyzer {
     final File file;
     final Predicate<String> on;
     final List<Problem> out = new ArrayList<>();
+    List<Explained> explain;
     FileFacts ff;
     Xml.Doc doc;
     Graph g;
@@ -72,7 +73,25 @@ public final class Analyzer {
     }
 
     public static List<Problem> run(Workspace ws, File file, String text, Predicate<String> on) {
+        return run(ws, file, text, on, null);
+    }
+
+    /** one EL reference and how it was resolved, for "nbkit analyze jsf --explain" */
+    public static final class Explained {
+        public final int offset;
+        public final String expr, steps;
+
+        Explained(int offset, String expr, String steps) {
+            this.offset = offset;
+            this.expr = expr;
+            this.steps = steps;
+        }
+    }
+
+    /** run, also writing into explain (when not null) how each name with a chain was resolved */
+    public static List<Problem> run(Workspace ws, File file, String text, Predicate<String> on, List<Explained> explain) {
         Analyzer a = new Analyzer(ws, file, on);
+        a.explain = explain;
         ws.override(a.file, text);
         try {
             a.go();
@@ -675,6 +694,9 @@ public final class Analyzer {
                     }
                 }
             }
+            for (El.Ref r : s.x.literals) {
+                types(s, r);
+            }
             for (El.Ref r : s.x.refs) {
                 if (r.assigned) {
                     continue;
@@ -807,7 +829,9 @@ public final class Analyzer {
             }
             ClassModel.ClassInfo ci = ws.classes.get(c);
             if (ci != null && member != null) {
-                todo.add(ci.superName);
+                if (ci.superName != null) {
+                    todo.add(ci.superName); // java/lang/Object has none (reached from 'abc'.concatt())
+                }
                 todo.addAll(ci.interfaces);
             }
         }
@@ -962,14 +986,39 @@ public final class Analyzer {
     /** walks the chain; returns the final type (or null). Reports missing members. */
     String walk(Site s, El.Ref r, int upto, boolean reportMissing) {
         lastGeneric = null;
-        int k0 = r.name.equals("cc") ? 2 : 0;
+        int k0 = chainStart(r);
         String generic = rootGeneric(s, r, new HashSet<>());
         String cur = ClassModel.erase(generic);
+        boolean stream = false; // after .stream(): EL's own Stream (and Optional), not java.util.stream
         boolean methodAttr = s.attr != null && METHOD_ATTRS.contains(s.attr.name) && isJsfLib(s.el) && s.x.whole && r.chain.size() > 0 && !r.nested;
         for (int k = k0; k < upto && k < r.chain.size(); k++) {
             El.Member m = r.chain.get(k);
+            // list[0] and array[i]: the item (a Map keeps its dynamic values)
+            if (m.name == null && !stream && generic != null && (generic.startsWith("[") || cur != null && ws.classes.isA(cur, "java/util/List"))) {
+                generic = ws.classes.elementGeneric(generic);
+                cur = ClassModel.erase(generic);
+                continue;
+            }
+            if (stream) {
+                if (!m.call || m.name == null) {
+                    return null;
+                }
+                if (!EL_STREAM.contains(m.name)) {
+                    if (reportMissing) {
+                        String hint = closest(m.name, EL_STREAM);
+                        report("el.member", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("el.member.method", m.name, "Stream (EL)") + Msg.hint(hint),
+                                List.of(), swap(s.x.off(m.a), s.x.off(m.b), m.name, hint));
+                    }
+                    return null;
+                }
+                continue;
+            }
             if (cur == null || m.name == null || !ws.classes.complete(cur) || dynamicType(cur)) {
                 return null;
+            }
+            if (m.call && m.name.equals("stream") && m.argCount == 0 && ws.classes.isA(cur, "java/lang/Iterable")) {
+                stream = true;
+                continue;
             }
             ClassModel.Members mm = ws.classes.members(cur);
             boolean last = k == r.chain.size() - 1;
@@ -1033,8 +1082,35 @@ public final class Analyzer {
             }
             return null;
         }
+        if (stream) {
+            return null; // what an EL stream gives is not followed
+        }
         lastGeneric = generic;
         return cur;
+    }
+
+    /** the methods of EL's Stream (EL 3.0, chapter 2.3) and of the Optional some of them give */
+    static final Set<String> EL_STREAM = Set.of("filter", "map", "flatMap", "distinct", "sorted", "forEach", "peek", "iterator",
+            "limit", "substream", "toArray", "toList", "reduce", "max", "min", "average", "sum", "count", "anyMatch", "allMatch",
+            "noneMatch", "findFirst", "get", "ifPresent", "orElse", "orElseGet");
+
+    static final Set<String> SCOPES = Set.of("requestScope", "viewScope", "sessionScope", "applicationScope", "flowScope");
+
+    /** the implicit objects whose type is known, as JSF gives them (jakarta first, then javax) */
+    static final Map<String, List<String>> IMPLICIT_TYPES = Map.of(
+            "facesContext", List.of("jakarta/faces/context/FacesContext", "javax/faces/context/FacesContext"),
+            "view", List.of("jakarta/faces/component/UIViewRoot", "javax/faces/component/UIViewRoot"),
+            "component", List.of("jakarta/faces/component/UIComponent", "javax/faces/component/UIComponent"));
+
+    /** where the chain starts being checked: after cc.attrs.x, after sessionScope.bean, else at once */
+    int chainStart(El.Ref r) {
+        if (r.literal) {
+            return 0;
+        }
+        if (r.name.equals("cc")) {
+            return 2;
+        }
+        return SCOPES.contains(r.name) && !r.chain.isEmpty() && r.chain.get(0).name != null && beanType(r.chain.get(0).name) != null ? 1 : 0;
     }
 
     /** the class of a resolved type; a type variable nobody gave falls back to its bound (the erased descriptor) */
@@ -1073,6 +1149,110 @@ public final class Analyzer {
     }
 
     void types(Site s, El.Ref r) {
+        try {
+            check(s, r);
+        } finally {
+            if (explain != null) {
+                explain.add(new Explained(s.x.off(r.a), s.x.text, steps(s, r)));
+            }
+        }
+    }
+
+    /** "customerVM: CustomerVM → rows: Rows → ..." and where (and why) the checking stopped */
+    String steps(Site s, El.Ref r) {
+        StringBuilder b = new StringBuilder(r.literal && r.literalType == null ? "'" + r.name + "'" : r.name).append(": ");
+        Decl status = r.literal ? null : statusDecl(s, r);
+        if (status != null) {
+            return b.append(Msg.t("explain.status", tag(status.el), String.join(", ", new java.util.TreeSet<>(STATUS)))).toString();
+        }
+        if (!r.literal && r.name.equals("resource")) {
+            return b.append(Msg.t("explain.resource")).toString();
+        }
+        String prev = rootType(s, r, new HashSet<>());
+        b.append(prev == null ? Msg.t("explain.untyped") : ClassModel.display(prev));
+        for (int k = chainStart(r); k < r.chain.size() && prev != null; k++) {
+            El.Member m = r.chain.get(k);
+            b.append(" → ").append(m.name == null ? "[...]" : m.name + (m.call ? "()" : "")).append(": ");
+            if (m.name == null) {
+                return b.append(Msg.t("explain.index")).toString();
+            }
+            if (dynamicType(prev)) {
+                return b.append(Msg.t("explain.dynamic")).toString();
+            }
+            if (!ws.classes.complete(prev)) {
+                return b.append(Msg.t("explain.incomplete")).toString();
+            }
+            String t = walk(s, r, k + 1, false), owner = prev;
+            int at = s.x.off(m.a);
+            String impl = t != null || ws.classes.members(owner).getters.containsKey(m.name) || ws.classes.members(owner).methods.containsKey(m.name) ? null
+                    : ws.implementations(owner).stream().filter(i -> ws.classes.members(i).getters.containsKey(m.name)
+                    || ws.classes.members(i).methods.containsKey(m.name)).findFirst().orElse(null);
+            b.append(t != null ? ClassModel.display(t)
+                    : impl != null ? Msg.t("explain.impl", ClassModel.display(impl))
+                    : Msg.t(out.stream().anyMatch(p -> p.start == at) ? "explain.missing" : "explain.untyped"));
+            prev = t;
+        }
+        return b.toString();
+    }
+
+    /**
+     * the properties of a varStatus: Mojarra's and MyFaces' status of ui:repeat and JSTL's LoopTagStatus of c:forEach,
+     * all of them (no false error whichever the implementation)
+     */
+    static final Set<String> STATUS = Set.of("index", "count", "first", "last", "begin", "end", "step", "even", "odd", "current");
+
+    /** a variable of the page with this name, visible here (it hides an implicit object of the same name) */
+    boolean hasDecl(Site s, El.Ref r) {
+        String attrName = s.attr == null ? null : s.attr.name;
+        for (Decl d : decls) {
+            if (d.name.equals(r.name) && visible(d, s.el, attrName, s.x.off(r.a))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** the varStatus declaration a name refers to here, or null */
+    Decl statusDecl(Site s, El.Ref r) {
+        Decl found = null;
+        String attrName = s.attr == null ? null : s.attr.name;
+        for (Decl d : decls) {
+            if (d.name.equals(r.name) && visible(d, s.el, attrName, s.x.off(r.a)) && (found == null || d.el.start >= found.el.start)) {
+                found = d;
+            }
+        }
+        return found != null && found.kind.equals("varStatus") ? found : null;
+    }
+
+    void check(Site s, El.Ref r) {
+        Decl status = r.literal ? null : statusDecl(s, r);
+        if (status != null) {
+            El.Member m = r.chain.isEmpty() ? null : r.chain.get(0);
+            if (m != null && m.name != null && !m.call && !STATUS.contains(m.name)) {
+                String hint = closest(m.name, STATUS);
+                report("el.member", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("el.member.status", m.name, tag(status.el)) + Msg.hint(hint),
+                        List.of(), swap(s.x.off(m.a), s.x.off(m.b), m.name, hint));
+            }
+            return;
+        }
+        // #{resource['library:name']}: the implicit object of JSF's resources, not a bean (Mojarra hands it to CDI
+        // as @Named("resource") ResourceHandler, which has no such property): the file must exist, like an outputStylesheet
+        if (!r.literal && r.name.equals("resource") && !r.chain.isEmpty()) {
+            El.Member m = r.chain.get(0);
+            if (m.name != null && !m.call && !m.name.contains("{")) {
+                int colon = m.name.indexOf(':');
+                String lib = colon < 0 ? null : m.name.substring(0, colon), name = m.name.substring(colon + 1);
+                resourceNote(s.x.off(m.a), s.x.off(m.b), lib, name);
+                if (!ws.resourceExists(lib, name)) {
+                    String path = Workspace.resourcePath(lib, name), hint = closest(path, ws.resourceNames().keySet());
+                    // the suggestion written the way the page writes it: library:name or a plain path
+                    String to = hint == null ? null : lib == null || !hint.contains("/") ? hint : hint.replaceFirst("/", ":");
+                    report("res.missing", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("res.missing", path) + Msg.hint(hint),
+                            resourceTarget(hint), swap(s.x.off(m.a), s.x.off(m.b), m.name, to));
+                }
+            }
+            return;
+        }
         if (r.chain.isEmpty() || rootType(s, r, new HashSet<>()) == null) {
             return;
         }
@@ -1095,9 +1275,25 @@ public final class Analyzer {
 
     /** rootType with its type arguments (the item of a List<Frame<T>> is Frame<T>) */
     String rootGeneric(Site s, El.Ref r, Set<Xml.Element> guard) {
+        if (r.literal) {
+            // 'abc'.concat(x) is a String; [1, 2] a List, {1, 2} a Set and {'a': 1} a Map, as EL builds them
+            return "L" + (r.literalType == null ? "java/lang/String" : r.literalType) + ";";
+        }
         String bean = beanType(r.name);
         if (bean != null) {
             return "L" + bean + ";";
+        }
+        // sessionScope.customerVM: the bean
+        if (SCOPES.contains(r.name)) {
+            return chainStart(r) == 1 ? "L" + beanType(r.chain.get(0).name) + ";" : null;
+        }
+        if (IMPLICIT_TYPES.containsKey(r.name) && !hasDecl(s, r)) {
+            for (String t : IMPLICIT_TYPES.get(r.name)) {
+                if (ws.classes.get(t) != null) {
+                    return "L" + t + ";";
+                }
+            }
+            return null;
         }
         if (r.name.equals("cc")) {
             if (!ff.composite || r.chain.size() < 3 || !"attrs".equals(r.chain.get(0).name) || r.chain.get(1).name == null) {
@@ -1116,6 +1312,22 @@ public final class Analyzer {
             if (d.name.equals(r.name) && visible(d, s.el, attrName, s.x.off(r.a)) && (found == null || d.el.start >= found.el.start)) {
                 found = d;
             }
+        }
+        // ui:param name="vm" value="#{bean.viewManager}" and c:set: the type of the value, when the value is just one reference
+        if (found != null && (found.kind.equals("ui:param") || found.kind.equals("c:set")) && guard.add(found.el)) {
+            for (Site v : sites) {
+                if (v.el == found.el && v.attr != null && v.attr.name.equals("value") && v.x.whole && !v.x.refs.isEmpty()) {
+                    El.Ref src = v.x.refs.get(0);
+                    if (src.tokIndex != 0 || src.tokEnd != v.x.toks.size() - 1) {
+                        return null; // an operation or text around it: not that type
+                    }
+                    if (src.chain.isEmpty()) {
+                        return rootGeneric(v, src, guard);
+                    }
+                    return rootType(v, src, guard) == null || walk(v, src, src.chain.size(), false) == null ? null : lastGeneric;
+                }
+            }
+            return null;
         }
         if (found == null || !found.kind.equals("var") || !LOOPS.contains(tag(found.el)) || !guard.add(found.el)) {
             return null;
@@ -1405,7 +1617,7 @@ public final class Analyzer {
             }
             for (File c : candidates) {
                 if (c.isFile()) {
-                    r.add(new Object[]{c.getAbsoluteFile(), e});
+                    r.add(new Object[]{c.toPath().toAbsolutePath().normalize().toFile(), e});
                     break;
                 }
             }
@@ -1636,9 +1848,33 @@ public final class Analyzer {
         if (lib != null && Set.of("javax.faces", "jakarta.faces", "primefaces", "omnifaces", "primefaces-extensions").contains(lib)) {
             return;
         }
-        if (!ws.resourceExists(lib, nameAttr.value.trim())) {
-            report("res.missing", Severity.ERROR, nameAttr.offset(0), nameAttr.offset(nameAttr.value.length()), Msg.t("res.missing", (lib == null ? "" : lib + "/") + nameAttr.value.trim()));
+        String name = nameAttr.value.trim();
+        resourceNote(nameAttr.offset(0), nameAttr.offset(nameAttr.value.length()), lib, name);
+        if (!ws.resourceExists(lib, name)) {
+            String path = Workspace.resourcePath(lib, name), hint = closest(path, ws.resourceNames().keySet());
+            // name="..." holds only what comes after the library: Replace with only when the library stays the same
+            String to = hint == null ? null : lib == null ? hint : hint.startsWith(lib + "/") ? hint.substring(lib.length() + 1) : null;
+            report("res.missing", Severity.ERROR, nameAttr.offset(0), nameAttr.offset(nameAttr.value.length()), Msg.t("res.missing", path) + Msg.hint(hint),
+                    resourceTarget(hint), to == null ? null : swap(nameAttr.offset(0), nameAttr.offset(nameAttr.value.length()), name, to));
         }
+    }
+
+    /** the blue note of a resource of the project: which file it is, with Go to (a resource inside a jar has none) */
+    void resourceNote(int a, int b, String lib, String name) {
+        File f = ws.resourceFile(lib, name);
+        if (f == null) {
+            return;
+        }
+        File w = ws.webrootOf(f);
+        String place = (w == null ? f.getName() : w.getAbsoluteFile().toPath().relativize(f.toPath()).toString().replace('\\', '/'));
+        places.putIfAbsent(place, new Rules.Target(place, f, 1));
+        note(a, b, "origin.resource", Workspace.resourcePath(lib, name), List.of(place));
+    }
+
+    /** "Go to" the resource suggested by Did you mean */
+    List<Rules.Target> resourceTarget(String hint) {
+        File f = hint == null ? null : ws.resourceNames().get(hint);
+        return f == null ? List.of() : List.of(new Rules.Target("resources/" + hint, f, 1));
     }
 
     void navigation(Xml.Attr a) {

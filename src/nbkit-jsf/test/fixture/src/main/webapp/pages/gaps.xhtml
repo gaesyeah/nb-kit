@@ -1,0 +1,23 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:c="jakarta.tags.core" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <ui:param name="vm" value="#{orderMB.orderManager}"/>
+    <h:outputText value="#{vm.entityHolderCommand.entity.total}"/>
+    <h:outputText value="#{vm.entityHolderCommand.entity.totl}"/><!--E:el.member-->
+    <c:set var="first" value="#{customerVM.items}"/>
+    <h:outputText value="#{first.size()}"/>
+    <ui:param name="mixed" value="#{customerVM.title} x"/>
+    <h:outputText value="#{mixed.anything}"/>
+    <ui:repeat value="#{customerVM.items}" var="row" varStatus="st">
+      <h:outputText value="#{row.name} #{st.index + 1} #{st.first} #{st.last} #{st.even} #{st.odd} #{st.begin} #{st.end} #{st.step} #{st.current}"/>
+      <h:outputText value="#{st.indx}"/><!--E:el.member-->
+    </ui:repeat>
+    <c:forEach items="#{customerVM.items}" var="it" varStatus="loop">
+      <h:outputText value="#{it.name} #{loop.count}"/>
+      <h:outputText value="#{loop.cuont}"/><!--E:el.member-->
+    </c:forEach>
+    <h:outputText value="#{customerVM.title.concat('a')}"/>
+    <h:outputText value="#{'banner.0'.concat(1).concat('.path')}"/>
+    <h:outputText value="#{'banner.0'.concatt(1)}"/><!--E:el.member-->
+    <h:outputText value="#{'banner.0'.concat(1).toUpperCas()}"/><!--E:el.member-->
+  </ui:define>
+</ui:composition>

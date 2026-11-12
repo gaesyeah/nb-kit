@@ -1,0 +1,29 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <!-- what NetBeans' Identifiers rule catches right: nbkit must catch it too -->
+    <h:outputText value="#{facesContext.externalContext.requestContextPath}"/>
+    <h:outputText value="#{facesContext.externalContext.requestContextPat}"/><!--E:el.member-->
+    <h:outputText value="#{facesContext.externalContext.requestParameterMap['id']}"/>
+    <h:outputText value="#{sessionScope.customerVM.title}"/>
+    <h:outputText value="#{sessionScope.customerVM.titel}"/><!--E:el.member-->
+    <h:outputText value="#{sessionScope.anything.goes}"/>
+    <h:outputText value="#{customerVM.items[0].name}"/>
+    <h:outputText value="#{customerVM.items[0].nmae}"/><!--E:el.member-->
+    <h:outputText value="#{customerVM.array[1].nmae}"/><!--E:el.member-->
+    <h:outputText value="#{customerVM.map['x'].anything}"/>
+    <h:outputText value="#{customerVM.format('a')}"/>
+    <h:outputText value="#{customerVM.formatt('a')}"/><!--E:el.member-->
+    <!-- EL streams: methods of EL's own Stream, not java.util.stream.Stream -->
+    <h:outputText value="#{customerVM.items.stream().map(c -> c.name).toList()}"/>
+    <h:outputText value="#{customerVM.items.stream().map(c -> c.name).average().get()}"/>
+    <h:outputText value="#{customerVM.items.stream().substream(1).count()}"/>
+    <h:outputText value="#{customerVM.items.stream().filtr(c -> c.name != null)}"/><!--E:el.member-->
+    <!-- list, set and map literals: what NetBeans checks there (and more: [1, 2].size() is fine, NetBeans marks it) -->
+    <h:outputText value="#{[1, 2, 3].stream().filter(x -> x > 1).toList()}"/>
+    <h:outputText value="#{[1, 2].size()} #{{1, 2}.contains(1)} #{{'a': 1}.anything}"/>
+    <h:outputText value="#{[1, 2].stremm()}"/><!--E:el.member-->
+    <h:outputText value="#{[1, 2].stream().filtr(x -> x > 1)}"/><!--E:el.member-->
+    <h:outputText value="#{{1, 2}.containz(1)}"/><!--E:el.member-->
+    <h:outputText value="#{customerVM.items[0].name}"/>
+  </ui:define>
+</ui:composition>

@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Erro:
-cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                  menu: mostra o status e o que dá pra fazer (sem terminal: só o status)\n  bash %s gui                              interface gráfica\n  bash %s install-self                     instala o nbkit para você: o comando nbkit e o atalho no menu\n  bash %s uninstall-self                   tira isso (os módulos continuam no NetBeans)\n  bash %s update-self                      atualiza essa cópia para o release mais novo\n  bash %s install [módulo...] [userdir]    instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir]  remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                  depois de abrir o NetBeans: confere se tudo carregou\n  bash %s analyze jsf <projeto>            roda as verificações de JSF em todos os xhtml de um projeto, sem o NetBeans\n  bash %s debug jsf on|off|log [userdir]   debug das verificações de JSF no NetBeans: ligar, desligar, ver as linhas\n  bash %s status [--json] [userdir]        o que está instalado (--json: para programas)\n  bash %s restore <backup>                 volta para um backup\n  bash %s delete-backup <backup>           apaga um backup\n  bash %s test                             roda os testes (só no repositório)\n  bash %s build                            compila os módulos de src/ (src/build.sh --help)\n  bash %s --help                           esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
+cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                  menu: mostra o status e o que dá pra fazer (sem terminal: só o status)\n  bash %s gui                              interface gráfica\n  bash %s install-self                     instala o nbkit para você: o comando nbkit e o atalho no menu\n  bash %s uninstall-self                   tira isso (os módulos continuam no NetBeans)\n  bash %s update-self                      atualiza essa cópia para o release mais novo\n  bash %s install [módulo...] [userdir]    instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir]  remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                  depois de abrir o NetBeans: confere se tudo carregou\n  bash %s analyze jsf <projeto>            roda as verificações de JSF em todos os xhtml de um projeto, sem o NetBeans\n  bash %s analyze jsf [<projeto>] --explain <arquivo>   só esse arquivo, dizendo como cada nome do EL foi resolvido\n  bash %s debug jsf on|off|log [userdir]   debug das verificações de JSF no NetBeans: ligar, desligar, ver as linhas\n  bash %s status [--json] [userdir]        o que está instalado (--json: para programas)\n  bash %s restore <backup>                 volta para um backup\n  bash %s delete-backup <backup>           apaga um backup\n  bash %s test                             roda os testes (só no repositório)\n  bash %s build                            compila os módulos de src/ (src/build.sh --help)\n  bash %s --help                           esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
 cli.theme_label=Tema %s
 cli.no_modules_dir=pasta modules/ não encontrada ao lado de %s. Baixe a pasta nbkit inteira.
 cli.no_modules=nenhum módulo em %s.
@@ -95,8 +95,11 @@ cli.menu_analyze=Analisar um projeto JSF
 cli.analyze_other=Outra pasta...
 cli.analyze_modules=%s módulos com páginas JSF
 cli.analyze_skip=%s não está compilado (sem target/classes): ficou de fora. Compile antes (mvn compile).
+cli.analyze_explain_ask=Explicar também como cada nome do EL de um arquivo foi resolvido?
+cli.analyze_explain_file=Arquivo xhtml
+cli.analyze_no_project=%s não está dentro de um projeto (nenhuma pasta acima tem pom.xml ou build.gradle).
 cli.analyze_ask=Pasta do projeto
-cli.analyze_usage=Uso: nbkit analyze jsf <pasta do projeto>
+cli.analyze_usage=Uso: nbkit analyze jsf <pasta do projeto> [--explain <arquivo>], ou nbkit analyze jsf --explain <arquivo>
 cli.analyze_no_dir=Pasta não encontrada: %s
 cli.analyze_no_java=Java 17 ou mais novo não encontrado (JAVA_HOME, PATH, /usr/lib/jvm). Instale um JDK ou defina JAVA_HOME.
 cli.analyze_no_classes=%s tem pom.xml mas não tem target/classes: compile o projeto antes (mvn compile). Sem as classes o nbkit não conhece os beans e marcaria todos.
@@ -349,6 +352,7 @@ gui.tip_check=Com o NetBeans aberto depois de instalar: confere no log se cada m
 gui.tip_test=Roda os testes automáticos do nbkit. Para quem altera o código do nbkit
 gui.tip_build=Gera de novo os módulos do NetBeans que o nbkit instala (os arquivos .jar) a partir do código Java em src/. Só é preciso depois de alterar esse código
 gui.analyze=Analisar projeto JSF...
+gui.analyze_explain_pick=Arquivo xhtml para explicar
 gui.analyze_pick=Pasta do projeto JSF
 gui.debug=Debug do JSF
 gui.debug_log=Ver linhas

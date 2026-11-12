@@ -67,6 +67,25 @@ for fx in fixture fixture-resolver; do
       contains "a misspelled ui:define name is replaced" "$out" "«footerr»  → WEB-INF/templates/main.xhtml:9  ⇒ footer"
       contains "a misspelled cc.attrs name is replaced" "$out" "«labell»  → resources/comp/field.xhtml:3  ⇒ label"
       contains "a misspelled CSS class is replaced" "$out" "«buton-row»  → resources/css/app.css:4  ⇒ button-row"
+      contains "a misspelled resource goes to the file, written as the page writes it" "$out" "«css:ap.css»  → resources/css/app.css:1  ⇒ css:app.css"
+      contains "with its library apart, only the name is replaced" "$out" "«aps.css»  → resources/css/app.css:1  ⇒ app.css"
+      contains "with no library, the whole path is replaced" "$out" "«css/app.cs»  → resources/css/app.css:1  ⇒ css/app.css"
+      contains "a misspelled library goes to the file, with nothing to replace in name" "$out" "«app.css»  → resources/css/app.css:1"
+      lacks "(not replaced: the library is another attribute)" "$out" "«app.css»  → resources/css/app.css:1  ⇒"
+      contains "a resource with nothing close has no suggestion" "$out" "«css:gone.css»"
+      contains "an existing resource goes to its file (blue note)" "$out" "«css:app.css»  → resources/css/app.css:1"
+      contains "a ui:param gets the type of its value" "$out" "«totl»  → ../java/app/Order.java:4  ⇒ total"
+      contains "a misspelled varStatus property is replaced" "$out" "«indx»  ⇒ index"
+      contains "also the LoopTagStatus of c:forEach" "$out" "«cuont»  ⇒ count"
+      contains "a method of a text literal is checked as String" "$out" "«concatt»  ⇒ concat"
+      contains "also after another call" "$out" "«toUpperCas»  ⇒ toUpperCase"
+      contains "facesContext has its type (as in NetBeans)" "$out" "«requestContextPat»  ⇒ requestContextPath"
+      contains "a bean read through its scope is that bean" "$out" "«titel»  → ../java/app/CustomerVM.java:12  ⇒ title"
+      contains "list[0] is an item of the list" "$out" "«nmae»  → ../java/app/Customer.java:3  ⇒ name"
+      contains "a stream of EL has the methods of EL's Stream" "$out" "«filtr»  ⇒ filter"
+      contains "a list literal is a List" "$out" "«stremm»  ⇒ stream"
+      contains "a set literal is a Set" "$out" "«containz»  ⇒ contains"
+      contains "also from h:outputStylesheet" "$out" "«css/app.css»  → resources/css/app.css:1"
     fi
   done
 done
@@ -101,6 +120,27 @@ contains "each module under its name" "$out" "site"
 contains "with its own problems" "$out" "Property 'numbr' does not exist in OrderPagination"
 contains "a module not compiled is left out, saying so" "$out" "admin is not compiled (no target/classes): skipped"
 check "and then the exit code says something was left out" test "$rc" = 1
+# --explain: one file, and how each name was resolved
+mkdir -p "$W/proj/target" && cp -r "$W/app" "$W/proj/target/classes"
+out="$(analyze "$W/proj" --explain pages/orders.xhtml)"; rc=$?
+check "analyze --explain exits with 0" test "$rc" = 0
+contains "it says the type of each step, inherited generics resolved" "$out" "orderMB: OrderMB → orderManager: OrderManager → paginationListDataModel: Paged"
+contains "a loop variable gets the type of the items" "$out" "order: OrderPagination → number: Integer"
+contains "it says where the checking found something missing" "$out" "order: OrderPagination → numbr: does not exist (see the error above)"
+contains "a member only an implementation has is said so, not taken as unknown" "$out" "order: OrderPagination → note: only in an implementation, OrderViewModelImpl"
+contains "the errors of the file come first" "$out" "Property 'numbr' does not exist in OrderPagination"
+lacks "and only that file" "$out" "customers.xhtml"
+out="$(NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false bash "$NBKIT_DIR/nbkit.sh" --lang en analyze jsf --explain "$W/proj/src/main/webapp/pages/orders.xhtml" </dev/null 2>&1)"; rc=$?
+check "--explain with only the file finds its project" test "$rc" = 0
+contains "and explains it" "$out" "order: OrderPagination → number: Integer"
+mkdir -p "$W/loose" && : > "$W/loose/a.xhtml"
+out="$(NBKIT_JSF_JAR="$W/nbkit-jsf.jar" bash "$NBKIT_DIR/nbkit.sh" --lang en analyze jsf --explain "$W/loose/a.xhtml" </dev/null 2>&1)"; rc=$?
+check "a file outside any project is refused" test "$rc" = 1
+contains "saying why" "$out" "is not inside a project"
+out="$(analyze "$W/proj" --explain pages/nothing.xhtml)"; rc=$?
+check "an --explain file that is not there exits with 2" test "$rc" = 2
+contains "and says so" "$out" "No file of"
+rm -rf "$W/proj/target"
 mkdir -p "$W/empty"
 out="$(analyze "$W/empty")"; rc=$?
 check "analyze exits with 2 when there is no xhtml" test "$rc" = 2

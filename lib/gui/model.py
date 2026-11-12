@@ -125,6 +125,9 @@ def command(action, userdir=None, target=None):
     verb = {'update': 'install', 'reinstall': 'install'}.get(action, action)
     # analyze jsf <project folder>, debug jsf on|off, debug jsf log <userdir>
     if verb == 'analyze':
+        # (project, file): also explain how each name of the EL of that file was resolved
+        if isinstance(target, tuple):
+            return ['bash', NBKIT, 'analyze', 'jsf', target[0], '--explain', target[1]]
         return ['bash', NBKIT, 'analyze', 'jsf', target]
     if verb in ('debug', 'debug-log'):
         return ['bash', NBKIT, 'debug', 'jsf'] + ([target] if verb == 'debug' else ['log'] + ([userdir] if userdir else []))

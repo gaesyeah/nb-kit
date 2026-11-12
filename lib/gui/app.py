@@ -406,7 +406,7 @@ class Window(Gtk.ApplicationWindow):
         pop = Gtk.Popover()
         items = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         for p in self.st.get('jsf_projects', []):
-            items.append(self.menu_item(p['name'], p['path'], pop, lambda path=p['path']: self.start('analyze', path)))
+            items.append(self.menu_item(p['name'], p['path'], pop, lambda path=p['path']: self.ask_explain(path)))
         items.append(self.menu_item(T('cli.analyze_other'), None, pop, self.pick_project))
         pop.set_child(items)
         b.set_popover(pop)
@@ -459,7 +459,44 @@ class Window(Gtk.ApplicationWindow):
         except GLib.Error:
             return  # closed without choosing
         if folder and folder.get_path():
-            self.start('analyze', folder.get_path())
+            self.ask_explain(folder.get_path())
+
+    def ask_explain(self, project):
+        """with or without the explanation of one file (how each name of its EL was resolved): then which file"""
+        d = Gtk.Window(title=T('gui.question'), transient_for=self, modal=True, resizable=False)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin_top=16, margin_bottom=16,
+                      margin_start=18, margin_end=18)
+        box.append(label(T('cli.analyze_explain_ask'), 'heading', wrap=True))
+        buttons = Gtk.Box(spacing=8, halign=Gtk.Align.END)
+        no, yes = Gtk.Button(label=T('gui.no')), Gtk.Button(label=T('gui.yes'))
+        for b in (no, yes):
+            b.set_cursor_from_name('pointer')
+            buttons.append(b)
+        no.add_css_class('suggested-action')
+        no.connect('clicked', lambda _b: (d.destroy(), self.start('analyze', project)))
+        yes.connect('clicked', lambda _b: (d.destroy(), self.pick_explain(project)))
+        box.append(buttons)
+        d.set_child(box)
+        d.set_default_widget(no)
+        self.explain_dialog = d
+        d.present()
+
+    def pick_explain(self, project):
+        xhtml = Gtk.FileFilter(name='xhtml')
+        xhtml.add_pattern('*.xhtml')
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(xhtml)
+        dialog = Gtk.FileDialog(title=T('gui.analyze_explain_pick'), modal=True, filters=filters,
+                                initial_folder=Gio.File.new_for_path(project))
+        dialog.open(self, None, lambda dl, res: self.on_explain_file(dl, res, project))
+
+    def on_explain_file(self, dialog, result, project):
+        try:
+            f = dialog.open_finish(result)
+        except GLib.Error:
+            return  # closed without choosing
+        if f and f.get_path():
+            self.start('analyze', (project, f.get_path()))
 
     def module_row(self, m):
         row = Gtk.Box(spacing=12, margin_top=8, margin_bottom=8, margin_start=10, margin_end=10)

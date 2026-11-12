@@ -1,0 +1,13 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:ui="jakarta.faces.facelets" xmlns:h="jakarta.faces.html" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <link rel="stylesheet" href="#{resource['css:app.css']}"/><!--I:origin-->
+    <img src="#{resource['images/logo.png']}"/><!--I:origin-->
+    <link rel="stylesheet" href="#{resource['css:gone.css']}"/><!--E:res.missing-->
+    <img src="#{resource['images:nologo.png']}"/><!--E:res.missing-->
+    <link rel="stylesheet" href="#{resource['css:ap.css']}"/><!--E:res.missing-->
+    <h:outputStylesheet name="css/app.css"/><!--I:origin-->
+    <h:outputStylesheet library="css" name="aps.css"/><!--E:res.missing-->
+    <h:outputStylesheet name="css/app.cs"/><!--E:res.missing-->
+    <h:outputStylesheet library="cs" name="app.css"/><!--E:res.missing-->
+  </ui:define>
+</ui:composition>

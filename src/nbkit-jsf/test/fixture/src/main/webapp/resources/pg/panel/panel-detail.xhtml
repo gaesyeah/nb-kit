@@ -1,0 +1,9 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui" template="/WEB-INF/templates/two.xhtml">
+  <ui:define name="definitions">
+    <ui:param name="sectionId" value=":page_form:main_container"/>
+  </ui:define>
+  <ui:define name="content">
+    <p:commandButton value="Back" update="#{sectionId}"/>
+    <ui:include src="./items/item-crud.xhtml"/>
+  </ui:define>
+</ui:composition>

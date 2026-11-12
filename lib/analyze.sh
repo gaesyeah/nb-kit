@@ -116,17 +116,30 @@ analyze_one() {
   echo
   case "$NBKIT_LANG" in pt*) lang=pt ;; esac
   [ -n "$G" ] && color=1
-  "$JAVA" -Duser.language=$lang -Dstdout.encoding=UTF-8 -Dnbkit.color=$color -cp "$JAR" nbkit.jsf.Analyze "$1" ${cp[@]+"${cp[@]}"} \
+  "$JAVA" -Duser.language=$lang -Dstdout.encoding=UTF-8 -Dnbkit.color=$color ${EXPLAIN:+"-Dnbkit.explain=$EXPLAIN"} \
+    -cp "$JAR" nbkit.jsf.Analyze "$1" ${cp[@]+"${cp[@]}"} \
     2> >(grep -v '^Picked up JAVA_TOOL_OPTIONS' >&2) || rc=$?
   return "$rc"
 }
 # without the compiled classes every bean would be unknown: errors that are not there
 not_compiled() { [ -f "$1/pom.xml" ] && [ ! -d "$1/target/classes" ]; }
 
-# jsf_analyze <project folder>: 0 it ran, 2 no xhtml. A folder with no pages of its own (a parent, a monorepo)
-# is analyzed module by module
+# jsf_analyze <project folder> [file]: 0 it ran, 2 no xhtml. A folder with no pages of its own (a parent, a monorepo)
+# is analyzed module by module. With a file, only that file (in its own project, found from it), also saying how each
+# name of its EL was resolved
 jsf_analyze() {
   local dir="${1:-}" mods=() m rc=0
+  EXPLAIN="${2:-}"
+  # with a file, its own project (the nearest folder above it with a pom.xml or a build.gradle): the module, in a monorepo
+  # (with a project given, the file may also be the end of its path: pages/x.xhtml)
+  if [ -f "$EXPLAIN" ]; then
+    EXPLAIN="$(cd "$(dirname "$EXPLAIN")" && pwd)/${EXPLAIN##*/}"
+    dir="$(dirname "$EXPLAIN")"
+    while [ "$dir" != / ] && [ ! -f "$dir/pom.xml" ] && [ ! -f "$dir/build.gradle" ] && [ ! -f "$dir/build.gradle.kts" ]; do dir="$(dirname "$dir")"; done
+    [ "$dir" != / ] || die "$(t cli.analyze_no_project "${EXPLAIN/#$HOME/\~}")"
+  elif [ -n "$EXPLAIN" ] && [ -z "$dir" ]; then
+    die "$(t cli.analyze_no_dir "$EXPLAIN")"
+  fi
   [ -n "$dir" ] || die "$(t cli.analyze_usage)"
   [ -d "$dir" ] || die "$(t cli.analyze_no_dir "$dir")"
   dir="$(cd "$dir" && pwd)"

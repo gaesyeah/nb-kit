@@ -57,7 +57,7 @@ export PYTHONPATH="$NBKIT_DIR/lib${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYT
 
 usage() {
   local ids; ids="$(printf '%s ' "${MODS[@]}")"
-  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
+  t cli.usage "$NBKIT_VERSION" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "$ME" "${ids% }" "$ME"
 }
 
 # ---------- the parts of the CLI (lib/) ----------
@@ -88,8 +88,11 @@ source "$NBKIT_DIR/lib/tools.sh"      # every folder in modules/tools/
 # analyze jsf <project> and debug jsf on|off|log [userdir]: their own arguments (a folder here is not a userdir)
 case "${1:-}" in
   analyze)
-    [ "${2:-}" = jsf ] && [ $# -le 3 ] || die "$(t cli.analyze_usage)"
-    header; jsf_analyze "${3:-}"; exit $? ;;
+    # analyze jsf <project> | analyze jsf <project> --explain <file> | analyze jsf --explain <file> (project found from the file)
+    [ "${2:-}" = jsf ] || die "$(t cli.analyze_usage)"
+    if [ "${3:-}" = --explain ] && [ $# = 4 ]; then header; jsf_analyze "" "$4"; exit $?; fi
+    { [ $# -le 3 ] || { [ $# = 5 ] && [ "$4" = --explain ]; }; } || die "$(t cli.analyze_usage)"
+    header; jsf_analyze "${3:-}" "${5:-}"; exit $? ;;
   debug)
     [ "${2:-}" = jsf ] && [ $# -le 4 ] || die "$(t cli.debug_usage)"
     jsf_debug "${3:-}" "${4:-}"; exit 0 ;;
@@ -471,7 +474,14 @@ if [ $MENU = 1 ]; then
           echo
           dir="${dir/#\~/$HOME}"
         fi
-        rc=0; jsf_analyze "$dir" || rc=$?
+        # with or without the explanation of one file (how each name of its EL was resolved)
+        file=""
+        if ask_yn "  $(t cli.analyze_explain_ask)" N; then
+          read -r -e -p "  $(t cli.analyze_explain_file): " -i "${dir%/}/" file || { echo; exit 0; }
+          file="${file/#\~/$HOME}"
+        fi
+        echo
+        rc=0; jsf_analyze "$dir" "$file" || rc=$?
         exit $rc ;;
       debug)
         if jsf_debug_on; then jsf_debug off >/dev/null; else jsf_debug on >/dev/null; fi

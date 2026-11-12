@@ -1,0 +1,5 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui">
+  <p:commandButton value="Back" update="#{sectionId}" disabled="#{readOnly}"/><!--I:origin-->
+  <p:commandButton value="Confirm" update="main_container"/><!--I:origin-->
+  <p:commandButton value="Typo" update="#{sectonId}"/><!--E:el.unknown-->
+</ui:composition>

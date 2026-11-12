@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -441,7 +442,7 @@ public final class Workspace {
                         if (src == null) {
                             continue;
                         }
-                        File f = new File(path.toFile().getParentFile(), src).getAbsoluteFile();
+                        File f = new File(path.toFile().getParentFile(), src).toPath().toAbsolutePath().normalize().toFile();
                         if (!f.isFile()) {
                             continue;
                         }
@@ -782,8 +783,10 @@ public final class Workspace {
             }
             return null;
         }
-        File f = new File(from.getParentFile(), p);
-        return f.isFile() ? f.getAbsoluteFile() : null;
+        // normalized: ./items/x.xhtml and ../../fragments/x.xhtml must be the same File as the file itself, or the
+        // names and ids of the including page do not reach it
+        File f = new File(from.getParentFile(), p).toPath().toAbsolutePath().normalize().toFile();
+        return f.isFile() ? f : null;
     }
 
     public File webrootOf(File f) {
@@ -914,6 +917,32 @@ public final class Workspace {
         }
         File res = new File(projectDir, "src/main/resources/META-INF/resources/" + rel);
         return res.isFile() ? res.getAbsoluteFile() : null;
+    }
+
+    private Map<String, File> resourceNames;
+
+    /** every resource of the project itself, as library/name -> its file: what "Did you mean" chooses from */
+    public synchronized Map<String, File> resourceNames() {
+        if (resourceNames == null) {
+            resourceNames = new TreeMap<>();
+            List<File> roots = new ArrayList<>();
+            for (File w : webroots) {
+                roots.add(new File(w, "resources"));
+            }
+            roots.add(new File(projectDir, "src/main/resources/META-INF/resources"));
+            for (File r : roots) {
+                if (!r.isDirectory()) {
+                    continue;
+                }
+                try (var s = Files.walk(r.toPath())) {
+                    s.filter(Files::isRegularFile).forEach(p -> resourceNames.putIfAbsent(
+                            r.toPath().relativize(p).toString().replace(File.separatorChar, '/'), p.toFile().getAbsoluteFile()));
+                } catch (IOException | RuntimeException ex) {
+                    // ignore
+                }
+            }
+        }
+        return resourceNames;
     }
 
     /** library/name, without a ?v=3 or #x at the end (cache busting: not part of the file name) */
