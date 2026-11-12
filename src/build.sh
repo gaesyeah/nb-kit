@@ -103,6 +103,13 @@ step "$(t build.step_sums)"
 (cd "$NBKIT_DIR/lib/jars" && sha256sum nbkit-colors.jar nbkit-core.jar > SHA256SUMS)
 sed -i "s/^sha256 = \"[0-9a-f]*\"/sha256 = \"$(sum_of "$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar")\"/" "$NBKIT_DIR/modules/tools/jsf/tool.toml"
 ok "lib/jars/SHA256SUMS, modules/tools/jsf/tool.toml"
+# the menu offers the JSF update only for a new version in tool.toml: says so when the JSF code changed since the
+# version was last set (by git, in a clone; outside one there is no history to compare with, so it says nothing)
+T="$NBKIT_DIR/modules/tools/jsf/tool.toml"
+if since="$(git -C "$NBKIT_DIR" log -1 --format=%h -G'^version *=' -- "$T" 2>/dev/null)" && [ -n "$since" ] &&
+   { ! git -C "$NBKIT_DIR" diff --quiet "$since" -- src/nbkit-jsf || [ -n "$(git -C "$NBKIT_DIR" ls-files --others --exclude-standard -- src/nbkit-jsf)" ]; }; then
+  warn "$(t build.jsf_version "$(sed -n 's/^version *= *//p' "$T")" "$since")"
+fi
 echo
 t build.finished; echo
 if [ $TEST = 1 ]; then

@@ -269,6 +269,29 @@ if command -v javac >/dev/null 2>&1; then
   rm -rf "$H"; mkdir -p "$H"; ln -s "$WORK/real/.netbeans" "$H/.netbeans"
   out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"
   contains "build.sh finds NetBeans with ~/.netbeans as a link" "$out" "NetBeans: $(readlink -f "$TESTS/netbeans")"
+  # the end of the build says for sure whether the JSF version must go up: by git, in a copy of this repository
+  # (a JDK that writes empty jars, so nothing here is touched)
+  if git -C "$NBKIT_DIR" rev-parse -q --verify HEAD >/dev/null 2>&1; then
+    C="$WORK/clone"
+    cp -a "$NBKIT_DIR" "$C"
+    sed -i 's/^version = .*/version = 99/' "$C/modules/tools/jsf/tool.toml"
+    git -C "$C" add -A && git -C "$C" -c user.name=t -c user.email=t@t commit -qm "jsf version 99"
+    printf '#!/bin/sh
+[ "$1" = -version ] && echo "javac 17.0.12"
+exit 0
+' > "$WORK/jdk/bin/javac"
+    printf '#!/bin/sh
+: > "$2"
+' > "$WORK/jdk/bin/jar"
+    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" 2>&1 </dev/null)"
+    lacks "with the JSF code as it was when its version was set, the build asks for nothing" "$out" "version 99"
+    echo "// changed" >> "$C/src/nbkit-jsf/src/nbkit/jsf/Rules.java"
+    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" 2>&1 </dev/null)"
+    contains "with the JSF code changed since, it says to raise version 99" "$out" "JSF code changed since version 99"
+    git -C "$C" checkout -q -- src; : > "$C/src/nbkit-jsf/src/nbkit/jsf/New.java"
+    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" 2>&1 </dev/null)"
+    contains "a new JSF file counts as a change too" "$out" "JSF code changed since version 99"
+  fi
 fi
 
 echo "Questions of the theme only when interactive"
@@ -408,7 +431,7 @@ fake=$!
 sleep 0.3
 for ud in "$H/.netbeans/31" "$WORK/real/.netbeans/31"; do
   out="$(HOME="$H" setsid -w bash "$NBKIT_DIR/nbkit.sh" install jsf "$ud" </dev/null 2>&1)"
-  contains "NetBeans is seen open with the userdir as ${ud#"$WORK"/}" "$out" "NetBeans seems to be open"
+  contains "NetBeans is seen open with the userdir as ${ud#"$WORK"/}" "$out" "NetBeans is open with this userdir"
 done
 out="$(HOME="$H" bash "$NBKIT_DIR/nbkit.sh" check "$H/.netbeans/31" </dev/null 2>&1)"
 contains "a userdir given through the link keeps its ~ path" "$out" "userdir  ~/.netbeans/31"

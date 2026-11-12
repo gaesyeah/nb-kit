@@ -133,7 +133,11 @@ close_netbeans() {
 ensure_closed() {
   nb_running || return 0
   remember_java
-  [ $INTERACTIVE = 1 ] || die "$(t cli.nb_open_die)"
+  if [ $INTERACTIVE = 0 ]; then
+    # without pgrep only the lock file is known, and NetBeans may have closed without removing it
+    command -v pgrep >/dev/null 2>&1 || die "$(t cli.nb_lock_die "$UD/lock")"
+    die "$(t cli.nb_open_die)"
+  fi
   if can_close; then
     if [ "${NBKIT_CLOSE:-}" != 1 ] && ! ask_yn "$(t cli.ask_close)" Y; then
       t cli.nothing_changed; echo; exit 0

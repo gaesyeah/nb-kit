@@ -1,6 +1,7 @@
 package nbkit.jsf.nb;
 
 import nbkit.jsf.Rules;
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -9,6 +10,7 @@ import java.util.WeakHashMap;
 import javax.swing.SwingUtilities;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
+import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 import org.netbeans.api.editor.settings.AttributesUtilities;
 import org.netbeans.api.editor.settings.EditorStyleConstants;
@@ -17,16 +19,20 @@ import org.openide.text.Annotation;
 import org.openide.text.NbDocument;
 
 /**
- * The blue notes (Severity.INFO): one annotation of type nbkit-jsf-origin per note, which gives the icon, the light
- * background, the wave and the mark on the right stripe (colors in Fonts & Colors > Annotations), plus the text as a
- * tooltip on the name itself, through the highlights layer JsfLayerFactory registers with the bag below.
+ * The blue notes (Severity.INFO): one annotation of type nbkit-jsf-origin per note, which gives the icon and the mark
+ * on the right stripe, plus, through the highlights layer JsfLayerFactory registers with the bag below, the blue wave,
+ * a see-through blue background and the text as a tooltip on the name itself. The background is mixed with the
+ * editor's own (an annotation type only takes one fixed color, too light on a dark theme, too strong on a light one).
  */
 final class OriginNotes {
 
     static final String TYPE = "nbkit-jsf-origin";
+    static final Color BLUE = new Color(0x3F8EE3);
     private static final Map<Document, OriginNotes> ALL = Collections.synchronizedMap(new WeakHashMap<>());
 
     final OffsetsBag tips;
+    /** the editor's background, from the component the layer was made for */
+    volatile Color editorBackground = Color.WHITE;
     private final List<Annotation> shown = new ArrayList<>();
 
     private OriginNotes(Document d) {
@@ -71,6 +77,7 @@ final class OriginNotes {
         }
         shown.clear();
         OffsetsBag fresh = new OffsetsBag(d);
+        Color back = mix(editorBackground, BLUE, 0.1); // as see-through as the theme warnings: about 10% of their wave color
         int len = d.getLength();
         for (Rules.Problem p : notes) {
             int s = Math.min(p.start, len), e = Math.min(p.end, len);
@@ -78,11 +85,19 @@ final class OriginNotes {
                 Note n = new Note(p.message);
                 NbDocument.addAnnotation(d, d.createPosition(s), e - s, n);
                 shown.add(n);
-                fresh.addHighlight(s, e, AttributesUtilities.createImmutable(EditorStyleConstants.Tooltip, p.message));
+                fresh.addHighlight(s, e, AttributesUtilities.createImmutable(StyleConstants.Background, back,
+                        EditorStyleConstants.WaveUnderlineColor, BLUE, EditorStyleConstants.Tooltip, p.message));
             } catch (BadLocationException ex) {
                 // the document changed midway: the next analysis fixes it
             }
         }
         tips.setHighlights(fresh);
+    }
+
+    /** a over b at the given share of b: a see-through b on top of a */
+    static Color mix(Color a, Color b, double share) {
+        return new Color((int) Math.round(a.getRed() * (1 - share) + b.getRed() * share),
+                (int) Math.round(a.getGreen() * (1 - share) + b.getGreen() * share),
+                (int) Math.round(a.getBlue() * (1 - share) + b.getBlue() * share));
     }
 }
