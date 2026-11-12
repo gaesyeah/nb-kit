@@ -32,18 +32,26 @@ public final class Rules {
         public final int start, end;
         public final String message;
         public final java.util.List<Target> targets;
+        /** what "Replace with" writes over [start, end) (null: no suggestion to write) */
+        public final String replacement;
 
         public Problem(String rule, Severity severity, int start, int end, String message) {
             this(rule, severity, start, end, message, java.util.List.of());
         }
 
         public Problem(String rule, Severity severity, int start, int end, String message, java.util.List<Target> targets) {
+            this(rule, severity, start, end, message, targets, null);
+        }
+
+        public Problem(String rule, Severity severity, int start, int end, String message, java.util.List<Target> targets,
+                String replacement) {
             this.rule = rule;
             this.severity = severity;
             this.start = start;
             this.end = Math.max(end, start + 1);
             this.message = message;
             this.targets = targets;
+            this.replacement = replacement;
         }
 
         @Override

@@ -36,6 +36,7 @@ public class RunFixture {
                 got.add(k);
                 StringBuilder go = new StringBuilder();
                 for (Rules.Target t : p.targets) go.append("  → ").append(web.toPath().relativize(t.file.toPath().toAbsolutePath())).append(':').append(t.line);
+                if (p.replacement != null) go.append("  ⇒ ").append(p.replacement);
                 msgs.put(k, p.message + "  «" + text.substring(p.start, Math.min(p.end, text.length())).replace("\n", " ") + "»" + go);
             }
             System.out.println("== " + web.toPath().relativize(f.toPath()));

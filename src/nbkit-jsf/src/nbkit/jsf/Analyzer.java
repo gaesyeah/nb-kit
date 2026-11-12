@@ -5,8 +5,10 @@ import nbkit.jsf.Rules.Severity;
 import nbkit.jsf.Workspace.FileFacts;
 import nbkit.jsf.Workspace.Inc;
 import java.io.File;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -86,14 +88,23 @@ public final class Analyzer {
     }
 
     void report(String rule, Severity s, int start, int end, String msg, List<Rules.Target> targets) {
+        report(rule, s, start, end, msg, targets, null);
+    }
+
+    void report(String rule, Severity s, int start, int end, String msg, List<Rules.Target> targets, String replacement) {
         if (on.test(rule)) {
             for (Problem p : out) {
                 if (p.start == start && p.rule.equals(rule)) {
                     return;
                 }
             }
-            out.add(new Problem(rule, s, start, end, msg, targets));
+            out.add(new Problem(rule, s, start, end, msg, targets, replacement));
         }
+    }
+
+    /** the text at [start, end) with "from" replaced by "to", for "Replace with" (null when there is no suggestion) */
+    String swap(int start, int end, String from, String to) {
+        return to == null ? null : doc.text.substring(start, Math.min(end, doc.text.length())).replace(from, to);
     }
 
     /** the file and line behind each place text made by origin() (and the CSS places), for "Go to" */
@@ -702,13 +713,15 @@ public final class Analyzer {
                             ? Msg.t("el.scope.after", tag(elsewhere.el), doc.line(elsewhere.el.start))
                             : Msg.t("el.scope.inside", tag(elsewhere.el), doc.line(elsewhere.el.start));
                     elsewhere.used = true;
-                    report("el.scope", Severity.ERROR, pos, s.x.off(r.b), Msg.t("el.scope", r.name, where));
+                    report("el.scope", Severity.ERROR, pos, s.x.off(r.b), Msg.t("el.scope", r.name, where),
+                            targets(origin(file, elsewhere.el, tag(elsewhere.el))));
                     continue;
                 }
                 File bundle = bundleInView(r.name);
                 if (bundle != null) {
                     String from = file.getParentFile().toPath().relativize(bundle.toPath()).toString();
-                    report("el.unknown", Severity.WARNING, pos, s.x.off(r.b), Msg.t("el.bundle.included", r.name, from));
+                    report("el.unknown", Severity.WARNING, pos, s.x.off(r.b), Msg.t("el.bundle.included", r.name, from),
+                            targets(origin(bundle, loadBundle(bundle, r.name), "f:loadBundle")));
                     continue;
                 }
                 String loop = fromComponentLoop(s.el, r.name);
@@ -726,7 +739,8 @@ public final class Analyzer {
                 String hint = closest(r.name, allNamesAt(s, attrName, pos));
                 report("el.unknown", sure ? Severity.ERROR : Severity.WARNING, pos, s.x.off(r.b),
                         (sure ? Msg.t("el.unknown", r.name) : Msg.t("el.unknown.resolver", r.name, ws.customElResolver))
-                        + Msg.hint(hint, placeOfName(hint, s, attrName, pos)), targets(placeOfName(hint, s, attrName, pos)));
+                        + Msg.hint(hint, placeOfName(hint, s, attrName, pos)), targets(placeOfName(hint, s, attrName, pos)),
+                        swap(pos, s.x.off(r.b), r.name, hint));
             }
             enumCompare(s);
             readonly(s);
@@ -736,6 +750,80 @@ public final class Analyzer {
     // f:loadBundle puts its var in the request while the view is built, so one in any file of the view (the page,
     // its templates, the files it includes) reaches the EL evaluated when the page is drawn. The first file that
     // declares it, when every page that uses this file has one; null otherwise
+    /** the f:loadBundle of the file that declares var="name" (null: not found, "Go to" opens the file) */
+    Xml.Element loadBundle(File f, String name) {
+        Xml.Doc d = ws.doc(f);
+        if (d != null) {
+            for (Xml.Element e : d.all) {
+                if (e.is("f", "loadBundle") && name.equals(e.value("var"))) {
+                    return e;
+                }
+            }
+        }
+        return null;
+    }
+
+    private final Map<File, List<String>> javaLines = new HashMap<>();
+
+    /**
+     * "Customer.java, line 12": where member (getter, is-getter, method, field, record component or enum constant) is
+     * in the source of the class or of a class above it; the class declaration when member is null or not found;
+     * nothing when there is no source in the project (a library class)
+     */
+    List<Rules.Target> javaTarget(String internalName, String member) {
+        if (internalName == null) {
+            return List.of();
+        }
+        Rules.Target declaration = null;
+        Deque<String> todo = new ArrayDeque<>(List.of(internalName));
+        Set<String> seen = new HashSet<>();
+        while (!todo.isEmpty()) {
+            String c = todo.poll();
+            if (c == null || !seen.add(c)) {
+                continue;
+            }
+            File src = javaSource(c);
+            if (src != null) {
+                List<String> lines = javaLines.computeIfAbsent(src, f -> {
+                    try {
+                        return java.nio.file.Files.readAllLines(f.toPath());
+                    } catch (java.io.IOException | RuntimeException e) {
+                        return List.of();
+                    }
+                });
+                String simple = c.substring(c.lastIndexOf('/') + 1).replaceAll(".*\\$", "");
+                Pattern decl = Pattern.compile("\\b(class|interface|enum|record)\\s+" + Pattern.quote(simple) + "\\b");
+                Pattern mem = member == null ? null : Pattern.compile("\\b(?:(?:get|is)" + Pattern.quote(cap(member)) + "\\s*\\(|"
+                        + Pattern.quote(member) + "\\s*[(;=,)])");
+                for (int i = 0; i < lines.size(); i++) {
+                    if (mem != null && mem.matcher(lines.get(i)).find()) {
+                        return List.of(new Rules.Target(Msg.t("origin.place", src.getName(), i + 1), src, i + 1));
+                    }
+                    if (declaration == null && c.equals(internalName) && decl.matcher(lines.get(i)).find()) {
+                        declaration = new Rules.Target(Msg.t("origin.place", src.getName(), i + 1), src, i + 1);
+                    }
+                }
+            }
+            ClassModel.ClassInfo ci = ws.classes.get(c);
+            if (ci != null && member != null) {
+                todo.add(ci.superName);
+                todo.addAll(ci.interfaces);
+            }
+        }
+        return declaration == null ? List.of() : List.of(declaration);
+    }
+
+    File javaSource(String internalName) {
+        String path = internalName.replaceAll("\\$.*", "") + ".java";
+        for (File root : ws.javaSources) {
+            File f = new File(root, path);
+            if (f.isFile()) {
+                return f;
+            }
+        }
+        return null;
+    }
+
     File bundleInView(String name) {
         File first = null;
         for (File root : ws.rootViews(file)) {
@@ -904,7 +992,8 @@ public final class Analyzer {
             String getter = mm.getters.get(m.name);
             if (getter != null) {
                 if (last && methodAttr && !mm.methods.containsKey(m.name) && reportMissing) {
-                    report("el.kind", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("el.kind.method", s.attr.name, m.name, cap(m.name), ClassModel.display(cur)));
+                    report("el.kind", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("el.kind.method", s.attr.name, m.name, cap(m.name), ClassModel.display(cur)),
+                            javaTarget(cur, m.name));
                     return null;
                 }
                 cur = ClassModel.classOf(getter);
@@ -926,7 +1015,8 @@ public final class Analyzer {
                     continue;
                 }
                 if (reportMissing) {
-                    report("el.kind", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("el.kind.property", m.name, ClassModel.display(cur), m.name, cap(m.name)));
+                    report("el.kind", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("el.kind.property", m.name, ClassModel.display(cur), m.name, cap(m.name)),
+                            javaTarget(cur, m.name));
                 }
                 return null;
             }
@@ -942,7 +1032,8 @@ public final class Analyzer {
         Set<String> opts = new HashSet<>(mm.getters.keySet());
         opts.addAll(mm.methods.keySet());
         String hint = closest(m.name, opts);
-        report("el.member", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t(call ? "el.member.method" : "el.member.property", m.name, ClassModel.display(cur)) + Msg.hint(hint));
+        report("el.member", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t(call ? "el.member.method" : "el.member.property", m.name, ClassModel.display(cur)) + Msg.hint(hint),
+                javaTarget(cur, hint), swap(s.x.off(m.a), s.x.off(m.b), m.name, hint));
     }
 
     boolean dynamicType(String t) {
@@ -979,7 +1070,8 @@ public final class Analyzer {
             List<String> consts = ci.enumConstants();
             if (!consts.isEmpty() && !consts.contains(c.literal)) {
                 String hint = closest(c.literal, new HashSet<>(consts));
-                report("el.enum", Severity.ERROR, s.x.off(c.litA), s.x.off(c.litB), Msg.t("el.enum", c.literal, ci.simpleName(), String.join(", ", consts.subList(0, Math.min(8, consts.size()))) + (consts.size() > 8 ? ", ..." : "")) + Msg.hint(hint));
+                report("el.enum", Severity.ERROR, s.x.off(c.litA), s.x.off(c.litB), Msg.t("el.enum", c.literal, ci.simpleName(), String.join(", ", consts.subList(0, Math.min(8, consts.size()))) + (consts.size() > 8 ? ", ..." : "")) + Msg.hint(hint),
+                        javaTarget(t, hint), swap(s.x.off(c.litA), s.x.off(c.litB), c.literal, hint));
             }
         }
     }
@@ -1041,12 +1133,14 @@ public final class Analyzer {
             if (with > 0) {
                 if (!without.isEmpty()) {
                     report("el.readonly", Severity.WARNING, x.off(last.a), x.off(last.b),
-                            Msg.t("el.readonly.some", last.name, cap(last.name), ClassModel.display(owner), String.join(", ", without)));
+                            Msg.t("el.readonly.some", last.name, cap(last.name), ClassModel.display(owner), String.join(", ", without)),
+                            javaTarget(owner, last.name));
                 }
                 return;
             }
         }
-        report("el.readonly", Severity.ERROR, x.off(last.a), x.off(last.b), Msg.t("el.readonly.setter", last.name, cap(last.name), ClassModel.display(owner)));
+        report("el.readonly", Severity.ERROR, x.off(last.a), x.off(last.b), Msg.t("el.readonly.setter", last.name, cap(last.name), ClassModel.display(owner)),
+                javaTarget(owner, last.name));
     }
 
     // ---------- unused ----------
@@ -1132,7 +1226,8 @@ public final class Analyzer {
                     String hint = closest(m.name, declared.keySet());
                     report("cc.attrs", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("cc.attrs", m.name)
                             + Msg.hint(hint, hint == null ? null : origin(file, declared.get(hint), "cc:attribute")),
-                            targets(hint == null ? null : origin(file, declared.get(hint), "cc:attribute")));
+                            targets(hint == null ? null : origin(file, declared.get(hint), "cc:attribute")),
+                            swap(s.x.off(m.a), s.x.off(m.b), m.name, hint));
                 }
             }
         }
@@ -1292,7 +1387,7 @@ public final class Analyzer {
                         String hint = closest(c, where.keySet());
                         if (hint != null) {
                             report("css.class", Severity.INFO, s0, s1, Msg.t("css.none", c) + Msg.hint(hint, where.get(hint).get(0)),
-                                    targets(where.get(hint).get(0)));
+                                    targets(where.get(hint).get(0)), swap(s0, s1, c, hint));
                         }
                     }
                 }
@@ -1450,7 +1545,8 @@ public final class Analyzer {
         if (!evs.contains(ev)) {
             List<String> l = new ArrayList<>(evs);
             String hint = closest(ev, evs);
-            report("ajax.event", Severity.ERROR, a.offset(0), a.offset(a.value.length()), Msg.t("ajax.event", ev, tag(target), Msg.hint(hint), String.join(", ", l.subList(0, Math.min(14, l.size()))) + (l.size() > 14 ? ", ..." : "")));
+            report("ajax.event", Severity.ERROR, a.offset(0), a.offset(a.value.length()), Msg.t("ajax.event", ev, tag(target), Msg.hint(hint), String.join(", ", l.subList(0, Math.min(14, l.size()))) + (l.size() > 14 ? ", ..." : "")),
+                    List.of(), swap(a.offset(0), a.offset(a.value.length()), ev, hint));
         }
     }
 
@@ -1587,14 +1683,15 @@ public final class Analyzer {
                 }
                 Xml.Attr ia = e.attr("id");
                 if (forEach != null && !isNamingContainer(e)) {
-                    report("id.duplicate", Severity.ERROR, ia.offset(0), ia.offset(ia.value.length()), Msg.t("id.duplicate.foreach", id, doc.line(forEach.start)));
+                    report("id.duplicate", Severity.ERROR, ia.offset(0), ia.offset(ia.value.length()), Msg.t("id.duplicate.foreach", id, doc.line(forEach.start)),
+                            targets(origin(file, forEach, "c:forEach")));
                 }
                 Map<String, Xml.Element> m = byNc.computeIfAbsent(nc, k -> new HashMap<>());
                 Xml.Element prev = m.get(id.trim());
                 if (prev != null) {
                     boolean exclusive = !conditionals(prev, nc).equals(conditionals(e, nc));
                     report("id.duplicate", exclusive ? Severity.WARNING : Severity.ERROR, ia.offset(0), ia.offset(ia.value.length()),
-                            Msg.t(exclusive ? "id.duplicate.jstl" : "id.duplicate", id, doc.line(prev.start)));
+                            Msg.t(exclusive ? "id.duplicate.jstl" : "id.duplicate", id, doc.line(prev.start)), targets(origin(file, prev, "id")));
                 } else {
                     m.put(id.trim(), e);
                 }
@@ -1689,7 +1786,8 @@ public final class Analyzer {
                     }
                     String hint = closest(kw, PF_KEYWORDS);
                     report("id.keyword", hint != null ? Severity.ERROR : Severity.WARNING, a.offset(ts + k.start()), a.offset(ts + k.end()),
-                            Msg.t("id.keyword", kw) + (hint != null ? Msg.hint("@" + hint) : ""));
+                            Msg.t("id.keyword", kw) + (hint != null ? Msg.hint("@" + hint) : ""), List.of(),
+                            swap(a.offset(ts + k.start()), a.offset(ts + k.end()), kw, hint));
                 }
                 continue;
             }
@@ -1718,7 +1816,8 @@ public final class Analyzer {
                     view.addAll(g.composed(root));
                 }
                 String at = hint == null ? null : placeOfAttr(view, null, "id", hint);
-                report("id.missing", dynamic ? Severity.WARNING : Severity.ERROR, a0, a1, Msg.t("id.missing", last) + Msg.hint(hint, at), targets(at));
+                report("id.missing", dynamic ? Severity.WARNING : Severity.ERROR, a0, a1, Msg.t("id.missing", last) + Msg.hint(hint, at), targets(at),
+                        swap(a0, a1, last, hint));
             } else if (missingIn > 0 && !dynamic) {
                 report("id.missing", Severity.WARNING, a0, a1, Msg.t("id.missing.some", last));
             } else if (missingIn == 0 && !ff.ids.contains(last)) {
@@ -1726,7 +1825,7 @@ public final class Analyzer {
             } else if (a.name.equals("update") || a.name.equals("render")) {
                 Xml.Element target = localIds.get(last);
                 if (target != null && target.value("rendered") != null && target.value("rendered").contains("{")) {
-                    report("id.rendered", Severity.WARNING, a0, a1, Msg.t("id.rendered", last));
+                    report("id.rendered", Severity.WARNING, a0, a1, Msg.t("id.rendered", last), targets(origin(file, target, tag(target))));
                 }
             }
         }
@@ -1902,7 +2001,7 @@ public final class Analyzer {
                         String hint = closest(n.value.trim(), inserts);
                         String at = hint == null ? null : placeOfAttr(g.composed(in.target), "insert", "name", hint);
                         report("tpl.define", Severity.ERROR, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.name", n.value.trim())
-                                + Msg.hint(hint, at), targets(at));
+                                + Msg.hint(hint, at), targets(at), swap(n.offset(0), n.offset(n.value.length()), n.value.trim(), hint));
                     }
                 }
             }

@@ -48,6 +48,25 @@ for fx in fixture fixture-resolver; do
       contains "a blue note goes to where the name comes from" "$out" "«kindLabel»  → pages/kinds.xhtml:6"
       contains "a CSS class goes to its rule" "$out" "«panel-title»  → resources/css/app.css:3"
       contains "a suggested name goes to where it is" "$out" "«tablee»  → pages/customers.xhtml:27"
+      contains "a variable used outside its loop goes to the loop" "$out" "«row»  → pages/customers.xhtml:27"
+      contains "a repeated id goes to the first one" "$out" "«dup»  → pages/customers.xhtml:36"
+      contains "an id repeated by c:forEach goes to the c:forEach" "$out" "«repeated»  → pages/customers.xhtml:35"
+      contains "an update of a component with rendered goes to it" "$out" "«panel»  → pages/customers.xhtml:17"
+      contains "a bundle from an included file goes to its f:loadBundle" "$out" "«tips»  → pages/bundled-part.xhtml:2"
+      # in the Java source: the member, the getter whose setter is missing, the enum constant suggested
+      contains "a method used as a property goes to the method" "$out" "«save»  → ../java/app/CustomerVM.java:10"
+      contains "a property with no setter goes to its getter" "$out" "«code»  → ../java/app/Customer.java:6"
+      contains "an interface property with no setter goes to the interface" "$out" "«note»  → ../java/app/Contact.java:8"
+      contains "a misspelled member goes to the one suggested" "$out" "«titl»  → ../java/app/CustomerVM.java:12  ⇒ title"
+      contains "a misspelled enum constant goes to the enum" "$out" "«'ACTIVEE'»  → ../java/app/Status.java:2  ⇒ 'ACTIVE'"
+      # "Replace with": exactly the marked text becomes the suggestion
+      contains "a misspelled bean is replaced by the close one" "$out" "«customerVn»  ⇒ customerVM"
+      contains "a misspelled id is replaced, keeping where it is" "$out" "«tablee»  → pages/customers.xhtml:27  ⇒ table"
+      contains "a misspelled keyword keeps its @" "$out" "«@from»  ⇒ @form"
+      contains "a misspelled ajax event is replaced" "$out" "«rowSelecte»  ⇒ rowSelect"
+      contains "a misspelled ui:define name is replaced" "$out" "«footerr»  → WEB-INF/templates/main.xhtml:9  ⇒ footer"
+      contains "a misspelled cc.attrs name is replaced" "$out" "«labell»  → resources/comp/field.xhtml:3  ⇒ label"
+      contains "a misspelled CSS class is replaced" "$out" "«buton-row»  → resources/css/app.css:4  ⇒ button-row"
     fi
   done
 done

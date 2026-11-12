@@ -215,6 +215,9 @@ final class Watcher implements DocumentListener {
                     Position s = d.createPosition(Math.min(p.start, len));
                     Position e = d.createPosition(Math.min(p.end, len));
                     List<Fix> fixes = new ArrayList<>();
+                    if (p.replacement != null && p.end <= text[0].length()) {
+                        fixes.add(new Replace(d, s, e, text[0].substring(p.start, p.end), p.replacement));
+                    }
                     for (Rules.Target t : p.targets) {
                         fixes.add(new GoTo(t));
                     }
