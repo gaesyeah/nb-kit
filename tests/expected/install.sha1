@@ -82,6 +82,7 @@ e6bcc6331e4eb8b789044c69cefb6170faef9dd8  ./config/LookAndFeel/FlatDarkLaf.prope
 62c80afe584b42f9dd71b69f3847129402f488b2  ./config/Modules/nbkit-jsf.xml
 9e4576a4bfe0a0c1c767f37361d5a028a197448e  ./config/Preferences/laf.properties
 f0bfca728b7d44dfe6ba69006776c2bdd8f7e680  ./config/Preferences/org/netbeans/modules/terminal/nb.properties
+4d84c3cc9629a5662e9cc0b3ded97e4dc2caadc5  ./etc/netbeans.conf
 jar-of-this-nbkit  ./modules/nbkit-colors.jar
 jar-of-this-nbkit  ./modules/nbkit-core.jar
 jar-of-this-nbkit  ./modules/nbkit-jsf.jar

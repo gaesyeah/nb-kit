@@ -189,6 +189,7 @@ theme.step_select=Selecionando visual, perfil
 theme.step_select_terminal=Selecionando visual, perfil e terminal (cor de seleção e fonte)
 theme.terminal_kept=seleção do terminal: mantida a cor que você escolheu (Tools > Options > Terminal)
 theme.terminal_font_kept=fonte do terminal: mantida a que você escolheu (Tools > Options > Terminal)
+theme.smooth_kept=suavização do texto: mantida a que você definiu (etc/netbeans.conf do userdir)
 theme.selected=%s + "%s"
 theme.selected_terminal=%s + "%s" + terminal
 theme.step_remove=Removendo perfil, interface e módulo

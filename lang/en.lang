@@ -189,6 +189,7 @@ theme.step_select=Selecting look and feel and profile
 theme.step_select_terminal=Selecting look and feel, profile and terminal (selection color and font)
 theme.terminal_kept=terminal selection: kept the color you chose (Tools > Options > Terminal)
 theme.terminal_font_kept=terminal font: kept the one you chose (Tools > Options > Terminal)
+theme.smooth_kept=text smoothing: kept the one you set (etc/netbeans.conf of the userdir)
 theme.selected=%s + "%s"
 theme.selected_terminal=%s + "%s" + terminal
 theme.step_remove=Removing profile, UI and module

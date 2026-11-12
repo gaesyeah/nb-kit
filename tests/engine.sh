@@ -337,6 +337,26 @@ HOME="$H" PATH="$WORK/bin:$PATH" bash "$NBKIT_DIR/nbkit.sh" uninstall one-dark-p
 check "and uninstalling leaves it" grep -qx 'term.fontFamily=Hack' "$TP"
 rm -rf "${WORK:?}/bin"
 
+echo "Smooth editor text"
+# without these options some desktops never pass their text smoothing to Java (Flatpak NetBeans on COSMIC:
+# editor text with no antialiasing); NetBeans reads <userdir>/etc/netbeans.conf after the installation's own
+NC="$U/etc/netbeans.conf"
+new_home "$H"
+mkdir -p "$U/etc"; echo 'netbeans_default_options="${netbeans_default_options} -J-Xmx4g"' > "$NC"
+mine="$(cat "$NC")"
+nbkit install one-dark-pro-mix >/dev/null
+check "the theme turns on text smoothing in the userdir's netbeans.conf" grep -q -- '-J-Dawt.useSystemAAFontSettings=lcd -J-Dswing.aatext=true' "$NC"
+check "and keeps your own lines there" grep -qxF "$mine" "$NC"
+nbkit install one-dark-pro-mix >/dev/null
+check "a reinstall does not add it twice" test "$(grep -c useSystemAAFontSettings "$NC")" = 1
+nbkit uninstall one-dark-pro-mix >/dev/null
+check "uninstalling takes out only its line" test "$(cat "$NC")" = "$mine"
+new_home "$H"
+mkdir -p "$U/etc"; echo 'netbeans_default_options="${netbeans_default_options} -J-Dawt.useSystemAAFontSettings=gasp"' > "$NC"
+out="$(nbkit install one-dark-pro-mix)"
+check "smoothing you set yourself is kept" test "$(grep -c useSystemAAFontSettings "$NC")" = 1
+contains "and the install says so" "$out" "text smoothing: kept the one you set"
+
 echo "Colors in a terminal"
 new_home "$H"
 # in a terminal (script): every ✓ in green, every error in red; in a pipe or a file, no colors at all

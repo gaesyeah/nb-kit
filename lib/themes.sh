@@ -120,7 +120,7 @@ theme_paths() {
     config/Preferences/org/netbeans/modules/terminal/nb.properties config/Modules/nbkit-colors.xml modules/nbkit-colors.jar \
     config/Modules/nbkit-cores.xml modules/nbkit-cores.jar \
     config/Modules/com-onedarkmix-netbeans.xml modules/com-onedarkmix-netbeans.jar onedark-manifest.json onedark-state.json \
-    onedark-version
+    onedark-version etc/netbeans.conf
 }
 
 theme_uninstall_summary() {
@@ -211,6 +211,25 @@ theme_current_font() {
 # builds the profile (lib/themes/build.py)
 theme_builder() {
   "$NBKIT_PY" "$THEMES_LIB/build.py" "$@"
+}
+
+# ---------- smooth editor text ----------
+# Some desktops never pass their text smoothing to Java (seen in the Flatpak NetBeans on COSMIC: editor text
+# drawn with no antialiasing, looking like another font). The NetBeans launcher reads <userdir>/etc/netbeans.conf
+# after the installation's own, so one line there turns it on for this userdir only.
+THEME_AA_LINE='netbeans_default_options="${netbeans_default_options} -J-Dawt.useSystemAAFontSettings=lcd -J-Dswing.aatext=true" # nbkit theme: smooth editor text'
+theme_smooth_text() {
+  local f="$UD/etc/netbeans.conf"
+  grep -qxF "$THEME_AA_LINE" "$f" 2>/dev/null && return 0
+  if grep -qs useSystemAAFontSettings "$f"; then t theme.smooth_kept; echo; return 0; fi
+  mkdir -p "$UD/etc"
+  echo "$THEME_AA_LINE" >> "$f"
+}
+theme_smooth_text_out() {
+  local f="$UD/etc/netbeans.conf" rest
+  [ -f "$f" ] || return 0
+  rest="$(grep -vxF "$THEME_AA_LINE" "$f" || true)"
+  if [ -n "$rest" ]; then printf '%s\n' "$rest" > "$f"; else rm -f "$f"; rmdir "$UD/etc" 2>/dev/null || true; fi
 }
 
 # ---------- colors (colors.toml -> NetBeans color files) ----------
@@ -369,6 +388,7 @@ EOF
       t theme.terminal_font_kept; echo
     fi
   fi
+  theme_smooth_text
   theme_select_state select "$THEME_LAF" "$THEME_PROFILE"
   rm -f "$UD/onedark-version"
   if [ -n "$THEME_TERMINAL_SELECTION" ]; then ok "$(t theme.selected_terminal "$THEME_BASE_NAME" "$THEME_PROFILE")"
@@ -407,6 +427,7 @@ theme_uninstall() {
     # empty: the file did not exist before the theme
     [ -s "$TERMPREF" ] || rm -f "$TERMPREF"
   fi
+  theme_smooth_text_out
   touch "$UD/.lastModified"
   # restoring a chosen backup: the next step brings everything back from it
   if [ -z "${THEME_RESTORE:-}" ] && [ -n "$first" ] && tar -tzf "$first" "$LAFT" >/dev/null 2>&1; then
