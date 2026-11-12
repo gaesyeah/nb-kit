@@ -9,4 +9,6 @@ public class ContactRecord implements Contact {
   public void setEmail(String email) { this.email = email; }
   public ContactRecord setEmailChained(String email) { setEmail(email); return this; }
   public String getNote() { return note; }
+  /** only here, not in Contact: EL finds it when the object is a ContactRecord */
+  public String getCompany() { return null; }
 }

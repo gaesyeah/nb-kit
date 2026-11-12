@@ -12,4 +12,8 @@ public class CustomerVM {
   public String getTitle() { return ""; }
   public boolean isCanEdit() { return true; }
   public String format(String s) { return s; }
+  public Rows<String, Customer> getRows() { return null; }
+  public CustomerRows getCustomerRows() { return null; }
+  public java.util.List<Contact> getContacts() { return null; }
+  public Customer[] getArray() { return null; }
 }

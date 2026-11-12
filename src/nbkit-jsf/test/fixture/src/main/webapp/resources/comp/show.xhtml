@@ -1,0 +1,12 @@
+<ui:component xmlns="http://www.w3.org/1999/xhtml" xmlns:cc="jakarta.faces.composite" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets">
+  <cc:interface>
+    <cc:attribute name="model" type="app.SlideShow"/>
+  </cc:interface>
+  <cc:implementation>
+    <ui:repeat value="#{cc.attrs.model.slides}" var="slide">
+      <h:outputText value="#{slide.title} #{slide.intervalMs}"/>
+      <h:outputText value="#{slide.intevalMs}"/><!--E:el.member-->
+    </ui:repeat>
+    <h:outputText value="#{cc.attrs.model.slidez}"/><!--E:el.member-->
+  </cc:implementation>
+</ui:component>

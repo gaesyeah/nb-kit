@@ -1,0 +1,31 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:c="jakarta.tags.core" xmlns:p="http://primefaces.org/ui" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <ui:repeat value="#{customerVM.items}" var="row">
+      <h:outputText value="#{row.name} #{row.status} #{row.active}"/>
+      <h:outputText value="#{row.nmae}"/><!--E:el.member-->
+    </ui:repeat>
+    <ui:repeat value="#{customerVM.contacts}" var="contact">
+      <h:outputText value="#{contact.phone} #{contact.company}"/>
+      <h:outputText value="#{contact.fax}"/><!--E:el.member-->
+    </ui:repeat>
+    <c:forEach items="#{customerVM.array}" var="it">
+      <h:outputText value="#{it.code} #{it.cdoe}"/><!--E:el.member-->
+    </c:forEach>
+    <p:dataTable value="#{customerVM.items}" var="r">
+      <p:column><h:outputText value="#{r.nmae}"/></p:column><!--E:el.member-->
+    </p:dataTable>
+    <h:outputText value="#{customerVM.contact.company}"/>
+    <h:outputText value="#{customerVM.contact.faxx}"/><!--E:el.member-->
+    <ui:repeat value="#{customerVM.rows}" var="cr">
+      <h:outputText value="#{cr.name}"/>
+      <h:outputText value="#{cr.nmae}"/><!--E:el.member-->
+    </ui:repeat>
+    <ui:repeat value="#{customerVM.customerRows}" var="fixed">
+      <h:outputText value="#{fixed.name}"/>
+      <h:outputText value="#{fixed.nmae}"/><!--E:el.member-->
+    </ui:repeat>
+    <ui:repeat value="#{customerVM.map}" var="entry">
+      <h:outputText value="#{entry.whatever}"/>
+    </ui:repeat>
+  </ui:define>
+</ui:composition>

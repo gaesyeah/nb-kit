@@ -690,6 +690,7 @@ public final class Analyzer {
                 if (found != null) {
                     found.used = true;
                     jstlIteration(s, r, found);
+                    types(s, r);
                     continue;
                 }
                 if (globals.contains(r.name) || ext.names.contains(r.name)) {
@@ -960,9 +961,12 @@ public final class Analyzer {
 
     /** walks the chain; returns the final type (or null). Reports missing members. */
     String walk(Site s, El.Ref r, int upto, boolean reportMissing) {
-        String cur = beanType(r.name);
+        lastGeneric = null;
+        int k0 = r.name.equals("cc") ? 2 : 0;
+        String generic = rootGeneric(s, r, new HashSet<>());
+        String cur = ClassModel.erase(generic);
         boolean methodAttr = s.attr != null && METHOD_ATTRS.contains(s.attr.name) && isJsfLib(s.el) && s.x.whole && r.chain.size() > 0 && !r.nested;
-        for (int k = 0; k < upto && k < r.chain.size(); k++) {
+        for (int k = k0; k < upto && k < r.chain.size(); k++) {
             El.Member m = r.chain.get(k);
             if (cur == null || m.name == null || !ws.classes.complete(cur) || dynamicType(cur)) {
                 return null;
@@ -986,7 +990,8 @@ public final class Analyzer {
                 if (pick == null) {
                     return null;
                 }
-                cur = ClassModel.classOf(pick.returnType());
+                generic = ws.classes.resolve(generic, pick);
+                cur = typeOf(generic, pick.returnType());
                 continue;
             }
             String getter = mm.getters.get(m.name);
@@ -996,7 +1001,9 @@ public final class Analyzer {
                             javaTarget(cur, m.name));
                     return null;
                 }
-                cur = ClassModel.classOf(getter);
+                ClassModel.MethodInfo gm = mm.getterMethods.get(m.name);
+                generic = gm == null ? getter : ws.classes.resolve(generic, gm);
+                cur = typeOf(generic, getter);
                 continue;
             }
             List<ClassModel.MethodInfo> ms = mm.methods.get(m.name);
@@ -1011,7 +1018,8 @@ public final class Analyzer {
                     }
                 }
                 if (noArg != null) {
-                    cur = ClassModel.classOf(noArg.returnType());
+                    generic = ws.classes.resolve(generic, noArg);
+                    cur = typeOf(generic, noArg.returnType());
                     continue;
                 }
                 if (reportMissing) {
@@ -1025,10 +1033,25 @@ public final class Analyzer {
             }
             return null;
         }
+        lastGeneric = generic;
         return cur;
     }
 
+    /** the class of a resolved type; a type variable nobody gave falls back to its bound (the erased descriptor) */
+    static String typeOf(String generic, String desc) {
+        String e = ClassModel.erase(generic);
+        return e != null ? e : ClassModel.classOf(desc);
+    }
+
     void missing(Site s, El.Member m, String cur, ClassModel.Members mm, boolean call) {
+        // EL looks the member up on the object at runtime: when the declared type is an interface or a superclass,
+        // a member that some implementation has may be there
+        for (String impl : ws.implementations(cur)) {
+            ClassModel.Members im = impl.equals(cur) ? mm : ws.classes.members(impl);
+            if (im.getters.containsKey(m.name) || im.methods.containsKey(m.name)) {
+                return;
+            }
+        }
         Set<String> opts = new HashSet<>(mm.getters.keySet());
         opts.addAll(mm.methods.keySet());
         String hint = closest(m.name, opts);
@@ -1050,10 +1073,65 @@ public final class Analyzer {
     }
 
     void types(Site s, El.Ref r) {
-        if (beanType(r.name) == null || r.chain.isEmpty()) {
+        if (r.chain.isEmpty() || rootType(s, r, new HashSet<>()) == null) {
             return;
         }
         walk(s, r, r.chain.size(), true);
+    }
+
+    /** the generic type (with type arguments) of the last member the last walk reached */
+    String lastGeneric;
+
+    static final Set<String> LOOPS = Set.of("ui:repeat", "c:forEach", "h:dataTable", "p:dataTable", "p:dataList", "p:dataGrid",
+            "p:dataView", "p:dataScroller", "p:carousel");
+
+    /**
+     * The type a reference starts from: a bean; cc.attrs.x of a cc:attribute with type="..." (the walk then starts
+     * after attrs.x); or the var of a loop (ui:repeat, dataTable...), the item type of the list in its value
+     */
+    String rootType(Site s, El.Ref r, Set<Xml.Element> guard) {
+        return ClassModel.erase(rootGeneric(s, r, guard));
+    }
+
+    /** rootType with its type arguments (the item of a List<Frame<T>> is Frame<T>) */
+    String rootGeneric(Site s, El.Ref r, Set<Xml.Element> guard) {
+        String bean = beanType(r.name);
+        if (bean != null) {
+            return "L" + bean + ";";
+        }
+        if (r.name.equals("cc")) {
+            if (!ff.composite || r.chain.size() < 3 || !"attrs".equals(r.chain.get(0).name) || r.chain.get(1).name == null) {
+                return null;
+            }
+            for (Xml.Element e : doc.all) {
+                if (e.is("cc", "attribute") && r.chain.get(1).name.equals(e.value("name")) && e.value("type") != null) {
+                    return "L" + e.value("type").trim().replace('.', '/') + ";";
+                }
+            }
+            return null;
+        }
+        Decl found = null;
+        String attrName = s.attr == null ? null : s.attr.name;
+        for (Decl d : decls) {
+            if (d.name.equals(r.name) && visible(d, s.el, attrName, s.x.off(r.a)) && (found == null || d.el.start >= found.el.start)) {
+                found = d;
+            }
+        }
+        if (found == null || !found.kind.equals("var") || !LOOPS.contains(tag(found.el)) || !guard.add(found.el)) {
+            return null;
+        }
+        for (Site v : sites) {
+            if (v.el == found.el && v.attr != null && (v.attr.name.equals("value") || v.attr.name.equals("items")) && v.x.whole
+                    && v.x.refs.size() == 1) {
+                El.Ref list = v.x.refs.get(0);
+                if (list.chain.isEmpty() || rootType(v, list, guard) == null) {
+                    return null;
+                }
+                walk(v, list, list.chain.size(), false); // an array ends with no class, only lastGeneric
+                return ws.classes.elementGeneric(lastGeneric);
+            }
+        }
+        return null;
     }
 
     /** rule 6 */

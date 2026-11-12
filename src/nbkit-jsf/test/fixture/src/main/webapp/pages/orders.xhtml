@@ -1,0 +1,13 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <p:dataTable value="#{orderMB.orderManager.paginationListDataModel}" var="order">
+      <h:outputText value="#{order.number} #{order.note}"/>
+      <h:outputText value="#{order.numbr}"/><!--E:el.member-->
+    </p:dataTable>
+    <ui:repeat value="#{orderMB.orderManager.selection}" var="picked">
+      <h:outputText value="#{picked.numbr}"/><!--E:el.member-->
+    </ui:repeat>
+    <h:outputText value="#{orderMB.orderManager.entityHolderCommand.entity.total}"/>
+    <h:outputText value="#{orderMB.orderManager.entityHolderCommand.entity.totl}"/><!--E:el.member-->
+  </ui:define>
+</ui:composition>

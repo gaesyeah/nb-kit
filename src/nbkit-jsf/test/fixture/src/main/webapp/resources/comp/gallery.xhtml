@@ -1,0 +1,11 @@
+<ui:component xmlns="http://www.w3.org/1999/xhtml" xmlns:cc="jakarta.faces.composite" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets">
+  <cc:interface>
+    <cc:attribute name="model" type="app.Gallery"/>
+  </cc:interface>
+  <cc:implementation>
+    <ui:repeat value="#{cc.attrs.model.frames}" var="frame">
+      <div data-interval="#{not empty frame.intervalMs ? frame.intevalMs : 3000}"></div><!--E:el.member-->
+      <h:outputText value="#{frame.content.anything}"/>
+    </ui:repeat>
+  </cc:implementation>
+</ui:component>
