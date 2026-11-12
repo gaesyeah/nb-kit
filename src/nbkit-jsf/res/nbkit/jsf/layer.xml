@@ -4,6 +4,7 @@
     <folder name="Editors">
         <folder name="AnnotationTypes">
             <file name="nbkit-jsf-origin.xml" url="origin-annotation.xml"/>
+            <file name="nbkit-jsf-origin-fixable.xml" url="origin-fixable-annotation.xml"/>
         </folder>
         <folder name="text">
             <folder name="xhtml">

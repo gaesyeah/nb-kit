@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE type PUBLIC "-//NetBeans//DTD annotation type 1.1//EN" "http://www.netbeans.org/dtds/annotation-type-1_1.dtd">
-<!-- the blue notes of the JSF checks: icon and blue mark on the right stripe; severity ok so the file does not turn
-     yellow or red. The wave and the see-through background come from OriginNotes, mixed with the editor's background -->
+<!-- a blue note of the JSF checks without "Go to" actions: icon and blue mark on the right stripe; severity ok so the
+     file does not turn yellow or red. The wave and the see-through background come from OriginNotes -->
 <type name="nbkit-jsf-origin"
       description_key="origin.annotation"
       localizing_bundle="nbkit.jsf.Bundle"

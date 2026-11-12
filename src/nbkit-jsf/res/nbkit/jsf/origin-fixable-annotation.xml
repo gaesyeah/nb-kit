@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE type PUBLIC "-//NetBeans//DTD annotation type 1.1//EN" "http://www.netbeans.org/dtds/annotation-type-1_1.dtd">
+<!-- a blue note with "Go to" actions in Alt+Enter: the NetBeans lightbulb with the blue badge, as the warning ones -->
+<type name="nbkit-jsf-origin-fixable"
+      description_key="origin.annotation.fixable"
+      localizing_bundle="nbkit.jsf.Bundle"
+      visible="true"
+      glyph="nbresloc:/nbkit/jsf/origin-fixable-glyph.png"
+      severity="ok"
+      priority="60"
+      browseable="false"
+      type="linepart"
+      use_custom_sidebar_color="true"
+      custom_sidebar_color="0x3F8EE3"/>

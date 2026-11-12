@@ -7,6 +7,7 @@ import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import javax.swing.text.Position;
 import org.netbeans.api.java.classpath.ClassPath;
 import org.netbeans.spi.editor.hints.ErrorDescription;
 import org.netbeans.spi.editor.hints.ErrorDescriptionFactory;
+import org.netbeans.spi.editor.hints.Fix;
 import org.netbeans.spi.editor.hints.HintsController;
 import org.netbeans.spi.editor.hints.Severity;
 import org.openide.filesystems.FileObject;
@@ -197,16 +199,32 @@ final class Watcher implements DocumentListener {
             List<ErrorDescription> eds = new ArrayList<>();
             List<Rules.Problem> notes = new ArrayList<>();
             int len = d.getLength();
+            javax.swing.text.Element lines = d.getDefaultRootElement();
+            // lines with an error or warning of nbkit: there a note gives up its blue icon, so that it never hides
+            // the problem (NetBeans shows one icon per line)
+            Set<Integer> problemLines = new HashSet<>();
             for (Rules.Problem p : ps) {
-                if (p.severity == Rules.Severity.INFO) {
+                if (p.severity != Rules.Severity.INFO) {
+                    problemLines.add(lines.getElementIndex(Math.min(p.start, len)));
+                } else {
                     notes.add(p);
-                    continue;
                 }
+            }
+            for (Rules.Problem p : ps) {
                 try {
                     Position s = d.createPosition(Math.min(p.start, len));
                     Position e = d.createPosition(Math.min(p.end, len));
-                    eds.add(ErrorDescriptionFactory.createErrorDescription(p.severity == Rules.Severity.ERROR ? Severity.ERROR
-                            : Severity.WARNING, p.message, d, s, e));
+                    List<Fix> fixes = new ArrayList<>();
+                    for (Rules.Target t : p.targets) {
+                        fixes.add(new GoTo(t));
+                    }
+                    Severity sev = p.severity == Rules.Severity.ERROR ? Severity.ERROR : p.severity == Rules.Severity.WARNING
+                            ? Severity.WARNING : Severity.HINT;
+                    String type = null;
+                    if (sev == Severity.HINT && !problemLines.contains(lines.getElementIndex(Math.min(p.start, len)))) {
+                        type = fixes.isEmpty() ? OriginNotes.TYPE : OriginNotes.TYPE_FIXABLE;
+                    }
+                    eds.add(ErrorDescriptionFactory.createErrorDescription(null, sev, type, p.message, null, fixes, d, s, e));
                 } catch (BadLocationException ex) {
                     // the document changed midway: the next analysis fixes it
                 }

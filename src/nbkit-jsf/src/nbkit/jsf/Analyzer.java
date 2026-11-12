@@ -82,14 +82,36 @@ public final class Analyzer {
     }
 
     void report(String rule, Severity s, int start, int end, String msg) {
+        report(rule, s, start, end, msg, List.of());
+    }
+
+    void report(String rule, Severity s, int start, int end, String msg, List<Rules.Target> targets) {
         if (on.test(rule)) {
             for (Problem p : out) {
                 if (p.start == start && p.rule.equals(rule)) {
                     return;
                 }
             }
-            out.add(new Problem(rule, s, start, end, msg));
+            out.add(new Problem(rule, s, start, end, msg, targets));
         }
+    }
+
+    /** the file and line behind each place text made by origin() (and the CSS places), for "Go to" */
+    final Map<String, Rules.Target> places = new HashMap<>();
+
+    List<Rules.Target> targets(List<String> placeTexts) {
+        List<Rules.Target> r = new ArrayList<>();
+        for (String p : placeTexts) {
+            Rules.Target t = p == null ? null : places.get(p);
+            if (t != null) {
+                r.add(t);
+            }
+        }
+        return r;
+    }
+
+    List<Rules.Target> targets(String placeText) {
+        return targets(java.util.Collections.singletonList(placeText));
     }
 
     static String tag(Xml.Element e) {
@@ -369,7 +391,9 @@ public final class Analyzer {
         String path = w == null ? f.getName() : w.getAbsoluteFile().toPath().relativize(f.getAbsoluteFile().toPath()).toString().replace('\\', '/');
         Xml.Doc d = f.equals(file) ? doc : ws.doc(f);
         String place = e == null || d == null ? path : Msg.t("origin.place", path, d.line(e.start));
-        return what == null ? place : place + " (" + what + ")";
+        String text = what == null ? place : place + " (" + what + ")";
+        places.putIfAbsent(text, new Rules.Target(text, f, e == null || d == null ? 1 : d.line(e.start)));
+        return text;
     }
 
     /** a blue note: nothing is wrong, it only says where the thing comes from */
@@ -382,7 +406,7 @@ public final class Analyzer {
             return;
         }
         String more = origins.size() > 1 ? Msg.t("origin.more", origins.size() - 1) : "";
-        report(rule, Severity.INFO, a, b, Msg.t(key, name, origins.get(0), more));
+        report(rule, Severity.INFO, a, b, Msg.t(key, name, origins.get(0), more), targets(origins));
     }
 
     static String what(Decl d) {
@@ -702,7 +726,7 @@ public final class Analyzer {
                 String hint = closest(r.name, allNamesAt(s, attrName, pos));
                 report("el.unknown", sure ? Severity.ERROR : Severity.WARNING, pos, s.x.off(r.b),
                         (sure ? Msg.t("el.unknown", r.name) : Msg.t("el.unknown.resolver", r.name, ws.customElResolver))
-                        + Msg.hint(hint, placeOfName(hint, s, attrName, pos)));
+                        + Msg.hint(hint, placeOfName(hint, s, attrName, pos)), targets(placeOfName(hint, s, attrName, pos)));
             }
             enumCompare(s);
             readonly(s);
@@ -1107,7 +1131,8 @@ public final class Analyzer {
                 if (!declared.containsKey(m.name) && !Set.of("id", "rendered", "binding").contains(m.name)) {
                     String hint = closest(m.name, declared.keySet());
                     report("cc.attrs", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("cc.attrs", m.name)
-                            + Msg.hint(hint, hint == null ? null : origin(file, declared.get(hint), "cc:attribute")));
+                            + Msg.hint(hint, hint == null ? null : origin(file, declared.get(hint), "cc:attribute")),
+                            targets(hint == null ? null : origin(file, declared.get(hint), "cc:attribute")));
                 }
             }
         }
@@ -1236,6 +1261,7 @@ public final class Analyzer {
                         own.add(c.getKey());
                     }
                     String place = Msg.t("origin.css.place", Msg.t("origin.place", path, c.getValue()), origin(x, (Xml.Element) sheet[1], null));
+                    places.putIfAbsent(place, new Rules.Target(Msg.t("origin.place", path, c.getValue()), css, c.getValue()));
                     List<String> l = where.computeIfAbsent(c.getKey(), k -> new ArrayList<>());
                     if (!l.contains(place)) {
                         l.add(place);
@@ -1265,7 +1291,8 @@ public final class Analyzer {
                         // a rule with a close name exists, as a possible typo
                         String hint = closest(c, where.keySet());
                         if (hint != null) {
-                            report("css.class", Severity.INFO, s0, s1, Msg.t("css.none", c) + Msg.hint(hint, where.get(hint).get(0)));
+                            report("css.class", Severity.INFO, s0, s1, Msg.t("css.none", c) + Msg.hint(hint, where.get(hint).get(0)),
+                                    targets(where.get(hint).get(0)));
                         }
                     }
                 }
@@ -1690,8 +1717,8 @@ public final class Analyzer {
                 for (File root : g.roots(file)) {
                     view.addAll(g.composed(root));
                 }
-                report("id.missing", dynamic ? Severity.WARNING : Severity.ERROR, a0, a1, Msg.t("id.missing", last)
-                        + Msg.hint(hint, hint == null ? null : placeOfAttr(view, null, "id", hint)));
+                String at = hint == null ? null : placeOfAttr(view, null, "id", hint);
+                report("id.missing", dynamic ? Severity.WARNING : Severity.ERROR, a0, a1, Msg.t("id.missing", last) + Msg.hint(hint, at), targets(at));
             } else if (missingIn > 0 && !dynamic) {
                 report("id.missing", Severity.WARNING, a0, a1, Msg.t("id.missing.some", last));
             } else if (missingIn == 0 && !ff.ids.contains(last)) {
@@ -1873,8 +1900,9 @@ public final class Analyzer {
                         report("tpl.define", Severity.WARNING, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.empty", n.value.trim()));
                     } else if (n != null && !empty && !(onlyMetadata && ws.incoming(in.from).isEmpty()) && !inserts.contains(n.value.trim())) {
                         String hint = closest(n.value.trim(), inserts);
+                        String at = hint == null ? null : placeOfAttr(g.composed(in.target), "insert", "name", hint);
                         report("tpl.define", Severity.ERROR, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.name", n.value.trim())
-                                + Msg.hint(hint, hint == null ? null : placeOfAttr(g.composed(in.target), "insert", "name", hint)));
+                                + Msg.hint(hint, at), targets(at));
                     }
                 }
             }

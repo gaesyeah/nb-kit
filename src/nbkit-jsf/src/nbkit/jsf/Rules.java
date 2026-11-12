@@ -13,18 +13,37 @@ public final class Rules {
     /** INFO: nothing wrong, it only says where a name or id comes from when that is in another file */
     public enum Severity { ERROR, WARNING, INFO }
 
+    /** a place the problem points to (where a name comes from, where the suggested one is): "Go to" in NetBeans */
+    public static final class Target {
+        public final String label;
+        public final java.io.File file;
+        public final int line;
+
+        public Target(String label, java.io.File file, int line) {
+            this.label = label;
+            this.file = file;
+            this.line = line;
+        }
+    }
+
     public static final class Problem {
         public final String rule;
         public final Severity severity;
         public final int start, end;
         public final String message;
+        public final java.util.List<Target> targets;
 
         public Problem(String rule, Severity severity, int start, int end, String message) {
+            this(rule, severity, start, end, message, java.util.List.of());
+        }
+
+        public Problem(String rule, Severity severity, int start, int end, String message, java.util.List<Target> targets) {
             this.rule = rule;
             this.severity = severity;
             this.start = start;
             this.end = Math.max(end, start + 1);
             this.message = message;
+            this.targets = targets;
         }
 
         @Override

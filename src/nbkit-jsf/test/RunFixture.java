@@ -34,7 +34,9 @@ public class RunFixture {
                 while (line < lines.length && starts[line] <= p.start) line++;
                 String k = line + " " + p.severity.name().charAt(0) + ":" + p.rule;
                 got.add(k);
-                msgs.put(k, p.message + "  «" + text.substring(p.start, Math.min(p.end, text.length())).replace("\n", " ") + "»");
+                StringBuilder go = new StringBuilder();
+                for (Rules.Target t : p.targets) go.append("  → ").append(web.toPath().relativize(t.file.toPath().toAbsolutePath())).append(':').append(t.line);
+                msgs.put(k, p.message + "  «" + text.substring(p.start, Math.min(p.end, text.length())).replace("\n", " ") + "»" + go);
             }
             System.out.println("== " + web.toPath().relativize(f.toPath()));
             for (String k : got) System.out.println((expected.contains(k) ? "  ok   " : "  EXTRA ") + k + "  " + msgs.get(k));

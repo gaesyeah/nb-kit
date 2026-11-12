@@ -43,6 +43,12 @@ for fx in fixture fixture-resolver; do
     n="$(grep -c ' ok ' <<<"$out")"
     if [ "$(tail -1 <<<"$out")" = "ALL OK" ]; then pass "$fx: every expected warning, and nothing else ($n checks, language: $l)"
     else fail "$fx: every expected warning, and nothing else (language: $l)" "$(grep -E 'EXTRA|MISSING|DIFFERENCES' <<<"$out")"; fi
+    if [ "$fx$l" = fixtureen ]; then
+      # where a note or a suggestion points to: "Go to" in NetBeans (Alt+Enter)
+      contains "a blue note goes to where the name comes from" "$out" "«kindLabel»  → pages/kinds.xhtml:6"
+      contains "a CSS class goes to its rule" "$out" "«panel-title»  → resources/css/app.css:3"
+      contains "a suggested name goes to where it is" "$out" "«tablee»  → pages/customers.xhtml:27"
+    fi
   done
 done
 finish
