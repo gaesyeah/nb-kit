@@ -315,9 +315,32 @@ if command -v javac >/dev/null 2>&1; then
   out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdk" bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"
   contains "build.sh does not load the annotation processors of the NetBeans jars" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
   rm -rf "$L"
-  out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/no-jdk" bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"; rc=$?
+  # no JDK anywhere: JAVA_HOME unset, a javac on the PATH that is not one, no JDK where JDKs are installed
+  mkdir -p "$WORK/nojdk/bin" "$WORK/jvm"
+  printf '#!/bin/sh\nexit 127\n' > "$WORK/nojdk/bin/javac"; chmod +x "$WORK/nojdk/bin/javac"
+  out="$(HOME="$H" NB_HOME='' JAVA_HOME='' NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"; rc=$?
   contains "build.sh without a JDK says it needs one" "$out" "needs a JDK 17 or newer"
   check "and, with nothing installed, stops with an error" test "$rc" = 1
+  # the Java the NetBeans jars need comes from their classes (NetBeans 31: class version 65, Java 21); a JDK 17 in
+  # JAVA_HOME (the system one at work) cannot read them, the one NetBeans brings in jdk/ can
+  NB21="$WORK/nb21"; mkdir -p "$NB21/platform/lib"
+  python3 -c "import zipfile; zipfile.ZipFile('$NB21/platform/lib/org-openide-util.jar','w').writestr('org/openide/util/X.class', bytes.fromhex('cafebabe00000041'))"
+  for v in 17 21; do
+    mkdir -p "$WORK/jdk$v/bin"
+    printf '#!/bin/sh\n[ "$1" = -version ] && { echo "javac %s.0.1"; exit 0; }\nexit 1\n' "$v" > "$WORK/jdk$v/bin/javac"
+    printf '#!/bin/sh\nexit 0\n' > "$WORK/jdk$v/bin/jar"; chmod +x "$WORK/jdk$v/bin/javac" "$WORK/jdk$v/bin/jar"
+  done
+  ln -s "$WORK/jdk21" "$NB21/jdk"
+  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" "$NB21" 2>&1 </dev/null)"
+  contains "build.sh takes the JDK NetBeans brings when the one in JAVA_HOME is too old for its jars" "$out" "| javac 21.0.1"
+  rm "$NB21/jdk"
+  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" "$NB21" 2>&1 </dev/null)"; rc=$?
+  contains "with only a JDK too old, it says which Java the NetBeans jars need" "$out" "need Java 21"
+  check "and stops before touching the jars" test "$rc" = 1
+  mkdir -p "$WORK/jvm/java-21"; ln -s "$WORK/jdk21/bin" "$WORK/jvm/java-21/bin"
+  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" "$NB21" 2>&1 </dev/null)"
+  contains "it also finds a JDK installed next to the system one" "$out" "| javac 21.0.1"
+  rm -rf "$WORK/jvm/java-21"
   # ~/.netbeans as a link to another folder, as on machines where the home folder is elsewhere
   new_home "$WORK/real"
   rm -rf "$H"; mkdir -p "$H"; ln -s "$WORK/real/.netbeans" "$H/.netbeans"

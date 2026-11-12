@@ -2,7 +2,8 @@
 # Builds the NetBeans modules of nbkit from the Java code in src/, against the jars of an Apache NetBeans
 # installation, and updates their sha256 (lib/jars/SHA256SUMS and modules/tools/jsf/tool.toml).
 #   bash src/build.sh [netbeans folder] [--test]      --test: runs the JSF tests (tests/jsf.sh) after building; --help
-# Without the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK 17 or newer (javac, jar).
+# Without the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK as new as the Java of the NetBeans
+# jars (17 or newer), found by itself: JAVA_HOME, the JDK NetBeans uses, the PATH, /usr/lib/jvm.
 set -euo pipefail
 trap 'exit 130' INT TERM HUP
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,17 +56,63 @@ find_netbeans() {
 [ -n "$NB" ] || NB="$(find_netbeans || true)"
 [ -n "$NB" ] && [ -d "$NB/platform" ] || die "$(t build.no_netbeans)"
 NB="$(readlink -f "$NB")"
-JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
-JAR="${JAVA_HOME:+$JAVA_HOME/bin/}jar"
-# without a JDK 17 or newer: offers to install one (asking first), like the tests
-if ! jdk_ok; then
+# the Java the NetBeans jars need: the newest class version among the platform's jars (NetBeans 31: 65, Java 21);
+# a JDK too old for them fails on every NetBeans class ("class file has wrong version")
+nb_java() {
+  python3 -c '
+import sys, glob, zipfile
+need = 0
+for jar in glob.glob(sys.argv[1] + "/platform/lib/*.jar") + glob.glob(sys.argv[1] + "/platform/core/*.jar"):
+    try:
+        z = zipfile.ZipFile(jar)
+        name = next((n for n in z.namelist() if n.endswith(".class") and not n.startswith("META-INF/")), None)
+        if name:
+            need = max(need, int.from_bytes(z.read(name)[6:8], "big") - 44)
+    except Exception:
+        pass
+print(need or "")
+' "$NB" 2>/dev/null || true
+}
+# JDKs to try, in order: JAVA_HOME, the one NetBeans runs with (netbeans_jdkhome of the userdirs' and its own
+# netbeans.conf, the jdk/ it brings), the javac on the PATH, the JDKs installed next to the system one
+jdk_candidates() {
+  local c
+  [ -z "${JAVA_HOME:-}" ] || echo "$JAVA_HOME"
+  for c in "$HOME"/.netbeans/*/etc/netbeans.conf "$NB/etc/netbeans.conf"; do
+    [ -f "$c" ] && sed -n 's/^[[:space:]]*netbeans_jdkhome[[:space:]]*=[[:space:]]*"\{0,1\}\([^"#]*\)"\{0,1\}.*/\1/p' "$c"
+  done
+  echo "$NB/jdk"
+  command -v javac >/dev/null 2>&1 && dirname "$(dirname "$(readlink -f "$(command -v javac)")")"
+  ls -d "${NBKIT_JVM_DIR:-/usr/lib/jvm}"/*/ 2>/dev/null | sort -rV
+}
+# JDK: the first candidate new enough for the NetBeans jars; FOUND: every JDK seen, with its version
+pick_jdk() {
+  local j v
+  JDK=""; FOUND=""
+  while IFS= read -r j; do
+    j="${j%/}"
+    [ -n "$j" ] && [ -x "$j/bin/javac" ] && [ -x "$j/bin/jar" ] || continue
+    v="$("$j/bin/javac" -version 2>&1 | sed -n 's/^javac \([0-9][0-9]*\).*/\1/p' | tail -1)"
+    [ -n "$v" ] || continue
+    case ", $FOUND," in *", $j ($v),"*) continue ;; esac
+    FOUND="${FOUND:+$FOUND, }$j ($v)"
+    if [ "$v" -ge "$NEED" ]; then JDK="$j"; return 0; fi
+  done < <(jdk_candidates)
+  return 1
+}
+NEED="$(nb_java)"
+[ -n "$NEED" ] && [ "$NEED" -ge 17 ] || NEED=17
+# without any JDK: offers to install one (asking first), like the tests
+if ! pick_jdk && [ -z "$FOUND" ]; then
   t build.need_jdk; echo
   # shellcheck disable=SC2086
   pkg_install "JDK" $JDK_SPEC || true
+  pick_jdk || true
 fi
-command -v "$JAVAC" >/dev/null 2>&1 && command -v "$JAR" >/dev/null 2>&1 || die "$(t build.no_jdk)"
-JV="$("$JAVAC" -version 2>&1 | sed -n 's/^javac \([0-9][0-9]*\).*/\1/p' | tail -1)"
-[ -n "$JV" ] && [ "$JV" -ge 17 ] || die "$(t build.old_jdk "${JV:-?}")"
+[ -n "$FOUND" ] || die "$(t build.no_jdk)"
+[ -n "$JDK" ] || die "$(t build.old_jdk "$NEED" "$FOUND" "$NEED")"
+JAVAC="$JDK/bin/javac"
+JAR="$JDK/bin/jar"
 info "$(t build.using "$NB" "$("$JAVAC" -version 2>&1 | grep '^javac' | tail -1)")"
 
 # NetBeans API jars to compile against
