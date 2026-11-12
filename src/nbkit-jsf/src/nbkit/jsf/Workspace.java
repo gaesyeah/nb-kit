@@ -898,16 +898,26 @@ public final class Workspace {
 
     /** resource (h:outputStylesheet etc.): resources/ of the application or META-INF/resources of the jars */
     public boolean resourceExists(String library, String name) {
-        String rel = (library == null || library.isBlank() ? "" : library + "/") + name;
+        return resourceFile(library, name) != null || classes.hasResource("META-INF/resources/" + resourcePath(library, name));
+    }
+
+    /**
+     * the file of a resource of the project itself, or null: resources/ of a webroot, or META-INF/resources of the
+     * project's classpath (Spring Boot), where JSF looks with no resources/ folder in between
+     */
+    public File resourceFile(String library, String name) {
+        String rel = resourcePath(library, name);
         for (File w : webroots) {
-            if (new File(w, "resources/" + rel).exists()) {
-                return true;
+            if (new File(w, "resources/" + rel).isFile()) {
+                return new File(w, "resources/" + rel).getAbsoluteFile();
             }
         }
-        if (classes.hasResource("META-INF/resources/" + rel)) {
-            return true;
-        }
         File res = new File(projectDir, "src/main/resources/META-INF/resources/" + rel);
-        return res.exists();
+        return res.isFile() ? res.getAbsoluteFile() : null;
+    }
+
+    /** library/name, without a ?v=3 or #x at the end (cache busting: not part of the file name) */
+    static String resourcePath(String library, String name) {
+        return (library == null || library.isBlank() ? "" : library.trim() + "/") + name.trim().replaceFirst("[?#].*$", "");
     }
 }

@@ -1187,9 +1187,9 @@ public final class Analyzer {
         for (Xml.Element e : d.all) {
             List<File> candidates = new ArrayList<>();
             if (e.is("h", "outputStylesheet") && e.value("name") != null && !e.value("name").contains("{")) {
-                String lib = e.value("library");
-                for (File w : ws.webroots) {
-                    candidates.add(new File(w, "resources/" + (lib == null || lib.isBlank() ? "" : lib.trim() + "/") + e.value("name").trim()));
+                File res = ws.resourceFile(e.value("library"), e.value("name"));
+                if (res != null) {
+                    candidates.add(res);
                 }
             } else if (e.local.equals("link") && "stylesheet".equalsIgnoreCase(String.valueOf(e.value("rel"))) && e.value("href") != null) {
                 // shortcut: an EL in front (#{request.contextPath}) is dropped; a full URL (CDN) is not read

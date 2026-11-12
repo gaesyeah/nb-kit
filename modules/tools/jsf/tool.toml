@@ -15,7 +15,7 @@ hint = { en = "the rules turn on and off in Tools > Options > Editor > JSF", pt-
 [netbeans_module]
 jar = "nbkit-jsf.jar"
 codename = "nbkit.jsf"
-sha256 = "ad70e8a99dce40fbb52e85344221feab6f4437598611aa1170c5c25a8c6a128a"
+sha256 = "f709678c468454b4edc4d034e80302f34ac6653a27828226f875bcd36728d837"
 
 # lines shown before confirming the uninstall
 [uninstall]
