@@ -51,4 +51,13 @@ for fx in fixture fixture-resolver; do
     fi
   done
 done
+
+# NetBeans' JSF support (what colors EL): turned on once by the module, then only asked about (see JsfSupportMark)
+compile -d "$W/mark" "$J/src/nbkit/jsf/nb/JsfSupportMark.java" "$J/test/RunJsfSupportMark.java"
+out="$("$JAVA" -cp "$W/mark" RunJsfSupportMark 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"
+contains "off and never handled: the module turns it on" "$out" "null active=false noask=false -> ACTIVATE"
+contains "already on: it only writes that down" "$out" "null active=true noask=false -> MARK_FOUND"
+contains "handled and on: nothing" "$out" "activated active=true noask=false -> NOTHING"
+contains "handled and turned off later: it asks, never turns it on by itself" "$out" "found active=false noask=false -> ASK"
+contains "after Don't ask again: nothing" "$out" "activated active=false noask=true -> NOTHING"
 finish

@@ -57,7 +57,10 @@ tool_module_overrides_back() {
     sed -i '/^enabled=/d' "$f"
     if [ "$prev" != absent ]; then echo "enabled=$prev" >> "$f"; elif [ ! -s "$f" ]; then rm -f "$f"; fi
   done < "$prefs"
-  sed -i '/^override\./d' "$prefs"
+  # the module may have turned on NetBeans' JSF support (netbeans.jsf=activated, see JsfSupportMark): it stays on,
+  # since turning its modules off here, with NetBeans closed, would make NetBeans refuse other modules that need them
+  if grep -qx 'netbeans\.jsf=activated' "$prefs"; then info "$(t tool.netbeans_jsf_stays)"; fi
+  sed -i '/^override\./d; /^netbeans\.jsf/d' "$prefs"
 }
 
 # with NetBeans open: the module is among the enabled ones and the log has no error about it

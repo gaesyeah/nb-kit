@@ -137,6 +137,7 @@ tool.corrupt=%s is corrupted (its sha256 does not match). Download nbkit again.
 tool.copied=module copied and verified (sha256)
 tool.step_uninstall=Removing: %s
 tool.removed=module removed
+tool.netbeans_jsf_stays=NetBeans' JSF support, which nbkit turned on, stays on (to turn it off: Tools > Plugins > Installed > JSF > Deactivate)
 tool.check_loaded=module loaded
 tool.check_missing=the module is not among the enabled modules
 tool.invalid=Warning: tool "%s" skipped: %s

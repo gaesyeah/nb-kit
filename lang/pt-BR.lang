@@ -137,6 +137,7 @@ tool.corrupt=o arquivo %s está corrompido (o sha256 não confere). Baixe o nbki
 tool.copied=módulo copiado e verificado (sha256)
 tool.step_uninstall=Removendo: %s
 tool.removed=módulo removido
+tool.netbeans_jsf_stays=o suporte a JSF do NetBeans, que o nbkit ativou, continua ativo (para desativar: Tools > Plugins > Installed > JSF > Deactivate)
 tool.check_loaded=módulo carregado
 tool.check_missing=o módulo não aparece entre os módulos ligados
 tool.invalid=Aviso: ferramenta "%s" ignorada: %s
