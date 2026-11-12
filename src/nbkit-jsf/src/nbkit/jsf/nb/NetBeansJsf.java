@@ -2,8 +2,6 @@ package nbkit.jsf.nb;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
@@ -19,6 +17,7 @@ import org.netbeans.api.autoupdate.OperationSupport;
 import org.netbeans.api.autoupdate.UpdateElement;
 import org.netbeans.api.autoupdate.UpdateManager;
 import org.netbeans.api.autoupdate.UpdateUnit;
+import org.openide.LifecycleManager;
 import org.openide.awt.Notification;
 import org.openide.awt.NotificationDisplayer;
 import org.openide.util.ImageUtilities;
@@ -73,7 +72,7 @@ final class NetBeansJsf {
         return null;
     }
 
-    /** turns it on, writes the mark with the modules NetBeans turned on, and says so */
+    /** turns it on, writes the mark and offers the restart (files keep no EL colors until NetBeans restarts) */
     private static void activate(UpdateElement kit) {
         try {
             OperationContainer<OperationSupport> container = OperationContainer.createForEnable();
@@ -87,23 +86,28 @@ final class NetBeansJsf {
                 LOG.info("nbkit: NetBeans' JSF support cannot be turned on (missing modules)");
                 return;
             }
-            List<String> modules = new ArrayList<>();
-            for (OperationContainer.OperationInfo<OperationSupport> each : container.listAll()) {
-                modules.add(each.getUpdateElement().getCodeName());
-            }
             OperationSupport.Restarter restarter = support.doOperation(null);
-            Preferences prefs = Settings.prefs();
-            prefs.put(JsfSupportMark.KEY, JsfSupportMark.ACTIVATED);
-            prefs.put(JsfSupportMark.MODULES, String.join(",", modules));
+            Settings.prefs().put(JsfSupportMark.KEY, JsfSupportMark.ACTIVATED);
             if (restarter != null) {
                 support.doRestartLater(restarter);
             }
-            NotificationDisplayer.getDefault().notify(Msg.t("netbeans.jsf.activated.title"), ICON,
-                    Msg.t(restarter != null ? "netbeans.jsf.activated.restart" : "netbeans.jsf.activated"), null,
-                    NotificationDisplayer.Priority.NORMAL);
+            Notification[] shown = new Notification[1];
+            shown[0] = NotificationDisplayer.getDefault().notify(Msg.t("netbeans.jsf.activated.title"), ICON,
+                    restartPanel(shown), restartPanel(shown), NotificationDisplayer.Priority.NORMAL);
         } catch (OperationException ex) {
             LOG.log(Level.INFO, "nbkit: NetBeans' JSF support could not be turned on", ex);
         }
+    }
+
+    private static JComponent restartPanel(Notification[] shown) {
+        JButton restart = new JButton(Msg.t("netbeans.jsf.activated.restart"));
+        restart.addActionListener(e -> {
+            shown[0].clear();
+            // NetBeans asks about unsaved files before closing, as always
+            LifecycleManager.getDefault().markForRestart();
+            LifecycleManager.getDefault().exit();
+        });
+        return panel(Msg.t("netbeans.jsf.activated"), restart);
     }
 
     /** it was turned off after the mark: asks (closing the notification asks again on the next start) */
@@ -124,13 +128,18 @@ final class NetBeansJsf {
             shown[0].clear();
             Settings.prefs().putBoolean(JsfSupportMark.NO_ASK, true);
         });
+        return panel(Msg.t("netbeans.jsf.ask"), activate, never);
+    }
+
+    private static JComponent panel(String text, JButton... actions) {
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
         buttons.setOpaque(false);
-        buttons.add(activate);
-        buttons.add(never);
+        for (JButton action : actions) {
+            buttons.add(action);
+        }
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.setOpaque(false);
-        panel.add(new JLabel(Msg.t("netbeans.jsf.ask")), BorderLayout.NORTH);
+        panel.add(new JLabel(text), BorderLayout.NORTH);
         panel.add(buttons, BorderLayout.SOUTH);
         return panel;
     }

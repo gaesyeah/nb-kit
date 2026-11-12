@@ -98,7 +98,7 @@ rm -f "$U/config/Preferences/$RULE.properties" "$U/config/Preferences/nbkit/jsf.
 # NetBeans' JSF support the module turned on stays on: turning its modules off here, with NetBeans closed, would make
 # NetBeans refuse other modules that need them ("could not install some modules")
 nbkit install >/dev/null 2>&1
-printf 'netbeans.jsf=activated\nnetbeans.jsf.modules=org.netbeans.modules.web.jsf.kit\n' > "$U/config/Preferences/nbkit/jsf.properties"
+printf 'netbeans.jsf=activated\n' > "$U/config/Preferences/nbkit/jsf.properties"
 out="$(nbkit uninstall)"
 contains "uninstalling says NetBeans' JSF support nbkit turned on stays on" "$out" "NetBeans' JSF support, which nbkit turned on, stays on"
 check "and forgets the mark" test "$(grep -c '^netbeans\.jsf' "$U/config/Preferences/nbkit/jsf.properties")" = 0
