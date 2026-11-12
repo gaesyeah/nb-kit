@@ -39,8 +39,25 @@ tool_module_install() {
 tool_module_uninstall() {
   local n; n="$(tool_module_name "$1")"
   rm -f "$UD/modules/$n.jar" "$C/Modules/$n.xml"
+  tool_module_overrides_back "$1"
   touch "$UD/.lastModified"
   ok "$(t tool.removed)"
+}
+
+# the module may have turned off NetBeans hint rules it replaces (it does that itself, inside NetBeans), writing in
+# its preferences override.<preferences node of the rule>=<the rule's "enabled" before: true, false or absent>;
+# NetBeans is closed now, so the rules are put back here
+tool_module_overrides_back() {
+  local prefs="$C/Preferences/${TOOL_CODE[$1]//.//}.properties" key prev f
+  [ -f "$prefs" ] || return 0
+  while IFS='=' read -r key prev; do
+    case "$key" in override.*) ;; *) continue ;; esac
+    f="$C/Preferences/${key#override.}.properties"
+    [ -f "$f" ] || continue
+    sed -i '/^enabled=/d' "$f"
+    if [ "$prev" != absent ]; then echo "enabled=$prev" >> "$f"; elif [ ! -s "$f" ]; then rm -f "$f"; fi
+  done < "$prefs"
+  sed -i '/^override\./d' "$prefs"
 }
 
 # with NetBeans open: the module is among the enabled ones and the log has no error about it

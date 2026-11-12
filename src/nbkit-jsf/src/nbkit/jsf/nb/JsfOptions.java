@@ -75,6 +75,7 @@ public final class JsfOptions extends OptionsPanelController {
         for (Map.Entry<String, JCheckBox> e : boxes.entrySet()) {
             Settings.prefs().putBoolean(e.getKey(), e.getValue().isSelected());
         }
+        NetBeansOverrides.apply();
         Watcher.rescheduleAll();
     }
 

@@ -1,1 +1,8 @@
 body{}
+/* .commented-out { } is not a class */
+.panel-title, .panel-title .icon { padding: 10px; }
+.button-row { background: url(img/back.png); }
+a[href$=".pdf"] { color: red; }
+@media (max-width: 768px) {
+  .form-row { display: grid; }
+}

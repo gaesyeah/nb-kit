@@ -68,6 +68,7 @@ public final class Rules {
         ALL.put("sec.escape", Msg.t("rule.sec.escape"));
         ALL.put("el.immediate", Msg.t("rule.el.immediate"));
         ALL.put("origin", Msg.t("rule.origin"));
+        ALL.put("css.class", Msg.t("rule.css.class"));
     }
 
     public static final Predicate<String> ALL_ON = r -> true;

@@ -32,4 +32,10 @@ public final class Msg {
     public static String hint(String hint) {
         return hint == null ? "" : t("hint", hint);
     }
+
+    /** " Did you mean 'x' (where it is)?" or empty; place may be null */
+    public static String hint(String hint, String place) {
+        // "file, line N (what)" inside the parentheses of the hint: "file, line N, what"
+        return hint == null ? "" : place == null ? t("hint", hint) : t("hint.at", hint, place.replaceFirst("^(.*) \\((.*)\\)$", "$1, $2"));
+    }
 }

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -373,11 +374,15 @@ public final class Analyzer {
 
     /** a blue note: nothing is wrong, it only says where the thing comes from */
     void note(int a, int b, String key, String name, List<String> origins) {
+        note("origin", a, b, key, name, origins);
+    }
+
+    void note(String rule, int a, int b, String key, String name, List<String> origins) {
         if (origins == null || origins.isEmpty()) {
             return;
         }
         String more = origins.size() > 1 ? Msg.t("origin.more", origins.size() - 1) : "";
-        report("origin", Severity.INFO, a, b, Msg.t(key, name, origins.get(0), more));
+        report(rule, Severity.INFO, a, b, Msg.t(key, name, origins.get(0), more));
     }
 
     static String what(Decl d) {
@@ -547,6 +552,7 @@ public final class Analyzer {
 
         names();
         unused();
+        cssClasses();
         compositeAttrs();
         elements();
         ids();
@@ -695,7 +701,8 @@ public final class Analyzer {
                 boolean sure = ws.customElResolver == null;
                 String hint = closest(r.name, allNamesAt(s, attrName, pos));
                 report("el.unknown", sure ? Severity.ERROR : Severity.WARNING, pos, s.x.off(r.b),
-                        (sure ? Msg.t("el.unknown", r.name) : Msg.t("el.unknown.resolver", r.name, ws.customElResolver)) + Msg.hint(hint));
+                        (sure ? Msg.t("el.unknown", r.name) : Msg.t("el.unknown.resolver", r.name, ws.customElResolver))
+                        + Msg.hint(hint, placeOfName(hint, s, attrName, pos)));
             }
             enumCompare(s);
             readonly(s);
@@ -747,6 +754,40 @@ public final class Analyzer {
             }
         }
         return r;
+    }
+
+    /** where a name visible at the site is declared: this file, another file of the view, a bean or faces-config */
+    String placeOfName(String name, Site s, String attrName, int pos) {
+        if (name == null) {
+            return null;
+        }
+        for (Decl d : decls) {
+            if (d.name.equals(name) && visible(d, s.el, attrName, pos)) {
+                return origin(file, d.el, what(d));
+            }
+        }
+        List<String> os = ext.from.getOrDefault(name, List.of());
+        if (os.isEmpty()) {
+            os = globalFrom.getOrDefault(name, List.of());
+        }
+        if (!os.isEmpty()) {
+            return os.get(0);
+        }
+        String bean = beanType(name);
+        return bean == null ? null : Msg.t("hint.bean", ClassModel.display(bean));
+    }
+
+    /** the first element of these files with attr = value (and, when given, of that ui: tag), as "file, line N" */
+    String placeOfAttr(Iterable<File> files, String uiTag, String attr, String value) {
+        for (File f : files) {
+            FileFacts x = ws.facts(f);
+            for (Xml.Element e : x == null ? List.<Xml.Element>of() : x.doc.all) {
+                if ((uiTag == null || e.is("ui", uiTag)) && e.value(attr) != null && e.value(attr).trim().equals(value)) {
+                    return origin(f, e, null);
+                }
+            }
+        }
+        return null;
     }
 
     static String closest(String name, Set<String> options) {
@@ -1065,7 +1106,8 @@ public final class Analyzer {
                 used.add(m.name);
                 if (!declared.containsKey(m.name) && !Set.of("id", "rendered", "binding").contains(m.name)) {
                     String hint = closest(m.name, declared.keySet());
-                    report("cc.attrs", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("cc.attrs", m.name) + Msg.hint(hint));
+                    report("cc.attrs", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("cc.attrs", m.name)
+                            + Msg.hint(hint, hint == null ? null : origin(file, declared.get(hint), "cc:attribute")));
                 }
             }
         }
@@ -1080,6 +1122,154 @@ public final class Analyzer {
             }
             Xml.Attr a = el.attr("name");
             report("unused", Severity.WARNING, a.offset(0), a.offset(a.value.length()), Msg.t("unused.ccattr", e.getKey()));
+        }
+    }
+
+    // ---------- CSS classes (blue notes; they replace NetBeans' "Missing CSS Class", which only looks at the
+    // stylesheets the file itself loads, not those of its template or of the pages that include it) ----------
+
+    static final Map<File, Object[]> CSS_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** class -> line of its first rule (comments, strings, attribute selectors and declarations do not count) */
+    static Map<String, Integer> cssClasses(File f) {
+        Object[] c = CSS_CACHE.get(f);
+        if (c != null && (long) c[0] == f.lastModified()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> r = (Map<String, Integer>) c[1];
+            return r;
+        }
+        Map<String, Integer> r = new LinkedHashMap<>();
+        try {
+            r = cssClasses(java.nio.file.Files.readString(f.toPath()));
+        } catch (java.io.IOException | RuntimeException e) {
+            // unreadable: no classes
+        }
+        CSS_CACHE.put(f, new Object[]{f.lastModified(), r});
+        return r;
+    }
+
+    static final Pattern CSS_CLASS = Pattern.compile("\\.(-?[_a-zA-Z][\\w-]*)");
+
+    static Map<String, Integer> cssClasses(String text) {
+        Map<String, Integer> r = new LinkedHashMap<>();
+        // comments become spaces, keeping the lines
+        String t = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL).matcher(text).replaceAll(m -> m.group().replaceAll("[^\n]", " "));
+        int start = 0;
+        for (int i = 0; i < t.length(); i++) {
+            char ch = t.charAt(i);
+            if (ch == '{') {
+                // the selector is what comes before a block; @media and the like hold rules, they are no selector
+                String prelude = t.substring(start, i);
+                if (!prelude.trim().startsWith("@")) {
+                    String clean = Pattern.compile("\"[^\"]*\"|'[^']*'|\\[[^\\]]*\\]").matcher(prelude).replaceAll(m -> " ".repeat(m.group().length()));
+                    Matcher m = CSS_CLASS.matcher(clean);
+                    while (m.find()) {
+                        int line = 1;
+                        for (int k = 0; k < start + m.start(); k++) {
+                            if (t.charAt(k) == '\n') {
+                                line++;
+                            }
+                        }
+                        r.putIfAbsent(m.group(1), line);
+                    }
+                }
+                start = i + 1;
+            } else if (ch == '}' || ch == ';') {
+                start = i + 1;
+            }
+        }
+        return r;
+    }
+
+    /** the stylesheets an xhtml file loads (h:outputStylesheet, link rel=stylesheet), with the element that loads each */
+    List<Object[]> stylesheets(File f, Xml.Doc d) {
+        List<Object[]> r = new ArrayList<>();
+        for (Xml.Element e : d.all) {
+            List<File> candidates = new ArrayList<>();
+            if (e.is("h", "outputStylesheet") && e.value("name") != null && !e.value("name").contains("{")) {
+                String lib = e.value("library");
+                for (File w : ws.webroots) {
+                    candidates.add(new File(w, "resources/" + (lib == null || lib.isBlank() ? "" : lib.trim() + "/") + e.value("name").trim()));
+                }
+            } else if (e.local.equals("link") && "stylesheet".equalsIgnoreCase(String.valueOf(e.value("rel"))) && e.value("href") != null) {
+                // shortcut: an EL in front (#{request.contextPath}) is dropped; a full URL (CDN) is not read
+                String href = e.value("href").replaceFirst("^.*[}]", "").replaceFirst("[?#].*$", "");
+                if (href.isBlank() || href.contains("://") || href.startsWith("//")) {
+                    continue;
+                }
+                if (href.startsWith("/")) {
+                    for (File w : ws.webroots) {
+                        candidates.add(new File(w, href.substring(1)));
+                    }
+                } else {
+                    candidates.add(new File(f.getParentFile(), href));
+                }
+            }
+            for (File c : candidates) {
+                if (c.isFile()) {
+                    r.add(new Object[]{c.getAbsoluteFile(), e});
+                    break;
+                }
+            }
+        }
+        return r;
+    }
+
+    void cssClasses() {
+        Map<String, List<String>> where = new LinkedHashMap<>(); // class -> "css/a.css, line N (loaded in x.xhtml, line M)"
+        Set<String> own = new HashSet<>(); // the stylesheets this file loads itself: nothing to say about those
+        Set<File> view = new LinkedHashSet<>(List.of(file));
+        for (File root : g.roots(file)) {
+            view.addAll(g.composed(root));
+        }
+        for (File x : view) {
+            FileFacts xf = ws.facts(x);
+            if (xf == null) {
+                continue;
+            }
+            for (Object[] sheet : stylesheets(x, xf.doc)) {
+                File css = (File) sheet[0];
+                File w = ws.webrootOf(css);
+                String path = w == null ? css.getName() : w.getAbsoluteFile().toPath().relativize(css.toPath()).toString().replace('\\', '/');
+                for (Map.Entry<String, Integer> c : cssClasses(css).entrySet()) {
+                    if (x.equals(file)) {
+                        own.add(c.getKey());
+                    }
+                    String place = Msg.t("origin.css.place", Msg.t("origin.place", path, c.getValue()), origin(x, (Xml.Element) sheet[1], null));
+                    List<String> l = where.computeIfAbsent(c.getKey(), k -> new ArrayList<>());
+                    if (!l.contains(place)) {
+                        l.add(place);
+                    }
+                }
+            }
+        }
+        if (where.isEmpty()) {
+            return;
+        }
+        for (Xml.Element e : doc.all) {
+            for (Xml.Attr a : e.attrs) {
+                if (!a.name.equals("class") && !a.name.equals("styleClass")) {
+                    continue;
+                }
+                Matcher m = Pattern.compile("[^\\s]+").matcher(a.value);
+                while (m.find()) {
+                    String c = m.group();
+                    if (c.contains("{") || c.contains("}") || own.contains(c)) {
+                        continue; // EL, or a class of a stylesheet this file loads itself
+                    }
+                    int s0 = a.offset(m.start()), s1 = a.offset(m.end());
+                    if (where.containsKey(c)) {
+                        note("css.class", s0, s1, "origin.css", c, where.get(c));
+                    } else {
+                        // no rule: often on purpose (a hook for JavaScript, a CSS of a jar or CDN); said only when
+                        // a rule with a close name exists, as a possible typo
+                        String hint = closest(c, where.keySet());
+                        if (hint != null) {
+                            report("css.class", Severity.INFO, s0, s1, Msg.t("css.none", c) + Msg.hint(hint, where.get(hint).get(0)));
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1496,7 +1686,12 @@ public final class Analyzer {
                     all.addAll(u.ids);
                 }
                 String hint = closest(last, all);
-                report("id.missing", dynamic ? Severity.WARNING : Severity.ERROR, a0, a1, Msg.t("id.missing", last) + Msg.hint(hint));
+                Set<File> view = new LinkedHashSet<>(List.of(file));
+                for (File root : g.roots(file)) {
+                    view.addAll(g.composed(root));
+                }
+                report("id.missing", dynamic ? Severity.WARNING : Severity.ERROR, a0, a1, Msg.t("id.missing", last)
+                        + Msg.hint(hint, hint == null ? null : placeOfAttr(view, null, "id", hint)));
             } else if (missingIn > 0 && !dynamic) {
                 report("id.missing", Severity.WARNING, a0, a1, Msg.t("id.missing.some", last));
             } else if (missingIn == 0 && !ff.ids.contains(last)) {
@@ -1678,7 +1873,8 @@ public final class Analyzer {
                         report("tpl.define", Severity.WARNING, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.empty", n.value.trim()));
                     } else if (n != null && !empty && !(onlyMetadata && ws.incoming(in.from).isEmpty()) && !inserts.contains(n.value.trim())) {
                         String hint = closest(n.value.trim(), inserts);
-                        report("tpl.define", Severity.ERROR, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.name", n.value.trim()) + Msg.hint(hint));
+                        report("tpl.define", Severity.ERROR, n.offset(0), n.offset(n.value.length()), Msg.t("tpl.define.name", n.value.trim())
+                                + Msg.hint(hint, hint == null ? null : placeOfAttr(g.composed(in.target), "insert", "name", hint)));
                     }
                 }
             }

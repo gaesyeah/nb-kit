@@ -77,6 +77,25 @@ out="$(nbkit uninstall)"; rc=$?
 check "uninstall exits with 0" test "$rc" = 0
 check "uninstall brings back exactly the original files" test "$(fingerprint "$H")" = "$before"
 
+echo "NetBeans rules the JSF module replaced"
+# inside NetBeans the module turned NetBeans' "Missing CSS Class" off and wrote down how it was (here, never set);
+# uninstalling with NetBeans closed puts it back
+nbkit install >/dev/null 2>&1
+RULE="org/netbeans/modules/csl/api/default/text_html_MissingClassRule"
+mkdir -p "$U/config/Preferences/nbkit" "$U/config/Preferences/$(dirname "$RULE")"
+printf 'css.class=true\noverride.%s=absent\n' "$RULE" > "$U/config/Preferences/nbkit/jsf.properties"
+printf 'enabled=false\n' > "$U/config/Preferences/$RULE.properties"
+nbkit uninstall >/dev/null 2>&1
+check "the NetBeans rule turned off by nbkit is back as it was" test ! -e "$U/config/Preferences/$RULE.properties"
+check "and what you ticked in Options stays" grep -qx 'css.class=true' "$U/config/Preferences/nbkit/jsf.properties"
+check "without the note of what it turned off" test "$(grep -c '^override\.' "$U/config/Preferences/nbkit/jsf.properties")" = 0
+nbkit install >/dev/null 2>&1
+printf 'override.%s=false\n' "$RULE" > "$U/config/Preferences/nbkit/jsf.properties"
+printf 'enabled=false\nseverity=ERROR\n' > "$U/config/Preferences/$RULE.properties"
+nbkit uninstall >/dev/null 2>&1
+check "a rule you had turned off yourself stays off, with its other settings" test "$(sort "$U/config/Preferences/$RULE.properties" | tr '\n' ' ')" = "enabled=false severity=ERROR "
+rm -f "$U/config/Preferences/$RULE.properties" "$U/config/Preferences/nbkit/jsf.properties"
+
 echo "Rollback on failure"
 before="$(fingerprint "$H")"
 for n in 2 6 9; do
@@ -273,7 +292,8 @@ if command -v javac >/dev/null 2>&1; then
   # (a JDK that writes empty jars, so nothing here is touched)
   if git -C "$NBKIT_DIR" rev-parse -q --verify HEAD >/dev/null 2>&1; then
     C="$WORK/clone"
-    cp -a "$NBKIT_DIR" "$C"
+    # a clone of its own (copying .git would share it when this is a git worktree) with the files as they are now
+    git clone -q "$NBKIT_DIR" "$C" && tar -C "$NBKIT_DIR" --exclude=.git -cf - . | tar -C "$C" -xf -
     sed -i 's/^version = .*/version = 99/' "$C/modules/tools/jsf/tool.toml"
     git -C "$C" add -A && git -C "$C" -c user.name=t -c user.email=t@t commit -qm "jsf version 99"
     printf '#!/bin/sh
