@@ -24,6 +24,7 @@ public final class JsfOptions extends OptionsPanelController {
 
     private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
     private final Map<String, JCheckBox> boxes = new LinkedHashMap<>();
+    private JCheckBox quiet;
     private JPanel panel;
 
     private JPanel panel() {
@@ -42,8 +43,14 @@ public final class JsfOptions extends OptionsPanelController {
             none.addActionListener(a -> setAll(false));
             buttons.add(all);
             buttons.add(none);
+            quiet = new JCheckBox(Msg.t("options.quiet"));
+            quiet.setToolTipText(Msg.t("options.quiet.tip"));
+            quiet.addActionListener(a -> pcs.firePropertyChange(PROP_CHANGED, false, true));
+            JPanel intro = new JPanel(new BorderLayout(0, 6));
+            intro.add(new JLabel(Msg.t("options.intro")), BorderLayout.NORTH);
+            intro.add(quiet, BorderLayout.SOUTH);
             JPanel top = new JPanel(new BorderLayout(0, 6));
-            top.add(new JLabel(Msg.t("options.intro")), BorderLayout.NORTH);
+            top.add(intro, BorderLayout.NORTH);
             JPanel bl = new JPanel(new BorderLayout());
             bl.add(buttons, BorderLayout.WEST);
             top.add(bl, BorderLayout.SOUTH);
@@ -68,6 +75,7 @@ public final class JsfOptions extends OptionsPanelController {
         for (Map.Entry<String, JCheckBox> e : boxes.entrySet()) {
             e.getValue().setSelected(Settings.enabled(e.getKey()));
         }
+        quiet.setSelected(QuietNotes.on());
     }
 
     @Override
@@ -75,6 +83,7 @@ public final class JsfOptions extends OptionsPanelController {
         for (Map.Entry<String, JCheckBox> e : boxes.entrySet()) {
             Settings.prefs().putBoolean(e.getKey(), e.getValue().isSelected());
         }
+        Settings.prefs().putBoolean(QuietNotes.KEY, quiet.isSelected());
         NetBeansOverrides.apply();
         Watcher.rescheduleAll();
     }
@@ -95,7 +104,7 @@ public final class JsfOptions extends OptionsPanelController {
                 return true;
             }
         }
-        return false;
+        return quiet.isSelected() != QuietNotes.on();
     }
 
     @Override

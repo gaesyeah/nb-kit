@@ -5,6 +5,8 @@
         <folder name="AnnotationTypes">
             <file name="nbkit-jsf-origin.xml" url="origin-annotation.xml"/>
             <file name="nbkit-jsf-origin-fixable.xml" url="origin-fixable-annotation.xml"/>
+            <file name="nbkit-jsf-origin-quiet.xml" url="origin-annotation-quiet.xml"/>
+            <file name="nbkit-jsf-origin-fixable-quiet.xml" url="origin-fixable-annotation-quiet.xml"/>
         </folder>
         <folder name="text">
             <folder name="xhtml">

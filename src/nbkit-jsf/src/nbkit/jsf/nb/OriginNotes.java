@@ -17,8 +17,9 @@ import org.netbeans.spi.editor.highlighting.support.OffsetsBag;
  * The look of the blue notes (Severity.INFO) on the text: blue wave, see-through blue background and the text as a
  * tooltip, through the highlights layer JsfLayerFactory registers with the bag below. The icon, the mark on the right
  * stripe and Alt+Enter come from the hints (Watcher), with the annotation types nbkit-jsf-origin and, when the note
- * has "Go to" actions, nbkit-jsf-origin-fixable (the NetBeans lightbulb with a blue badge). The background is mixed
- * with the editor's own (an annotation type only takes one fixed color, too light on a dark theme).
+ * has "Go to" actions, nbkit-jsf-origin-fixable (the NetBeans lightbulb with a blue badge), or their -quiet versions.
+ * The background is mixed with the editor's own (an annotation type only takes one fixed color, too light on a dark
+ * theme). How see-through each part is: QuietNotes.
  */
 final class OriginNotes {
 
@@ -47,12 +48,13 @@ final class OriginNotes {
 
     private void apply(Document d, List<Rules.Problem> notes) {
         OffsetsBag fresh = new OffsetsBag(d);
-        Color back = mix(editorBackground, BLUE, 0.1); // as see-through as the theme warnings: about 10% of their wave color
+        Color back = mix(editorBackground, BLUE, QuietNotes.background());
+        Color wave = QuietNotes.wave(editorBackground);
         int len = d.getLength();
         for (Rules.Problem p : notes) {
             int s = Math.min(p.start, len), e = Math.min(p.end, len);
             fresh.addHighlight(s, e, AttributesUtilities.createImmutable(StyleConstants.Background, back,
-                    EditorStyleConstants.WaveUnderlineColor, BLUE, EditorStyleConstants.Tooltip, p.message));
+                    EditorStyleConstants.WaveUnderlineColor, wave, EditorStyleConstants.Tooltip, p.message));
         }
         tips.setHighlights(fresh);
     }

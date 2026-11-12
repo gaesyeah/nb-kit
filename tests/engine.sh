@@ -349,6 +349,9 @@ exit 0
   fi
 fi
 
+# jar refuses a manifest line over 512 bytes ("line too long"): long ones go on continuation lines
+check "no module manifest has a line jar refuses" test -z "$(awk 'length > 511 {print FILENAME}' "$NBKIT_DIR"/src/*/manifest.mf)"
+
 echo "Questions of the theme only when interactive"
 # the font of the theme installed on the machine: the build asks whether to keep yours, but only with the
 # menu or NBKIT_TTY=1; with arguments it must not wait on the terminal (it used to, from the tests)

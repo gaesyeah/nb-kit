@@ -222,7 +222,7 @@ final class Watcher implements DocumentListener {
                             ? Severity.WARNING : Severity.HINT;
                     String type = null;
                     if (sev == Severity.HINT && !problemLines.contains(lines.getElementIndex(Math.min(p.start, len)))) {
-                        type = fixes.isEmpty() ? OriginNotes.TYPE : OriginNotes.TYPE_FIXABLE;
+                        type = QuietNotes.type(!fixes.isEmpty());
                     }
                     eds.add(ErrorDescriptionFactory.createErrorDescription(null, sev, type, p.message, null, fixes, d, s, e));
                 } catch (BadLocationException ex) {
