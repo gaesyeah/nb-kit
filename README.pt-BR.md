@@ -118,7 +118,7 @@ Cada regra liga e desliga em **Tools > Options > Editor > JSF**. As mensagens sa
   - nome que não existe;
   - variável fora do lugar;
   - propriedade ou método inexistente no bean;
-  - `value` de campo que não pode ser gravado;
+  - `value` de campo que não pode ser gravado: erro onde o JSF grava, nota azul quando o campo nunca é enviado habilitado (`disabled` ou `readonly` true, em todas as páginas que o incluem, ou enviado só por botões que aparecem com ele desabilitado), aviso quando isso só se sabe com a página rodando;
   - método onde se espera propriedade;
   - constante de enum inexistente;
   - `cc.attrs` não declarado;

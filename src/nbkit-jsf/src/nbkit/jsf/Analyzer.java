@@ -1388,7 +1388,7 @@ public final class Analyzer {
         boolean single = x.whole && x.refs.stream().filter(r -> !r.nested).count() == 1 && x.refs.get(0).pureLvalue;
         if (!single) {
             boolean literalOnly = x.refs.isEmpty() && x.whole;
-            report("el.readonly", Severity.ERROR, x.start, x.end, Msg.t(literalOnly ? "el.readonly.literal" : "el.readonly.expr", tag(s.el)));
+            unwritable(s, Severity.ERROR, x.start, x.end, Msg.t(literalOnly ? "el.readonly.literal" : "el.readonly.expr", tag(s.el)), List.of());
             return;
         }
         El.Ref r = x.refs.get(0);
@@ -1422,15 +1422,618 @@ public final class Analyzer {
             }
             if (with > 0) {
                 if (!without.isEmpty()) {
-                    report("el.readonly", Severity.WARNING, x.off(last.a), x.off(last.b),
+                    unwritable(s, Severity.WARNING, x.off(last.a), x.off(last.b),
                             Msg.t("el.readonly.some", last.name, cap(last.name), ClassModel.display(owner), String.join(", ", without)),
                             javaTarget(owner, last.name));
                 }
                 return;
             }
         }
-        report("el.readonly", Severity.ERROR, x.off(last.a), x.off(last.b), Msg.t("el.readonly.setter", last.name, cap(last.name), ClassModel.display(owner)),
+        unwritable(s, Severity.ERROR, x.off(last.a), x.off(last.b), Msg.t("el.readonly.setter", last.name, cap(last.name), ClassModel.display(owner)),
                 javaTarget(owner, last.name));
+    }
+
+    // ---------- when JSF writes an input ----------
+    // JSF writes the value of an input only when the form is sent with it enabled: a disabled or readonly input is
+    // skipped by its renderer (no value read, no setter called). So a value with nowhere to be written is an error
+    // where the input is enabled when sent, a blue note where it never is, and a warning when that is only known
+    // when the page runs. The conditions are evaluated page by page (the values the including pages give to
+    // ui:param), with getters that always return the same constant, and with what sends the form: the buttons and
+    // ajax that process the input, and when they are there. Anything nbkit cannot follow counts as sending it.
+
+    /** a condition: a constant, an atom (known only when the page runs), not, and, or */
+    static final class Cond {
+        final char op;       // c constant, a atom, ! not, & and, | or
+        final boolean value;
+        final String atom;
+        final Cond l, r;
+
+        Cond(char op, boolean value, String atom, Cond l, Cond r) {
+            this.op = op;
+            this.value = value;
+            this.atom = atom;
+            this.l = l;
+            this.r = r;
+        }
+
+        static final Cond TRUE = new Cond('c', true, null, null, null), FALSE = new Cond('c', false, null, null, null);
+
+        static Cond atom(String text) {
+            return new Cond('a', false, text.trim().replaceAll("\\s+", " "), null, null);
+        }
+
+        static Cond not(Cond a) {
+            return a.op == 'c' ? (a.value ? FALSE : TRUE) : new Cond('!', false, null, a, null);
+        }
+
+        static Cond and(Cond a, Cond b) {
+            if (a.op == 'c') {
+                return a.value ? b : FALSE;
+            }
+            if (b.op == 'c') {
+                return b.value ? a : FALSE;
+            }
+            return new Cond('&', false, null, a, b);
+        }
+
+        static Cond or(Cond a, Cond b) {
+            if (a.op == 'c') {
+                return a.value ? TRUE : b;
+            }
+            if (b.op == 'c') {
+                return b.value ? TRUE : a;
+            }
+            return new Cond('|', false, null, a, b);
+        }
+
+        void atoms(Set<String> out) {
+            if (op == 'a') {
+                out.add(atom);
+            }
+            if (l != null) {
+                l.atoms(out);
+            }
+            if (r != null) {
+                r.atoms(out);
+            }
+        }
+
+        boolean eval(Map<String, Boolean> values) {
+            switch (op) {
+                case 'c': return value;
+                case 'a': return values.get(atom);
+                case '!': return !l.eval(values);
+                case '&': return l.eval(values) && r.eval(values);
+                default: return l.eval(values) || r.eval(values);
+            }
+        }
+
+        /** true: for every value of its atoms; false: for none; null: depends on them */
+        Boolean always() {
+            Set<String> as = new java.util.TreeSet<>();
+            atoms(as);
+            if (as.size() > 10) {
+                return null;
+            }
+            List<String> names = new ArrayList<>(as);
+            boolean any = false, all = true;
+            for (int m = 0; m < 1 << names.size(); m++) {
+                Map<String, Boolean> v = new HashMap<>();
+                for (int i = 0; i < names.size(); i++) {
+                    v.put(names.get(i), (m >> i & 1) == 1);
+                }
+                boolean b = eval(v);
+                any |= b;
+                all &= b;
+            }
+            return all ? Boolean.TRUE : any ? null : Boolean.FALSE;
+        }
+    }
+
+    /** the boolean an attribute gives: no attribute is dflt; text without EL is true only for "true" */
+    Cond attrCond(String v, boolean dflt, Xml.Element site, WriteCtx ctx, int depth) {
+        if (v == null) {
+            return dflt ? Cond.TRUE : Cond.FALSE;
+        }
+        String t = v.trim();
+        if (!t.contains("#{") && !t.contains("${")) {
+            return t.equalsIgnoreCase("true") ? Cond.TRUE : Cond.FALSE;
+        }
+        String inner = t.length() > 3 && (t.startsWith("#{") || t.startsWith("${")) && t.endsWith("}") ? t.substring(2, t.length() - 1) : null;
+        if (inner == null || inner.contains("#{") || inner.contains("${")) {
+            return Cond.atom(t); // text and EL together: a text, true only when it reads "true"
+        }
+        return condOf(inner, site, ctx, depth);
+    }
+
+    /** the condition of an EL expression: or, and, not, parentheses; any other part is an atom, resolved below */
+    Cond condOf(String el, Xml.Element site, WriteCtx ctx, int depth) {
+        if (topLevel(el, "?") || topLevel(el, ";") || el.contains("->")) {
+            return Cond.atom(el); // ternary, several statements, lambdas: as a whole
+        }
+        int[] pos = {0};
+        Cond c = condOr(el, pos, site, ctx, depth);
+        skipSpace(el, pos);
+        return c != null && pos[0] >= el.length() ? c : Cond.atom(el);
+    }
+
+    static boolean topLevel(String s, String ch) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (quote != 0) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '\'' || c == '"') {
+                quote = c;
+            } else if (c == '(' || c == '[' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == ']' || c == '}') {
+                depth--;
+            } else if (depth == 0 && s.startsWith(ch, i)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static void skipSpace(String s, int[] pos) {
+        while (pos[0] < s.length() && Character.isWhitespace(s.charAt(pos[0]))) {
+            pos[0]++;
+        }
+    }
+
+    /** the boolean operator at pos (|| or, && and), or 0 */
+    static char boolOp(String s, int i) {
+        if (s.startsWith("||", i)) {
+            return '|';
+        }
+        if (s.startsWith("&&", i)) {
+            return '&';
+        }
+        for (String w : new String[] {"or", "and"}) {
+            if (s.startsWith(w, i) && (i == 0 || !Character.isJavaIdentifierPart(s.charAt(i - 1)))
+                    && (i + w.length() >= s.length() || !Character.isJavaIdentifierPart(s.charAt(i + w.length())))) {
+                return w.charAt(0) == 'o' ? '|' : '&';
+            }
+        }
+        return 0;
+    }
+
+    Cond condOr(String s, int[] pos, Xml.Element site, WriteCtx ctx, int depth) {
+        Cond c = condAnd(s, pos, site, ctx, depth);
+        while (c != null) {
+            skipSpace(s, pos);
+            if (pos[0] >= s.length() || boolOp(s, pos[0]) != '|') {
+                return c;
+            }
+            pos[0] += 2;
+            Cond r = condAnd(s, pos, site, ctx, depth);
+            c = r == null ? null : Cond.or(c, r);
+        }
+        return null;
+    }
+
+    Cond condAnd(String s, int[] pos, Xml.Element site, WriteCtx ctx, int depth) {
+        Cond c = condUnary(s, pos, site, ctx, depth);
+        while (c != null) {
+            skipSpace(s, pos);
+            if (pos[0] >= s.length() || boolOp(s, pos[0]) != '&') {
+                return c;
+            }
+            pos[0] += s.startsWith("&&", pos[0]) ? 2 : 3;
+            Cond r = condUnary(s, pos, site, ctx, depth);
+            c = r == null ? null : Cond.and(c, r);
+        }
+        return null;
+    }
+
+    Cond condUnary(String s, int[] pos, Xml.Element site, WriteCtx ctx, int depth) {
+        skipSpace(s, pos);
+        int i = pos[0];
+        if (i >= s.length()) {
+            return null;
+        }
+        if (s.charAt(i) == '!' && !s.startsWith("!=", i)) {
+            pos[0]++;
+            Cond c = condUnary(s, pos, site, ctx, depth);
+            return c == null ? null : Cond.not(c);
+        }
+        if (s.startsWith("not", i) && (i + 3 >= s.length() || !Character.isJavaIdentifierPart(s.charAt(i + 3)))) {
+            pos[0] += 3;
+            Cond c = condUnary(s, pos, site, ctx, depth);
+            return c == null ? null : Cond.not(c);
+        }
+        if (s.charAt(i) == '(') {
+            pos[0]++;
+            Cond c = condOr(s, pos, site, ctx, depth);
+            skipSpace(s, pos);
+            if (c == null || pos[0] >= s.length() || s.charAt(pos[0]) != ')') {
+                return null;
+            }
+            pos[0]++;
+            return c;
+        }
+        // an operand: up to a boolean operator or a closing parenthesis outside brackets and quotes
+        int depthB = 0;
+        char quote = 0;
+        int j = i;
+        for (; j < s.length(); j++) {
+            char c = s.charAt(j);
+            if (quote != 0) {
+                if (c == '\\') {
+                    j++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+            if (c == '\'' || c == '"') {
+                quote = c;
+            } else if (c == '(' || c == '[') {
+                depthB++;
+            } else if (c == ')' || c == ']') {
+                if (depthB == 0) {
+                    break;
+                }
+                depthB--;
+            } else if (depthB == 0 && boolOp(s, j) != 0) {
+                break;
+            }
+        }
+        String operand = s.substring(i, j).trim();
+        pos[0] = j;
+        return operand.isEmpty() ? null : operandCond(operand, site, ctx, depth);
+    }
+
+    static final Pattern NAME = Pattern.compile("[A-Za-z_$][\\w$]*");
+    static final Pattern CHAIN = Pattern.compile("([A-Za-z_$][\\w$]*)((?:\\.[A-Za-z_$][\\w$]*)+)");
+
+    /** an operand: true, false, null, a name the pages give (ui:param, c:set), a getter that returns a constant */
+    Cond operandCond(String o, Xml.Element site, WriteCtx ctx, int depth) {
+        switch (o) {
+            case "true": return Cond.TRUE;
+            case "false": case "null": return Cond.FALSE;
+            default: break;
+        }
+        if (NAME.matcher(o).matches()) {
+            Cond v = depth < 4 ? nameCond(o, site, ctx, depth + 1) : null;
+            return v != null ? v : Cond.atom(o);
+        }
+        Matcher m = CHAIN.matcher(o);
+        if (m.matches()) {
+            Boolean k = constantGetter(o);
+            if (k != null) {
+                return k ? Cond.TRUE : Cond.FALSE;
+            }
+        }
+        return Cond.atom(o);
+    }
+
+    /** the value of name at site in ctx: declared in this file, passed or declared by the including page; null: unknown */
+    Cond nameCond(String name, Xml.Element site, WriteCtx ctx, int depth) {
+        for (Decl d : decls) {
+            if (d.name.equals(name) && (d.kind.equals("ui:param") || d.kind.equals("c:set")) && visible(d, site, null, site.start)) {
+                return attrCond(d.el.value("value"), false, d.el, null, depth);
+            }
+        }
+        if (ctx == null || ctx.in == null) {
+            return null;
+        }
+        Inc in = ctx.in;
+        for (Xml.Element p : in.el.elements()) {
+            if (p.is("ui", "param") && name.equals(trim(p.value("name")))) {
+                ctx.origins.add(origin(in.from, p, "ui:param"));
+                return attrCond(p.value("value"), false, p, null, depth);
+            }
+        }
+        FileFacts from = ws.facts(in.from);
+        if (from == null) {
+            return null;
+        }
+        for (Decl d : decls(from.doc)) {
+            if (d.name.equals(name) && (d.kind.equals("ui:param") || d.kind.equals("c:set"))
+                    && (d.scope == FILE && !d.passed || visible(d, in.el, null, in.el.start))) {
+                ctx.origins.add(origin(in.from, d.el, what(d)));
+                return attrCond(d.el.value("value"), false, d.el, null, depth);
+            }
+        }
+        // not given here: from the pages above (not followed), or nowhere: EL reads it as null, false
+        if (!g.in(in.from).isEmpty() || beanType(name) != null || !ext.names.contains(name)) {
+            return null;
+        }
+        ctx.origins.add(origin(in.from, in.el, null));
+        return Cond.FALSE;
+    }
+
+    static String trim(String s) {
+        return s == null ? null : s.trim();
+    }
+
+    /** bean.flag whose getter in the Java source only returns true or false; null: anything else */
+    Boolean constantGetter(String chain) {
+        String[] parts = chain.split("\\.");
+        String type = beanType(parts[0]);
+        for (int i = 1; type != null && i < parts.length - 1; i++) {
+            type = ws.classes.complete(type) ? ws.classes.members(type).getters.get(parts[i]) : null;
+            type = ClassModel.classOf(type);
+        }
+        if (type == null) {
+            return null;
+        }
+        String prop = parts[parts.length - 1];
+        Pattern body = Pattern.compile("\\b(?:boolean|Boolean)\\s+(?:is|get)" + Pattern.quote(cap(prop))
+                + "\\s*\\(\\s*\\)\\s*\\{\\s*return\\s+(true|false)\\s*;\\s*\\}");
+        Deque<String> todo = new ArrayDeque<>(List.of(type));
+        Set<String> seen = new HashSet<>();
+        while (!todo.isEmpty()) {
+            String c = todo.poll();
+            if (c == null || !seen.add(c)) {
+                continue;
+            }
+            File src = javaSource(c);
+            if (src != null) {
+                String text = String.join("\n", javaLines.computeIfAbsent(src, f -> {
+                    try {
+                        return java.nio.file.Files.readAllLines(f.toPath());
+                    } catch (java.io.IOException | RuntimeException e) {
+                        return List.of();
+                    }
+                }));
+                Matcher m = body.matcher(text);
+                if (m.find()) {
+                    return m.group(1).equals("true");
+                }
+                if (Pattern.compile("\\b(?:is|get)" + Pattern.quote(cap(prop)) + "\\s*\\(").matcher(text).find()) {
+                    return null; // the getter is here and does something else
+                }
+            }
+            ClassModel.ClassInfo ci = ws.classes.get(c);
+            if (ci != null && ci.superName != null) {
+                todo.add(ci.superName);
+            }
+        }
+        return null;
+    }
+
+    /** one page that shows the input: the include that brings this file (null: the file itself, nothing above) */
+    static final class WriteCtx {
+        final Inc in;
+        final List<String> origins = new ArrayList<>();
+
+        WriteCtx(Inc in) {
+            this.in = in;
+        }
+    }
+
+    static final Set<String> DATA = Set.of("dataTable", "dataGrid", "dataList", "dataView", "dataScroller", "treeTable", "tree",
+            "tabView", "accordionPanel", "wizard", "carousel", "schedule", "pickList", "orderList");
+
+    /** whether JSF writes inp in ctx: true always, false never, null depends on what is known only when it runs */
+    Boolean writes(Xml.Element inp, WriteCtx ctx, boolean alone) {
+        Cond off = Cond.or(attrCond(inp.value("disabled"), false, inp, ctx, 0), attrCond(inp.value("readonly"), false, inp, ctx, 0));
+        Cond sent = alone ? Cond.TRUE : sent(inp, ctx);
+        return Cond.and(Cond.not(off), sent).always();
+    }
+
+    /** when the form is sent processing inp; TRUE when nbkit cannot follow what sends it */
+    Cond sent(Xml.Element inp, WriteCtx ctx) {
+        Xml.Element form = formOf(inp);
+        List<Xml.Element> scope = new ArrayList<>();
+        Xml.Doc d = doc;
+        Inc via = null;
+        if (form != null) {
+            for (Xml.Element e : doc.all) {
+                if (e != form && inside(e, form)) {
+                    scope.add(e);
+                }
+            }
+        } else {
+            // the form of the page that includes this file, around the include
+            if (ctx == null || ctx.in == null || !"include".equals(ctx.in.kind) || ws.facts(ctx.in.from) == null) {
+                return Cond.TRUE;
+            }
+            via = ctx.in;
+            d = ws.facts(via.from).doc;
+            form = formOf(via.el);
+            if (form == null) {
+                return Cond.TRUE;
+            }
+            for (Xml.Element e : d.all) {
+                if (e != form && inside(e, form) && !inside(e, via.el)) {
+                    scope.add(e);
+                }
+            }
+            scope.addAll(doc.all);
+        }
+        for (Xml.Element p = inp.parent; p != null && p != form; p = p.parent) {
+            if (p.is("p", DATA.toArray(new String[0]))) {
+                return Cond.TRUE; // paging, sorting, tabs: these send what is inside them by themselves
+            }
+        }
+        Cond any = Cond.FALSE;
+        for (Xml.Element e : scope) {
+            String lib = Ns.lib(e.ns);
+            if (e.is("ui", "include", "insert", "decorate") && e != via.el
+                    || !Set.of("h", "f", "ui", "c", "p", "pe", "o", "html", "jsf", "").contains(lib)) {
+                return Cond.TRUE; // content nbkit does not see here
+            }
+            Boolean processes;
+            Xml.Element owner = e;
+            if (e.is("h", "commandButton", "commandLink")) {
+                if (hasAjax(e)) {
+                    continue; // its f:ajax decides
+                }
+                processes = true;
+            } else if (e.is("p", "commandButton", "commandLink", "menuitem", "splitButton")) {
+                processes = "false".equals(trim(e.value("ajax"))) || hasAjax(e) && e.value("process") == null ? Boolean.TRUE
+                        : processes(e.value("process") == null ? "@form" : e.value("process"), e, inp);
+            } else if (e.is("p", "ajax") || e.is("f", "ajax")) {
+                owner = e.parent;
+                String p = e.value(e.is("f", "ajax") ? "execute" : "process");
+                processes = processes(p == null ? "@this" : p, owner, inp);
+            } else if (e.is("p", "remoteCommand", "poll") || e.is("h", "commandScript") || e.is("o", "commandScript")) {
+                return Cond.TRUE;
+            } else if (e.value("process") != null || e.value("execute") != null) {
+                processes = processes(e.value("process") != null ? e.value("process") : e.value("execute"), e, inp);
+            } else {
+                continue;
+            }
+            if (processes == null) {
+                return Cond.TRUE;
+            }
+            if (processes) {
+                any = Cond.or(any, active(e, form, ctx));
+            }
+        }
+        return any;
+    }
+
+    static boolean hasAjax(Xml.Element e) {
+        for (Xml.Element c : e.elements()) {
+            if (c.is("f", "ajax") || c.is("p", "ajax")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static Xml.Element formOf(Xml.Element e) {
+        for (Xml.Element p = e.parent; p != null; p = p.parent) {
+            if (p.is("h", "form") || p.is("o", "form")) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    static boolean inside(Xml.Element e, Xml.Element a) {
+        for (Xml.Element p = e; p != null; p = p.parent) {
+            if (p == a) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** whether what process (or execute) names includes inp; null: an expression nbkit does not follow */
+    static Boolean processes(String spec, Xml.Element owner, Xml.Element inp) {
+        boolean unknown = false;
+        for (String tok : spec.trim().split("[\\s,]+")) {
+            if (tok.isEmpty() || tok.equals("@none")) {
+                continue;
+            }
+            if (tok.equals("@form") || tok.equals("@all")) {
+                return true;
+            }
+            if (tok.equals("@this") || tok.equals("@parent")) {
+                Xml.Element o = tok.equals("@this") ? owner : owner.parent;
+                if (o != null && inside(inp, o)) {
+                    return true;
+                }
+                continue;
+            }
+            if (tok.startsWith("@") || tok.contains("{")) {
+                unknown = true;
+                continue;
+            }
+            String id = tok.substring(tok.lastIndexOf(':') + 1);
+            for (Xml.Element p = inp; p != null; p = p.parent) {
+                if (id.equals(trim(p.value("id")))) {
+                    return true;
+                }
+            }
+        }
+        return unknown ? null : false;
+    }
+
+    /** when e is there and enabled: rendered (and c:if) of it and of what is around it in the form, not disabled */
+    Cond active(Xml.Element e, Xml.Element form, WriteCtx ctx) {
+        Cond c = Cond.not(attrCond(e.value("disabled"), false, e, ctx, 0));
+        for (Xml.Element p = e; p != null && p != form; p = p.parent) {
+            c = Cond.and(c, attrCond(p.value("rendered"), true, p, ctx, 0));
+            if (p.is("c", "if")) {
+                c = Cond.and(c, attrCond(p.value("test"), false, p, ctx, 0));
+            }
+        }
+        return c;
+    }
+
+    /** reports a value with nowhere to be written by where JSF writes it: error, warning, or a blue note */
+    void unwritable(Site s, Severity sev, int a, int b, String msg, List<Rules.Target> targets) {
+        Xml.Element inp = s.el;
+        if (inp.attr("disabled") == null && inp.attr("readonly") == null) {
+            report("el.readonly", sev, a, b, msg, targets);
+            return;
+        }
+        List<WriteCtx> ctxs = new ArrayList<>();
+        for (Inc in : g.in(file)) {
+            ctxs.add(new WriteCtx(in));
+        }
+        if (ctxs.isEmpty()) {
+            ctxs.add(new WriteCtx(null));
+        }
+        // the pages in the order of their paths, the same on every machine (the files come in the order of the disk)
+        ctxs.sort(java.util.Comparator.comparing((WriteCtx c) -> c.in == null ? "" : c.in.from.getPath()));
+        List<String> written = new ArrayList<>(), never = new ArrayList<>(), origins = new ArrayList<>(), writtenFrom = new ArrayList<>();
+        int writes = 0, depends = 0;
+        boolean byPages = false, alone = true;
+        for (WriteCtx ctx : ctxs) {
+            Boolean w = writes(inp, ctx, false);
+            byPages |= !ctx.origins.isEmpty();
+            String page = ctx.in == null ? null : origin(ctx.in.from, null, null);
+            if (Boolean.TRUE.equals(w)) {
+                writes++;
+                if (page != null) {
+                    written.add(page);
+                }
+                writtenFrom.addAll(ctx.origins);
+            } else if (w == null) {
+                depends++;
+            } else {
+                if (page != null) {
+                    never.add(page);
+                }
+                origins.addAll(ctx.origins);
+                alone &= Boolean.FALSE.equals(writes(inp, new WriteCtx(ctx.in), true));
+            }
+        }
+        String cond = condText(inp);
+        if (writes > 0) {
+            // written everywhere, or nothing says where: the problem as it is; otherwise the pages where it is written
+            if (writes == ctxs.size() || !byPages || written.isEmpty()) {
+                report("el.readonly", sev, a, b, msg, targets);
+            } else {
+                List<Rules.Target> t = new ArrayList<>(targets);
+                t.addAll(targets(writtenFrom));
+                report("el.readonly", sev, a, b, msg + " " + Msg.t("el.readonly.pages", String.join(", ", written), cond), t);
+            }
+            return;
+        }
+        if (depends > 0) {
+            report("el.readonly", Severity.WARNING, a, b, msg + " " + Msg.t("el.readonly.depends", cond), targets);
+            return;
+        }
+        String why = !alone ? Msg.t("el.readonly.never.submit", cond)
+                : byPages ? Msg.t("el.readonly.never.pages", cond, String.join(", ", never)) : Msg.t("el.readonly.never.constant", cond);
+        List<Rules.Target> t = new ArrayList<>(targets);
+        t.addAll(targets(origins));
+        report("el.readonly", Severity.INFO, a, b, msg + " " + Msg.t("el.readonly.never", why), t);
+    }
+
+    /** disabled="..." or readonly="...", as written */
+    static String condText(Xml.Element inp) {
+        List<String> r = new ArrayList<>();
+        for (String n : new String[] {"disabled", "readonly"}) {
+            if (inp.value(n) != null) {
+                r.add(n + "=\"" + inp.value(n).trim() + "\"");
+            }
+        }
+        return String.join(" / ", r);
     }
 
     // ---------- unused ----------

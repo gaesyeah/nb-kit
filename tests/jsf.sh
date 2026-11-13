@@ -86,6 +86,14 @@ for fx in fixture fixture-resolver; do
       contains "a list literal is a List" "$out" "«stremm»  ⇒ stream"
       contains "a set literal is a Set" "$out" "«containz»  ⇒ contains"
       contains "also from h:outputStylesheet" "$out" "«css/app.css»  → resources/css/app.css:1"
+      # a value with no setter on a disabled or readonly input: by where JSF writes it
+      contains "never written (disabled true): a blue note that says why" "$out" "But it is never sent enabled (disabled=\"#{true}\" is always true)"
+      contains "true in every page that includes it: names the pages and goes to their ui:param" "$out" \
+        "is true in pages/ro/create.xhtml, pages/ro/detail.xhtml): JSF never writes it here.  «code»  → ../java/app/LockVM.java:6  → pages/ro/create.xhtml:4  → pages/ro/detail.xhtml:4"
+      contains "false in one page: an error that names it and goes to its ui:param" "$out" \
+        "In pages/ro/create.xhtml it is sent enabled (disabled=\"#{readOnly}\" is false there): JSF writes it.  «code»  → ../java/app/LockVM.java:6  → pages/ro/create.xhtml:3"
+      contains "known only when the page runs: a warning that says so" "$out" "JSF only leaves it alone while disabled=\"#{lockVM.busy}\" is true"
+      contains "sent only while disabled: says what sends the form" "$out" "what sends the form only does it while disabled=\"#{lockVM.busy}\" is true"
     fi
   done
 done

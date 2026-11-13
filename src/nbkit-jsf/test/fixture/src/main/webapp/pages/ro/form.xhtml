@@ -1,0 +1,19 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui">
+  <!-- an input whose value has no setter: an error only where JSF writes it (disabled and readonly: never written) -->
+  <h:inputText value="#{lockVM.code}"/><!--E:el.readonly-->
+  <h:inputText value="#{lockVM.code}" disabled="#{true}"/><!--I:el.readonly-->
+  <h:inputText value="#{lockVM.code}" readonly="true"/><!--I:el.readonly-->
+  <h:inputText value="#{lockVM.code}" disabled="false"/><!--E:el.readonly-->
+  <h:inputText value="#{lockVM.code.trim()}" disabled="#{true}"/><!--I:el.readonly-->
+  <!-- from the pages that include this file: false in create, true in detail -->
+  <h:inputText value="#{lockVM.code}" disabled="#{readOnly}"/><!--E:el.readonly I:origin-->
+  <h:inputText value="#{lockVM.code}" disabled="#{viewOnly}"/><!--I:el.readonly I:origin-->
+  <!-- a getter that always gives the same: as the constant -->
+  <h:inputText value="#{lockVM.code}" disabled="#{lockVM.locked}"/><!--I:el.readonly-->
+  <h:inputText value="#{lockVM.code}" disabled="#{lockVM.open}"/><!--E:el.readonly-->
+  <h:inputText value="#{lockVM.code}" disabled="#{not lockVM.locked}"/><!--E:el.readonly-->
+  <!-- known only when the page runs: a warning -->
+  <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--W:el.readonly-->
+  <h:inputText value="#{lockVM.code}" disabled="#{viewOnly or lockVM.busy}"/><!--I:el.readonly I:origin-->
+  <h:inputText value="#{lockVM.code}" disabled="#{readOnly and lockVM.busy}"/><!--E:el.readonly I:origin-->
+</ui:composition>

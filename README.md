@@ -118,7 +118,7 @@ Each rule turns on and off in **Tools > Options > Editor > JSF**. The messages c
   - name that does not exist;
   - variable out of place;
   - property or method missing in the bean;
-  - input `value` that cannot be written;
+  - input `value` that cannot be written: an error where JSF writes it, a blue note when the input is never sent enabled (`disabled` or `readonly` true, in every page that includes it, or only sent by buttons that show while it is disabled), a warning when that is known only when the page runs;
   - method where a property is expected;
   - enum constant that does not exist;
   - undeclared `cc.attrs`;

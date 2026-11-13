@@ -1,0 +1,31 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui">
+  <!-- the buttons that send the form only show while the input is disabled: never written -->
+  <h:form>
+    <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--I:el.readonly-->
+    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/>
+  </h:form>
+  <h:form>
+    <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--I:el.readonly-->
+    <h:selectBooleanCheckbox value="#{lockVM.flag}"><p:ajax/></h:selectBooleanCheckbox>
+    <h:panelGroup rendered="#{lockVM.busy}"><h:commandButton value="Save" action="#{lockVM.save}"/></h:panelGroup>
+  </h:form>
+  <!-- a button that sends it enabled, or something nbkit cannot follow: still a warning -->
+  <h:form>
+    <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--W:el.readonly-->
+    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/>
+    <p:commandButton value="Save" action="#{lockVM.save}"/>
+  </h:form>
+  <h:form>
+    <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--W:el.readonly-->
+    <h:selectBooleanCheckbox value="#{lockVM.flag}"><p:ajax process="@form"/></h:selectBooleanCheckbox>
+  </h:form>
+  <h:form>
+    <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--W:el.readonly-->
+    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/>
+    <p:remoteCommand name="go" action="#{lockVM.save}"/>
+  </h:form>
+  <h:form>
+    <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"><p:ajax/></h:inputText><!--W:el.readonly-->
+    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/>
+  </h:form>
+</ui:composition>
