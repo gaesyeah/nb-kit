@@ -103,6 +103,26 @@ class AllAtOnce(unittest.TestCase):
             self.assertNotEqual(model.T(key), key)
 
 
+class Build(unittest.TestCase):
+    """the build button says whether the jars are up to date with src/ ("build" of status --json)"""
+    def test_up_to_date(self):
+        st = {'clone': True, 'build': []}
+        self.assertEqual(model.build_text(st), 'Build the modules (up to date)')
+        self.assertIn('Nothing changed in src/ since the last build', model.build_tip(st))
+
+    def test_changed_says_what(self):
+        st = {'clone': True, 'build': [{'module': 'nbkit-jsf', 'reason': 'changed'}, {'module': 'nbkit-core', 'reason': 'missing'}]}
+        self.assertEqual(model.build_text(st), 'Build the modules')
+        tip = model.build_tip(st)
+        self.assertTrue(tip.startswith(model.T('gui.tip_build')))
+        self.assertIn('Changed since the last build: nbkit-jsf (code changed), nbkit-core (no jar)', tip)
+
+    def test_unknown_is_not_up_to_date(self):
+        # an older nbkit.sh without "build": the plain button
+        self.assertEqual(model.build_text({'clone': True}), 'Build the modules')
+        self.assertEqual(model.build_tip({'clone': True}), model.T('gui.tip_build'))
+
+
 class Commands(unittest.TestCase):
     def test_argv(self):
         self.assertEqual(model.NBKIT, os.path.join(helpers.ROOT, 'nbkit.sh'))

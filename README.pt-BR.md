@@ -297,7 +297,7 @@ Os jars já vêm compilados em `lib/jars/` e `modules/tools/jsf/`. Para compilar
 bash src/build.sh [pasta do netbeans]     # ou: bash nbkit.sh build
 ```
 
-Ele compila contra os jars da sua instalação do NetBeans (sem a pasta: `NB_HOME`, ou o NetBeans que usou o `~/.netbeans` por último) com um JDK 17 ou mais novo, e atualiza os sha256. `bash src/build.sh --help` mostra as opções.
+Ele compila contra os jars da sua instalação do NetBeans (sem a pasta: `NB_HOME`, ou o NetBeans que usou o `~/.netbeans` por último) com um JDK 17 ou mais novo, e atualiza os sha256. Cada jar guarda no manifest uma marca do código de que foi compilado: quando nada mudou em `src/` desde então, o build diz que os módulos estão em dia (no menu e na interface, "(em dia)") e pergunta antes de compilar mesmo assim; `--force` compila sem perguntar. `bash src/build.sh --help` mostra as opções.
 
 ## Estrutura
 

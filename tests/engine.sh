@@ -298,13 +298,13 @@ if command -v javac >/dev/null 2>&1; then
   F="$H/.local/share/flatpak/app/org.apache.netbeans/current/active/files/netbeans"
   mkdir -p "$F/platform"
   sed -i "s|Installation *=.*|Installation            = /app/netbeans/nb|" "$U/var/log/messages.log"
-  out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" 2>&1)"
+  out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" --force 2>&1)"
   contains "build.sh finds NetBeans installed with Flatpak" "$out" "NetBeans: $F"
   # Flatpak keeps NetBeans in a long folder: hundreds of jars there make a classpath too big for one argument
   L="$F/$(printf 'x%.0s' $(seq 200))"
   mkdir -p "$L/modules"
   for i in $(seq 1500); do : > "$L/modules/org-netbeans-modules-some-long-module-name-$i.jar"; done
-  out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"
+  out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" --force 2>&1 </dev/null)"
   lacks "build.sh compiles with a classpath of hundreds of long paths" "$out" "Argument list too long"
   # the NetBeans jars bring annotation processors, some built for a newer Java than the JDK here: javac must not
   # load them (a javac that writes down its arguments and fails, so build.sh stops before touching the jars)
@@ -312,13 +312,13 @@ if command -v javac >/dev/null 2>&1; then
   printf '#!/bin/sh\n[ "$1" = -version ] && { echo "javac 17.0.12"; exit 0; }\necho "javac args: $*"; exit 1\n' > "$WORK/jdk/bin/javac"
   printf '#!/bin/sh\nexit 0\n' > "$WORK/jdk/bin/jar"
   chmod +x "$WORK/jdk/bin/javac" "$WORK/jdk/bin/jar"
-  out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdk" bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"
+  out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdk" bash "$NBKIT_DIR/src/build.sh" --force 2>&1 </dev/null)"
   contains "build.sh does not load the annotation processors of the NetBeans jars" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
   rm -rf "$L"
   # no JDK anywhere: JAVA_HOME unset, a javac on the PATH that is not one, no JDK where JDKs are installed
   mkdir -p "$WORK/nojdk/bin" "$WORK/jvm"
   printf '#!/bin/sh\nexit 127\n' > "$WORK/nojdk/bin/javac"; chmod +x "$WORK/nojdk/bin/javac"
-  out="$(HOME="$H" NB_HOME='' JAVA_HOME='' NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"; rc=$?
+  out="$(HOME="$H" NB_HOME='' JAVA_HOME='' NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" --force 2>&1 </dev/null)"; rc=$?
   contains "build.sh without a JDK says it needs one" "$out" "needs a JDK 17 or newer"
   check "and, with nothing installed, stops with an error" test "$rc" = 1
   # the Java the NetBeans jars need comes from their classes (NetBeans 31: class version 65, Java 21); a JDK 17 in
@@ -331,20 +331,20 @@ if command -v javac >/dev/null 2>&1; then
     printf '#!/bin/sh\nexit 0\n' > "$WORK/jdk$v/bin/jar"; chmod +x "$WORK/jdk$v/bin/javac" "$WORK/jdk$v/bin/jar"
   done
   ln -s "$WORK/jdk21" "$NB21/jdk"
-  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" "$NB21" 2>&1 </dev/null)"
+  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" --force "$NB21" 2>&1 </dev/null)"
   contains "build.sh takes the JDK NetBeans brings when the one in JAVA_HOME is too old for its jars" "$out" "| javac 21.0.1"
   rm "$NB21/jdk"
-  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" "$NB21" 2>&1 </dev/null)"; rc=$?
+  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" --force "$NB21" 2>&1 </dev/null)"; rc=$?
   contains "with only a JDK too old, it says which Java the NetBeans jars need" "$out" "need Java 21"
   check "and stops before touching the jars" test "$rc" = 1
   mkdir -p "$WORK/jvm/java-21"; ln -s "$WORK/jdk21/bin" "$WORK/jvm/java-21/bin"
-  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" "$NB21" 2>&1 </dev/null)"
+  out="$(HOME="$H" JAVA_HOME="$WORK/jdk17" NBKIT_JVM_DIR="$WORK/jvm" PATH="$WORK/nojdk/bin:$PATH" bash "$NBKIT_DIR/src/build.sh" --force "$NB21" 2>&1 </dev/null)"
   contains "it also finds a JDK installed next to the system one" "$out" "| javac 21.0.1"
   rm -rf "$WORK/jvm/java-21"
   # ~/.netbeans as a link to another folder, as on machines where the home folder is elsewhere
   new_home "$WORK/real"
   rm -rf "$H"; mkdir -p "$H"; ln -s "$WORK/real/.netbeans" "$H/.netbeans"
-  out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" 2>&1 </dev/null)"
+  out="$(HOME="$H" NB_HOME='' bash "$NBKIT_DIR/src/build.sh" --force 2>&1 </dev/null)"
   contains "build.sh finds NetBeans with ~/.netbeans as a link" "$out" "NetBeans: $(readlink -f "$TESTS/netbeans")"
   # the end of the build says for sure whether the JSF version must go up: by git, in a copy of this repository
   # (a JDK that writes empty jars, so nothing here is touched)
@@ -361,13 +361,13 @@ exit 0
     printf '#!/bin/sh
 : > "$2"
 ' > "$WORK/jdk/bin/jar"
-    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" 2>&1 </dev/null)"
+    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" --force 2>&1 </dev/null)"
     lacks "with the JSF code as it was when its version was set, the build asks for nothing" "$out" "version 99"
     echo "// changed" >> "$C/src/nbkit-jsf/src/nbkit/jsf/Rules.java"
-    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" 2>&1 </dev/null)"
+    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" --force 2>&1 </dev/null)"
     contains "with the JSF code changed since, it says to raise version 99" "$out" "JSF code changed since version 99"
     git -C "$C" checkout -q -- src; : > "$C/src/nbkit-jsf/src/nbkit/jsf/New.java"
-    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" 2>&1 </dev/null)"
+    out="$(HOME="$H" NB_HOME="$TESTS/netbeans" JAVA_HOME="$WORK/jdk" bash "$C/src/build.sh" --force 2>&1 </dev/null)"
     contains "a new JSF file counts as a change too" "$out" "JSF code changed since version 99"
   fi
 fi
@@ -590,5 +590,72 @@ contains "after the project, it asks: with or without the explanation of a file"
 out="$(nbkit --lang en debug jsf maybe)"; rc=$?
 check "an unknown debug option fails" test "$rc" = 1
 contains "and shows how to use it" "$out" "Usage: nbkit debug jsf on|off|log [userdir]"
+
+echo "Build only when the code changed"
+# a copy of this nbkit, so its jars and src/ can be changed; mark_jar <jar> [mark]: the jar with that mark in its
+# manifest (no mark: without one), as src/build.sh would have written it
+B="$WORK/bm"; mkdir -p "$B"
+tar -C "$NBKIT_DIR" --exclude=.git -cf - . | tar -C "$B" -xf -
+mark_jar() {
+  python3 - "$1" "${2:-}" <<'PY'
+import sys, zipfile
+path, mark = sys.argv[1], sys.argv[2]
+z = zipfile.ZipFile(path)
+items = [(i, z.read(i.filename)) for i in z.infolist()]
+z.close()
+with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as out:
+    for i, data in items:
+        if i.filename == 'META-INF/MANIFEST.MF':
+            lines = [l for l in data.decode().splitlines() if l and not l.startswith('NbKit-Source-Hash:')]
+            data = ('\r\n'.join(lines + ([f'NbKit-Source-Hash: {mark}'] if mark else [])) + '\r\n\r\n').encode()
+        out.writestr(i, data)
+PY
+}
+# a JDK whose javac writes down its arguments and fails: the build stops before touching the jars
+mkdir -p "$WORK/jdka/bin"
+printf '#!/bin/sh\n[ "$1" = -version ] && { echo "javac 17.0.12"; exit 0; }\necho "javac args: $*"; exit 1\n' > "$WORK/jdka/bin/javac"
+printf '#!/bin/sh\nexit 0\n' > "$WORK/jdka/bin/jar"; chmod +x "$WORK/jdka/bin/javac" "$WORK/jdka/bin/jar"
+smark() { NBKIT_DIR="$B" bash -c 'source "$NBKIT_DIR/lib/buildmark.sh"; source_mark "$1"' _ "$1"; }
+bnk() { HOME="$H" bash "$B/nbkit.sh" --lang en "$@" </dev/null 2>&1; }
+manifest_of() { python3 -c 'import sys, zipfile; print(zipfile.ZipFile(sys.argv[1]).read("META-INF/MANIFEST.MF").decode())' "$1" 2>&1; }
+for m in nbkit-core nbkit-colors nbkit-jsf; do
+  case $m in nbkit-jsf) j="$B/modules/tools/jsf/$m.jar" ;; *) j="$B/lib/jars/$m.jar" ;; esac
+  mark_jar "$j" "$(smark $m)"
+done
+json="$(bnk status --json)"
+check "status --json: with every jar built from the code as it is, nothing to build" test "$(jget "$json" "d['build']")" = "[]"
+out="$(HOME="$H" bash "$B/src/build.sh" --lang en 2>&1 </dev/null)"; rc=$?
+contains "build.sh says nothing changed since the last build" "$out" "Nothing changed since the last build: the modules are up to date."
+contains "and how to build anyway" "$out" "--force"
+check "and builds nothing" test "$rc/$(grep -c 'Building ' <<<"$out")" = "0/0"
+out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdka" bash "$B/src/build.sh" --force 2>&1 </dev/null)"
+contains "build.sh --force builds anyway" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
+out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdka" bash "$B/nbkit.sh" build --force 2>&1 </dev/null)"
+contains "nbkit build --force too" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
+asked="$(printf 'n\r' | HOME="$H" timeout 30 script -qec "bash '$B/src/build.sh' --lang en" /dev/null 2>&1 | tr -d '\r')"
+contains "in a terminal it asks whether to build anyway" "$asked" "Build anyway? [y/N]"
+contains "and, with no, builds nothing" "$asked" "Nothing was built."
+menu_out="$(printf '\033' | HOME="$H" timeout 30 script -qec "bash '$B/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+contains "the menu shows the build as up to date" "$menu_out" "Build the modules (up to date)"
+# what makes a jar out of date: its code changed, it has no mark (built before it existed), it is missing
+echo "// changed" >> "$B/src/nbkit-jsf/src/nbkit/jsf/El.java"
+mark_jar "$B/lib/jars/nbkit-core.jar"
+rm "$B/lib/jars/nbkit-colors.jar"
+json="$(bnk status --json)"
+check "status --json lists each jar to build and why" test "$(jget "$json" "[(b['module'], b['reason']) for b in d['build']]")" = \
+  "[('nbkit-core', 'unmarked'), ('nbkit-colors', 'missing'), ('nbkit-jsf', 'changed')]"
+menu_out="$(printf '\033' | HOME="$H" timeout 30 script -qec "bash '$B/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+lacks "then the menu does not call it up to date" "$menu_out" "(up to date)"
+out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdka" bash "$B/src/build.sh" --lang en 2>&1 </dev/null)"
+contains "build.sh says what changed" "$out" "Changed since the last build: nbkit-core (jar from before the build mark), nbkit-colors (no jar), nbkit-jsf (code changed)"
+contains "and builds without asking" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
+# the mark src/build.sh writes is the one the comparison reads (a JDK whose jar tool keeps the manifest it gets)
+mkdir -p "$WORK/jdkm/bin"
+printf '#!/bin/sh\n[ "$1" = -version ] && { echo "javac 17.0.12"; exit 0; }\nexit 0\n' > "$WORK/jdkm/bin/javac"
+printf '#!/bin/sh\npython3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1], \\"w\\").write(sys.argv[2], \\"META-INF/MANIFEST.MF\\")" "$2" "$3"\n' > "$WORK/jdkm/bin/jar"
+chmod +x "$WORK/jdkm/bin/javac" "$WORK/jdkm/bin/jar"
+HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdkm" bash "$B/src/build.sh" >/dev/null 2>&1 </dev/null
+check "after a build, nothing to build" test "$(jget "$(bnk status --json)" "d['build']")" = "[]"
+contains "and the manifest keeps the module's own lines" "$(manifest_of "$B/modules/tools/jsf/nbkit-jsf.jar")" "OpenIDE-Module: nbkit.jsf"
 
 finish

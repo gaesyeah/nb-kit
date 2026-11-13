@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
 # Builds the NetBeans modules of nbkit from the Java code in src/, against the jars of an Apache NetBeans
 # installation, and updates their sha256 (lib/jars/SHA256SUMS and modules/tools/jsf/tool.toml).
-#   bash src/build.sh [netbeans folder] [--test]      --test: runs the JSF tests (tests/jsf.sh) after building; --help
+#   bash src/build.sh [netbeans folder] [--test] [--force]
+#   --test: runs the JSF tests (tests/jsf.sh) after building; --force: builds even when the jars are up to date; --help
+# Builds only when the code of a module changed since its jar was built (lib/buildmark.sh); otherwise it says so
+# and, in a terminal, asks whether to build anyway.
 # Without the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK as new as the Java of the NetBeans
 # jars (17 or newer), found by itself: JAVA_HOME, the JDK NetBeans uses, the PATH, /usr/lib/jvm.
 set -euo pipefail
 trap 'exit 130' INT TERM HUP
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NBKIT_DIR="$(dirname "$SRC")"
-NB=""; TEST=0; HELP=0; BAD=""
+NB=""; TEST=0; FORCE=0; HELP=0; BAD=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --lang=*) NBKIT_LANG="${1#--lang=}" ;;
     --lang) NBKIT_LANG="${2:-}"; [ $# -gt 1 ] && shift ;;
     --test) TEST=1 ;;
+    --force) FORCE=1 ;;
     -h|--help|help) HELP=1 ;;
     -*) BAD="$1" ;;
     *) NB="$1" ;;
@@ -24,8 +28,30 @@ done
 source "$NBKIT_DIR/lib/terminal.sh"
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/packages.sh"
+# shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/buildmark.sh"
 if [ $HELP = 1 ]; then t build.usage; exit 0; fi
 [ -z "$BAD" ] || die "$(t build.unknown_option "$BAD")"
+
+# ---------- anything to build? ----------
+# the questions follow nbkit.sh (NBKIT_INTERACTIVE: the menu, the interface); run by itself, a terminal
+if [ $FORCE = 0 ]; then
+  STALE="$(build_stale_text)"
+  if [ -n "$STALE" ]; then
+    info "$(t build.changed "$STALE")"
+  else
+    ok "$(t build.current)"
+    ask=0
+    if [ -n "${NBKIT_INTERACTIVE:-}" ]; then ask=$NBKIT_INTERACTIVE; elif [ -t 0 ] && [ -t 1 ]; then ask=1; fi
+    if [ "$ask" = 1 ]; then
+      ask_yn "$(t build.ask_force)" N || { echo; t build.skipped; echo; exit 0; }
+      echo
+    else
+      t build.force_hint; echo
+      exit 0
+    fi
+  fi
+fi
 
 # ---------- NetBeans and JDK ----------
 find_netbeans() {
@@ -135,16 +161,17 @@ build() {
   # the JDK here ("compiled by a more recent version of the Java Runtime"); javac would load them all
   "$JAVAC" --release 17 -proc:none -encoding UTF-8 -nowarn -d "$dir" @"$TMP/$name.classpath" "${java[@]}"
   cp -r "$SRC/$name/res/." "$dir/"
+  # the manifest with the mark of the code it was built from (lib/buildmark.sh); its blank lines out, so the mark
+  # stays in the main section
+  { grep -v '^[[:space:]]*$' "$SRC/$name/manifest.mf"; echo "NbKit-Source-Hash: $(source_mark "$name")"; } > "$TMP/$name.mf"
   rm -f "$out"
-  (cd "$dir" && "$JAR" cfm "$out" "$SRC/$name/manifest.mf" .)
+  (cd "$dir" && "$JAR" cfm "$out" "$TMP/$name.mf" .)
   ok "$(t build.done "${out#"$NBKIT_DIR"/}")"
 }
 sum_of() { sha256sum "$1" | cut -d' ' -f1; }
 
-TOTAL=4
-build nbkit-core "$NBKIT_DIR/lib/jars/nbkit-core.jar"
-build nbkit-colors "$NBKIT_DIR/lib/jars/nbkit-colors.jar"
-build nbkit-jsf "$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar"
+TOTAL=$(( ${#BUILD_MODULES[@]} + 1 ))
+for e in "${BUILD_MODULES[@]}"; do build "${e%%:*}" "$NBKIT_DIR/${e#*:}"; done
 
 step "$(t build.step_sums)"
 (cd "$NBKIT_DIR/lib/jars" && sha256sum nbkit-colors.jar nbkit-core.jar > SHA256SUMS)

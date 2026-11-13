@@ -120,6 +120,26 @@ def bulk(st):
     return [(act, ids) for act, ids in groups if len(ids) >= 2]
 
 
+# why a jar needs a build (lib/buildmark.sh): the same texts as src/build.sh
+REASON_KEYS = {'changed': 'build.reason_changed', 'missing': 'build.reason_missing', 'unmarked': 'build.reason_unmarked'}
+
+
+def build_text(st):
+    """the build button: "(up to date)" when no jar needs building ("build" of status --json is [])"""
+    return T('gui.build_current') if st.get('build') == [] else T('gui.build')
+
+
+def build_tip(st):
+    """its tooltip: up to date, or what changed since the last build and why"""
+    stale = st.get('build')
+    if stale == []:
+        return T('gui.tip_build_current')
+    if not stale:
+        return T('gui.tip_build')
+    what = ', '.join(T(REASON_KEYS.get(b['reason'], 'build.reason_unmarked'), b['module']) for b in stale)
+    return T('gui.tip_build') + '\n\n' + T('gui.tip_build_changed', what)
+
+
 def command(action, userdir=None, target=None):
     """argv of nbkit.sh for an action; target is the module id (or a list of them) or the backup file"""
     verb = {'update': 'install', 'reinstall': 'install'}.get(action, action)

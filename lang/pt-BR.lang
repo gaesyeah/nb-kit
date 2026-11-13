@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Erro:
-cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                  menu: mostra o status e o que dá pra fazer (sem terminal: só o status)\n  bash %s gui                              interface gráfica\n  bash %s install-self                     instala o nbkit para você: o comando nbkit e o atalho no menu\n  bash %s uninstall-self                   tira isso (os módulos continuam no NetBeans)\n  bash %s update-self                      atualiza essa cópia para o release mais novo\n  bash %s install [módulo...] [userdir]    instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir]  remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                  depois de abrir o NetBeans: confere se tudo carregou\n  bash %s analyze jsf <projeto>            roda as verificações de JSF em todos os xhtml de um projeto, sem o NetBeans\n  bash %s analyze jsf [<projeto>] --explain <arquivo>   só esse arquivo, dizendo como cada nome do EL foi resolvido\n  bash %s debug jsf on|off|log [userdir]   debug das verificações de JSF no NetBeans: ligar, desligar, ver as linhas\n  bash %s status [--json] [userdir]        o que está instalado (--json: para programas)\n  bash %s restore <backup>                 volta para um backup\n  bash %s delete-backup <backup>           apaga um backup\n  bash %s test                             roda os testes (só no repositório)\n  bash %s build                            compila os módulos de src/ (src/build.sh --help)\n  bash %s --help                           esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
+cli.usage=nbkit v%s: módulos para o NetBeans\n\nUso:\n  bash %s                                  menu: mostra o status e o que dá pra fazer (sem terminal: só o status)\n  bash %s gui                              interface gráfica\n  bash %s install-self                     instala o nbkit para você: o comando nbkit e o atalho no menu\n  bash %s uninstall-self                   tira isso (os módulos continuam no NetBeans)\n  bash %s update-self                      atualiza essa cópia para o release mais novo\n  bash %s install [módulo...] [userdir]    instala ou atualiza (sem módulo: todos)\n  bash %s uninstall [módulo...] [userdir]  remove (sem módulo: todos os instalados)\n  bash %s check [userdir]                  depois de abrir o NetBeans: confere se tudo carregou\n  bash %s analyze jsf <projeto>            roda as verificações de JSF em todos os xhtml de um projeto, sem o NetBeans\n  bash %s analyze jsf [<projeto>] --explain <arquivo>   só esse arquivo, dizendo como cada nome do EL foi resolvido\n  bash %s debug jsf on|off|log [userdir]   debug das verificações de JSF no NetBeans: ligar, desligar, ver as linhas\n  bash %s status [--json] [userdir]        o que está instalado (--json: para programas)\n  bash %s restore <backup>                 volta para um backup\n  bash %s delete-backup <backup>           apaga um backup\n  bash %s test                             roda os testes (só no repositório)\n  bash %s build                            compila os módulos de src/ que mudaram (--force: todos; src/build.sh --help)\n  bash %s --help                           esta ajuda\n\nMódulos: %s\nIdioma: --lang pt-BR ou --lang en (sem isso, o do sistema)\nSe a instalação do NetBeans não for achada: NB_HOME=/caminho/do/netbeans bash %s\n
 cli.theme_label=Tema %s
 cli.no_modules_dir=pasta modules/ não encontrada ao lado de %s. Baixe a pasta nbkit inteira.
 cli.no_modules=nenhum módulo em %s.
@@ -91,6 +91,7 @@ cli.menu_backups=Backups (%s)
 cli.menu_uninstall=Desinstalar
 cli.menu_test=Rodar os testes
 cli.menu_build=Compilar os módulos
+cli.menu_build_current=(em dia)
 cli.menu_analyze=Analisar um projeto JSF
 cli.analyze_other=Outra pasta...
 cli.analyze_modules=%s módulos com páginas JSF
@@ -284,8 +285,16 @@ build.step=Compilando %s
 build.done=%s gerado
 build.step_sums=Atualizando os sha256
 build.finished=Pronto.
+build.changed=Mudou desde o último build: %s
+build.reason_changed=%s (código alterado)
+build.reason_missing=%s (sem jar)
+build.reason_unmarked=%s (jar de antes da marca de build)
+build.current=Nada mudou desde o último build: os módulos estão em dia.
+build.ask_force=Compilar mesmo assim?
+build.skipped=Nada foi compilado.
+build.force_hint=Para compilar mesmo assim: bash src/build.sh --force (ou nbkit build --force).
 build.jsf_version=O código do JSF mudou desde que a version %s foi definida em modules/tools/jsf/tool.toml (commit %s): aumente-a para o menu oferecer a atualização.
-build.usage=Compila os módulos do NetBeans de src/ e atualiza os sha256.\n\nUso:\n  bash src/build.sh [pasta do netbeans] [--test]\n\n  --test   roda os testes do JSF (tests/jsf.sh) depois de compilar\n  --help   esta ajuda\n\nSem a pasta: NB_HOME, ou o NetBeans que usou o ~/.netbeans por último. Precisa de um JDK 17 ou mais novo.\n
+build.usage=Compila os módulos do NetBeans de src/ e atualiza os sha256.\n\nUso:\n  bash src/build.sh [pasta do netbeans] [--test] [--force]\n\n  --test   roda os testes do JSF (tests/jsf.sh) depois de compilar\n  --force  compila mesmo quando nada mudou desde o último build\n  --help   esta ajuda\n\nSem a pasta: NB_HOME, ou o NetBeans que usou o ~/.netbeans por último. Precisa de um JDK 17 ou mais novo.\n
 build.unknown_option=opção desconhecida: %s (veja bash src/build.sh --help)
 
 # ---------- testes (tests/run.sh) ----------
@@ -324,6 +333,9 @@ gui.backups=Backups (%s)
 gui.check=Verificar
 gui.test=Rodar os testes
 gui.build=Compilar os módulos
+gui.build_current=Compilar os módulos (em dia)
+gui.tip_build_current=Nada mudou em src/ desde o último build: os arquivos .jar são os deste código. Compila mesmo assim se você confirmar
+gui.tip_build_changed=Mudou desde o último build: %s
 gui.ready=Pronto. A saída das ações aparece aqui.
 gui.running=Em andamento
 gui.done=Concluído

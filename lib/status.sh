@@ -41,6 +41,14 @@ status_json() {
       "$(json_bool test -e "$d/modules/nbkit-core.jar")"
     sep=,
   done
+  # in a clone: the jars to build again and why (lib/buildmark.sh); [] all up to date
+  printf '],"build":['
+  sep=""
+  if [ -f "$NBKIT_DIR/src/build.sh" ]; then
+    while IFS=$'\t' read -r id s; do
+      printf '%s{"module":%s,"reason":%s}' "$sep" "$(json_str "$id")" "$(json_str "$s")"; sep=,
+    done < <(build_stale)
+  fi
   if [ -z "$UD" ]; then printf '],"userdir":null,"modules":[],"backups":[]}\n'; return 0; fi
   printf '],"userdir":%s,"netbeans_running":%s,"can_check":%s,"jsf_projects":[' "$(json_str "$UD")" "$(json_bool nb_running)" "$(json_bool can_check)"
   sep=""

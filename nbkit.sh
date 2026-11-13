@@ -72,6 +72,8 @@ source "$NBKIT_DIR/lib/backups.sh"
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/status.sh"
 # shellcheck disable=SC1091
+source "$NBKIT_DIR/lib/buildmark.sh"
+# shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/selfinstall.sh"
 # shellcheck disable=SC1091
 source "$NBKIT_DIR/lib/analyze.sh"
@@ -97,13 +99,14 @@ case "${1:-}" in
     [ "${2:-}" = jsf ] && [ $# -le 4 ] || die "$(t cli.debug_usage)"
     jsf_debug "${3:-}" "${4:-}"; exit 0 ;;
 esac
-ACTION=""; UD=""; SEL=(); JSON=0; BKF=""
+ACTION=""; UD=""; SEL=(); JSON=0; FORCE=(); BKF=""
 for a in "$@"; do
   case "$a" in
     -h|--help|help) usage; exit 0 ;;
     install|uninstall|check|status|restore|delete-backup|gui|test|build|install-self|uninstall-self|update-self)
       [ -z "$ACTION" ] && ACTION="$a" || die "$(t cli.repeated_command "$a")" ;;
     --json) JSON=1 ;;
+    --force) FORCE=(--force) ;;
     all|todos) SEL=("${MODS[@]}") ;;
     *)
       if [ -n "${MOD_FN[$a]:-}" ]; then SEL+=("$a")
@@ -128,7 +131,7 @@ if [ "$ACTION" = test ]; then
   exec bash "$NBKIT_DIR/tests/run.sh"
 fi
 # rebuilds the NetBeans modules from src/ (see src/build.sh)
-if [ "$ACTION" = build ]; then exec bash "$NBKIT_DIR/src/build.sh"; fi
+if [ "$ACTION" = build ]; then exec bash "$NBKIT_DIR/src/build.sh" ${FORCE[@]+"${FORCE[@]}"}; fi
 # nbkit itself on the system (lib/selfinstall.sh): needs no NetBeans
 if [ "$ACTION" = install-self ]; then header; install_self; exit 0; fi
 if [ "$ACTION" = update-self ]; then header; update_self; exit 0; fi
@@ -411,7 +414,13 @@ if [ $MENU = 1 ]; then
     # the release zip has no tests/
     if [ -f "$NBKIT_DIR/tests/run.sh" ]; then
       opts+=("$(t cli.menu_test)"); acts+=(test)
-      opts+=("$(t cli.menu_build)"); acts+=(build)
+      # "(up to date)": nothing changed since the last build (it still builds, asking first)
+      if [ -f "$NBKIT_DIR/src/build.sh" ] && [ -z "$(build_stale)" ]; then
+        opts+=("$(t cli.menu_build) ${D}$(t cli.menu_build_current)${N}")
+      else
+        opts+=("$(t cli.menu_build)")
+      fi
+      acts+=(build)
       if jsf_debug_on; then st="${G}$(jsf_debug_state)${N}"; else st="${D}$(jsf_debug_state)${N}"; fi
       opts+=("$(t cli.menu_debug "$st")"); acts+=(debug)
       opts+=("$(t cli.menu_debug_log)"); acts+=(debug-log)

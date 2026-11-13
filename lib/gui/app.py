@@ -419,11 +419,16 @@ class Window(Gtk.ApplicationWindow):
             self.content.append(label(T('gui.section_dev'), 'heading'))
             self.dev = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             row = Gtk.Box(spacing=8)
-            for key, act in (('gui.test', 'test'), ('gui.build', 'build')):
-                b = button(T(key), self.start, act, tip=model.TIP_KEYS[act])
-                b.set_name(act)
-                row.append(b)
-                self.action_buttons.append(b)
+            b = button(T('gui.test'), self.start, 'test', tip=model.TIP_KEYS['test'])
+            b.set_name('test')
+            row.append(b)
+            self.action_buttons.append(b)
+            # build: "(up to date)" when nothing changed in src/; it still builds, src/build.sh asks first
+            b = button(model.build_text(self.st), self.start, 'build')
+            b.set_tooltip_text(model.build_tip(self.st))
+            b.set_name('build')
+            row.append(b)
+            self.action_buttons.append(b)
             self.dev.append(row)
             self.dev.append(Gtk.Separator())
             # the JSF debug below a line: the switch, its label on the right, then the button that shows its lines

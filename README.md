@@ -296,7 +296,7 @@ The jars are already built in `lib/jars/` and `modules/tools/jsf/`. To build the
 bash src/build.sh [netbeans folder]       # or: bash nbkit.sh build
 ```
 
-It compiles against the jars of your NetBeans installation (without the folder: `NB_HOME`, or the NetBeans that last used `~/.netbeans`) with a JDK 17 or newer, and updates the sha256 sums. `bash src/build.sh --help` shows the options.
+It compiles against the jars of your NetBeans installation (without the folder: `NB_HOME`, or the NetBeans that last used `~/.netbeans`) with a JDK 17 or newer, and updates the sha256 sums. Each jar keeps in its manifest a mark of the code it was built from: when nothing in `src/` changed since then, the build says the modules are up to date (in the menu and in the interface, "(up to date)") and asks before building anyway; `--force` builds without asking. `bash src/build.sh --help` shows the options.
 
 ## Structure
 

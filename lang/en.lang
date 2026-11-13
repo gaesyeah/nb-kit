@@ -4,7 +4,7 @@
 
 # ---------- CLI (nbkit.sh) ----------
 cli.error=Error:
-cli.usage=nbkit v%s: modules for NetBeans\n\nUsage:\n  bash %s                                  menu: shows the status and what can be done (without a terminal: only the status)\n  bash %s gui                              graphical interface\n  bash %s install-self                     installs nbkit for you: the nbkit command and the menu entry\n  bash %s uninstall-self                   takes that out (the modules stay in NetBeans)\n  bash %s update-self                      updates that copy to the latest release\n  bash %s install [module...] [userdir]    installs or updates (no module: all)\n  bash %s uninstall [module...] [userdir]  removes (no module: all installed)\n  bash %s check [userdir]                  after opening NetBeans: checks that everything loaded\n  bash %s analyze jsf <project>            runs the JSF checks on every xhtml of a project, without NetBeans\n  bash %s analyze jsf [<project>] --explain <file>   only that file, saying how each name of its EL was resolved\n  bash %s debug jsf on|off|log [userdir]   debug of the JSF checks in NetBeans: turn on, off, see its lines\n  bash %s status [--json] [userdir]        what is installed (--json: for programs)\n  bash %s restore <backup>                 goes back to a backup\n  bash %s delete-backup <backup>           deletes a backup\n  bash %s test                             runs the tests (only in the repository)\n  bash %s build                            builds the modules of src/ (src/build.sh --help)\n  bash %s --help                           this help\n\nModules: %s\nLanguage: --lang pt-BR or --lang en (without it, the system one)\nIf the NetBeans installation is not found: NB_HOME=/path/to/netbeans bash %s\n
+cli.usage=nbkit v%s: modules for NetBeans\n\nUsage:\n  bash %s                                  menu: shows the status and what can be done (without a terminal: only the status)\n  bash %s gui                              graphical interface\n  bash %s install-self                     installs nbkit for you: the nbkit command and the menu entry\n  bash %s uninstall-self                   takes that out (the modules stay in NetBeans)\n  bash %s update-self                      updates that copy to the latest release\n  bash %s install [module...] [userdir]    installs or updates (no module: all)\n  bash %s uninstall [module...] [userdir]  removes (no module: all installed)\n  bash %s check [userdir]                  after opening NetBeans: checks that everything loaded\n  bash %s analyze jsf <project>            runs the JSF checks on every xhtml of a project, without NetBeans\n  bash %s analyze jsf [<project>] --explain <file>   only that file, saying how each name of its EL was resolved\n  bash %s debug jsf on|off|log [userdir]   debug of the JSF checks in NetBeans: turn on, off, see its lines\n  bash %s status [--json] [userdir]        what is installed (--json: for programs)\n  bash %s restore <backup>                 goes back to a backup\n  bash %s delete-backup <backup>           deletes a backup\n  bash %s test                             runs the tests (only in the repository)\n  bash %s build                            builds the modules of src/ that changed (--force: all; src/build.sh --help)\n  bash %s --help                           this help\n\nModules: %s\nLanguage: --lang pt-BR or --lang en (without it, the system one)\nIf the NetBeans installation is not found: NB_HOME=/path/to/netbeans bash %s\n
 cli.theme_label=Theme %s
 cli.no_modules_dir=modules/ folder not found next to %s. Download the whole nbkit folder.
 cli.no_modules=no module in %s.
@@ -91,6 +91,7 @@ cli.menu_backups=Backups (%s)
 cli.menu_uninstall=Uninstall
 cli.menu_test=Run the tests
 cli.menu_build=Build the modules
+cli.menu_build_current=(up to date)
 cli.menu_analyze=Analyze a JSF project
 cli.analyze_other=Other folder...
 cli.analyze_modules=%s modules with JSF pages
@@ -284,8 +285,16 @@ build.step=Building %s
 build.done=%s written
 build.step_sums=Updating the sha256 sums
 build.finished=Done.
+build.changed=Changed since the last build: %s
+build.reason_changed=%s (code changed)
+build.reason_missing=%s (no jar)
+build.reason_unmarked=%s (jar from before the build mark)
+build.current=Nothing changed since the last build: the modules are up to date.
+build.ask_force=Build anyway?
+build.skipped=Nothing was built.
+build.force_hint=To build anyway: bash src/build.sh --force (or nbkit build --force).
 build.jsf_version=The JSF code changed since version %s was set in modules/tools/jsf/tool.toml (commit %s): raise it, so the menu offers the update.
-build.usage=Builds the NetBeans modules of src/ and updates their sha256.\n\nUsage:\n  bash src/build.sh [netbeans folder] [--test]\n\n  --test   runs the JSF tests (tests/jsf.sh) after building\n  --help   this help\n\nWithout the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK 17 or newer.\n
+build.usage=Builds the NetBeans modules of src/ and updates their sha256.\n\nUsage:\n  bash src/build.sh [netbeans folder] [--test] [--force]\n\n  --test   runs the JSF tests (tests/jsf.sh) after building\n  --force  builds even when nothing changed since the last build\n  --help   this help\n\nWithout the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK 17 or newer.\n
 build.unknown_option=unknown option: %s (see bash src/build.sh --help)
 
 # ---------- tests (tests/run.sh) ----------
@@ -324,6 +333,9 @@ gui.backups=Backups (%s)
 gui.check=Check
 gui.test=Run the tests
 gui.build=Build the modules
+gui.build_current=Build the modules (up to date)
+gui.tip_build_current=Nothing changed in src/ since the last build: the .jar files are the ones of this code. Builds anyway if you confirm
+gui.tip_build_changed=Changed since the last build: %s
 gui.ready=Ready. The output of the actions shows up here.
 gui.running=Running
 gui.done=Done
