@@ -14,8 +14,8 @@ source "$NBKIT_DIR/lib/packages.sh"
 source "$NBKIT_DIR/lib/gui.sh"
 PY="${NBKIT_PY:-python3}"
 export PYTHONDONTWRITEBYTECODE=1
-# run from the interface ("Run the tests"): the nbkit runs inside the tests must not send it their steps
-unset NBKIT_UI_EVENTS NBKIT_TTY
+# run from the interface ("Run the tests"): the nbkit runs inside the tests must not send it their steps nor wait for its answers
+unset NBKIT_UI_EVENTS NBKIT_TTY NBKIT_INTERACTIVE
 failed=(); skipped=()
 
 # ---------- tools ----------

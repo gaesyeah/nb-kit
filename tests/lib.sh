@@ -7,8 +7,8 @@ export LC_ALL=C.UTF-8 NBKIT_LANG=en NBKIT_OFFLINE=1
 export PATH="$TESTS/bin:$PATH"
 # the XDG folders of the machine (fonts, menu entries, caches) stay out: everything goes to the fake home
 unset XDG_DATA_HOME XDG_CONFIG_HOME XDG_CACHE_HOME
-# run from the interface ("Run the tests"): the nbkit runs inside the tests must not send it their steps
-unset NBKIT_UI_EVENTS NBKIT_TTY
+# run from the interface ("Run the tests"): the nbkit runs inside the tests must not send it their steps nor wait for its answers
+unset NBKIT_UI_EVENTS NBKIT_TTY NBKIT_INTERACTIVE
 PASS=0; FAIL=0
 if [ -t 1 ]; then G=$'\e[32m'; R=$'\e[31m'; D=$'\e[2m'; N=$'\e[0m'; else G=; R=; D=; N=; fi
 

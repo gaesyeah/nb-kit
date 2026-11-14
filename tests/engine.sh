@@ -267,8 +267,9 @@ check "a tweak NetBeans wrote stays" test "$(cat "$U/config/Editors/text/x-java/
 echo "Run from the interface"
 E2="$WORK/outer-events"
 : > "$E2"
-NBKIT_UI_EVENTS="$E2" NBKIT_TTY=1 bash -c 'source "$1/tests/lib.sh"; echo "${NBKIT_UI_EVENTS:-}${NBKIT_TTY:-}"' _ "$NBKIT_DIR" > "$WORK/env-seen"
+NBKIT_UI_EVENTS="$E2" NBKIT_TTY=1 NBKIT_INTERACTIVE=1 bash -c 'source "$1/tests/lib.sh"; echo "${NBKIT_UI_EVENTS:-}${NBKIT_TTY:-}" > "$2"; echo "${NBKIT_INTERACTIVE:-}" > "$2.ask"' _ "$NBKIT_DIR" "$WORK/env-seen"
 check "the tests do not send their steps to the interface that runs them" test -z "$(cat "$WORK/env-seen" "$E2")"
+check "nor wait for its answers (a question inside a test would hang it)" test -z "$(cat "$WORK/env-seen.ask")"
 
 echo "Help"
 out="$(nbkit --help)"
