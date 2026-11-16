@@ -1,10 +1,12 @@
 """The interface window, driven like a person would (tests/gui.sh runs it on a virtual screen, Xvfb), against
 the fake NetBeans of tests/netbeans in HOME: buttons, terminal, progress, questions, backups, about, closing."""
+import faulthandler
 import hashlib
 import os
 import subprocess
 import sys
 import time
+import traceback
 
 import helpers                  # lib/ on the path, English texts
 from gui import app
@@ -86,8 +88,13 @@ def finish_waiting(w):
     return wait(lambda: not w.busy, 20)
 
 
+# a window that stops answering: after this long it prints where each thread is and exits with an error
+TIME_LIMIT = 180
+
+
 def main():
     scenario = sys.argv[1]
+    faulthandler.dump_traceback_later(TIME_LIMIT, exit=True)
     if scenario == 'dark':
         # the desktop asks for dark mode (GNOME setting; tests/gui.sh keeps settings in memory)
         schema = Gio.SettingsSchemaSource.get_default().lookup('org.gnome.desktop.interface', True)
@@ -99,7 +106,12 @@ def main():
     w = app.Window()
     w.present()
     wait(lambda: False, 0.3)
-    {'actions': actions, 'closing': closing, 'dark': dark, 'decline': decline, 'small': small, 'laptop': laptop}[scenario](w)
+    try:
+        {'actions': actions, 'closing': closing, 'dark': dark, 'decline': decline, 'small': small, 'laptop': laptop,
+         'nouserdir': nouserdir}[scenario](w)
+    except Exception:
+        # an error in the window or in a check is a failure, and the scenario still ends with its summary
+        check('the scenario runs to the end without an error', False, traceback.format_exc())
     print()
     print(f'{G}{PASS} passed{N}' if FAIL == 0 else f'{R}{FAIL} failed{N}, {PASS} passed')
     return 0 if FAIL == 0 else 1
@@ -130,8 +142,23 @@ def actions(w):
     check('every button explains itself on hover (tooltip)', not tips, [b.get_label() for b in tips])
     by_name = {b.get_name(): b for b in w.action_buttons}
     check('the tooltip of "Build the modules" says what is built and when', 'src/' in by_name['build'].get_tooltip_text())
-    check('Analyze JSF project is in the main area, not in development',
-          'analyze' in by_name and by_name['analyze'].get_parent() is not w.dev)
+    ctl = w.rows['jsf']['controls']
+    check('the JSF controls are in the JSF checks card, below a line under its status',
+          ctl is not None and isinstance(ctl.get_prev_sibling(), Gtk.Separator)
+          and all(by_name[n].get_parent() is ctl for n in ('analyze', 'debug', 'debug-log')))
+    check('on the left the debug switch, its label on the right of it, then the button that shows its lines',
+          ctl.get_first_child() is by_name['debug'] and by_name['debug'].get_next_sibling().get_label() == app.T('gui.debug')
+          and by_name['debug'].get_next_sibling().get_next_sibling() is by_name['debug-log'])
+    right = lambda x: x.compute_bounds(w)[1].origin.x + x.compute_bounds(w)[1].size.width
+    check('the analysis last, on the right edge, lined up with the buttons of the card',
+          ctl.get_last_child() is by_name['analyze']
+          and abs(right(by_name['analyze']) - right(w.rows['jsf']['buttons']['install'])) <= 1,
+          (right(by_name['analyze']), right(w.rows['jsf']['buttons']['install'])))
+    check('the JSF debug is a switch, off', isinstance(by_name['debug'], Gtk.Switch) and not by_name['debug'].get_active())
+    check('the theme card has no controls', w.rows['one-dark-pro-mix']['controls'] is None)
+    check('development keeps only the tests and the build, in one row with no line',
+          len(children(w.dev)) == 1 and by_name['test'].get_parent() is w.dev.get_first_child()
+          and by_name['build'].get_parent() is w.dev.get_first_child())
     items = by_name['analyze'].get_popover().get_child()
     check('it offers the projects open in NetBeans, then any other folder',
           items.get_last_child().get_label() == app.T('cli.analyze_other'))
@@ -143,14 +170,6 @@ def actions(w):
     d.get_default_widget().emit('clicked')
     check('without (the default) analyzes the project', started == [('analyze', '/p')], started)
     w.start = real_start
-    debug, first = by_name['debug'], w.dev.get_first_child()
-    check('development: tests and build on top, a line, then the JSF debug (no title of its own)',
-          by_name['test'].get_parent() is first and by_name['build'].get_parent() is first
-          and isinstance(first.get_next_sibling(), Gtk.Separator) and debug.get_parent() is first.get_next_sibling().get_next_sibling())
-    check('the JSF debug is a switch, off, first in its row', isinstance(debug, Gtk.Switch) and not debug.get_active()
-          and debug.get_prev_sibling() is None)
-    check('its label is on the right of the switch', debug.get_next_sibling().get_label() == app.T('gui.debug'))
-    check('then the button that shows its lines', debug.get_next_sibling().get_next_sibling() is by_name['debug-log'])
     height = lambda x: x.measure(Gtk.Orientation.VERTICAL, -1)[1]
     check('Running/Done is as far from the bar as a title from its buttons (the clear button adds no height)',
           w.status_row.get_spacing() == w.content.get_spacing() and height(w.result_row) == height(w.result),
@@ -326,6 +345,18 @@ def actions(w):
     wait(lambda: False, 0.3)
     check('about shows the version and the repository', w.about.get_version() == w.st['version'] and 'gaesyeah/nb-kit' in w.about.get_website())
     w.about.destroy()
+
+
+def nouserdir(w):
+    print('No NetBeans userdir')
+    check('it says there is no userdir', w.notice.get_text() == app.T('gui.no_userdir'), w.notice.get_text())
+    check('only the JSF checks card is shown', list(w.rows) == ['jsf'], list(w.rows))
+    row = w.rows['jsf']
+    check('with no status line and no install buttons', row['status'] is None and row['buttons'] == {}, row)
+    names = [c.get_name() for c in children(row['controls'])] if row.get('controls') else []
+    check('only its controls: in a clone the debug on the left, the analysis on the right',
+          names[0] == 'debug' and 'debug-log' in names and names[-1] == 'analyze', names)
+    check('no install, backups or check bar', not any(b.get_name() in ('install-all', 'backups', 'check') for b in w.action_buttons))
 
 
 def inside(w):

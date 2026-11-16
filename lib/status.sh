@@ -30,11 +30,24 @@ can_check() {
 }
 # asks before uninstalling (menu and interface): what each module removes
 json_bool() { if "$@"; then echo true; else echo false; fi; }
+# the controls of a module as a JSON list (mod_controls)
+controls_json() {
+  local c sep=""
+  printf '['
+  while read -r c; do printf '%s%s' "$sep" "$(json_str "$c")"; sep=,; done < <(mod_controls "$1")
+  printf ']'
+}
+# what every module entry has: id, category, names, version and its controls
+module_json() {
+  printf '{"id":%s,"category":%s,"name":%s,"label":%s,"description":%s,"version":%s,"controls":%s' \
+    "$(json_str "$1")" "$(json_str "${MOD_CAT[$1]}")" "$(json_str "${MOD_NAME[$1]}")" "$(json_str "$(mod_label "$1")")" \
+    "$(json_str "${MOD_DESC[$1]}")" "$(json_str "${MOD_VER[$1]}")" "$(controls_json "$1")"
+}
 status_json() {
   local d id s inst sep="" f first
   # self_installed: nbkit is on the system (install-self); self_running: and this is that copy
   printf '{"version":%s,"lang":%s,"clone":%s,"jsf_debug":%s,"self_installed":%s,"self_running":%s,"userdirs":[' "$(json_str "$NBKIT_VERSION")" \
-    "$(json_str "$NBKIT_LANG")" "$(json_bool test -f "$NBKIT_DIR/tests/run.sh")" "$(json_bool jsf_debug_on)" "$(json_bool self_installed)" \
+    "$(json_str "$NBKIT_LANG")" "$(json_bool nbkit_clone)" "$(json_bool jsf_debug_on)" "$(json_bool self_installed)" \
     "$(json_bool test "$NBKIT_DIR" = "$(readlink -f "$SELF_DEST")")"
   for d in ${UDS[@]+"${UDS[@]}"}; do
     printf '%s{"path":%s,"name":%s,"has_nbkit":%s}' "$sep" "$(json_str "$d")" "$(json_str "NetBeans ${d##*/}")" \
@@ -49,7 +62,17 @@ status_json() {
       printf '%s{"module":%s,"reason":%s}' "$sep" "$(json_str "$id")" "$(json_str "$s")"; sep=,
     done < <(build_stale)
   fi
-  if [ -z "$UD" ]; then printf '],"userdir":null,"modules":[],"backups":[]}\n'; return 0; fi
+  # with no userdir: only the modules that offer controls (they need no NetBeans), without a status
+  if [ -z "$UD" ]; then
+    printf '],"userdir":null,"modules":['
+    sep=""
+    for id in "${MODS[@]}"; do
+      [ -n "$(mod_controls "$id")" ] || continue
+      printf '%s%s}' "$sep" "$(module_json "$id")"; sep=,
+    done
+    printf '],"backups":[]}\n'
+    return 0
+  fi
   printf '],"userdir":%s,"netbeans_running":%s,"can_check":%s,"jsf_projects":[' "$(json_str "$UD")" "$(json_bool nb_running)" "$(json_bool can_check)"
   sep=""
   while IFS=$'\t' read -r f first; do
@@ -60,9 +83,7 @@ status_json() {
   for id in "${MODS[@]}"; do
     s="$(mod_status "$id")"
     case "$s" in ok) inst="$(json_str "${MOD_VER[$id]}")" ;; no|old:\?) inst=null ;; *) inst="$(json_str "${s#*:}")" ;; esac
-    printf '%s{"id":%s,"category":%s,"name":%s,"label":%s,"description":%s,"version":%s,"status":%s,"installed":%s}' "$sep" \
-      "$(json_str "$id")" "$(json_str "${MOD_CAT[$id]}")" "$(json_str "${MOD_NAME[$id]}")" "$(json_str "$(mod_label "$id")")" \
-      "$(json_str "${MOD_DESC[$id]}")" "$(json_str "${MOD_VER[$id]}")" "$(json_str "${s%%:*}")" "$inst"
+    printf '%s%s,"status":%s,"installed":%s}' "$sep" "$(module_json "$id")" "$(json_str "${s%%:*}")" "$inst"
     sep=,
   done
   printf '],"backups":['

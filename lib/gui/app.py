@@ -401,17 +401,6 @@ class Window(Gtk.ApplicationWindow):
                 self.action_buttons.append(b)
         else:
             bar = Gtk.Box(spacing=8)
-        # runs on a project folder, so it needs no userdir: the projects open in NetBeans, or any folder
-        b = Gtk.MenuButton(label=T('gui.analyze'), tooltip_text=T(model.TIP_KEYS['analyze']), name='analyze')
-        pop = Gtk.Popover()
-        items = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        for p in self.st.get('jsf_projects', []):
-            items.append(self.menu_item(p['name'], p['path'], pop, lambda path=p['path']: self.ask_explain(path)))
-        items.append(self.menu_item(T('cli.analyze_other'), None, pop, self.pick_project))
-        pop.set_child(items)
-        b.set_popover(pop)
-        bar.append(b)
-        self.action_buttons.append(b)
         self.content.append(bar)
         # only in a clone of the repository (the release zip has no tests/)
         self.dev = None
@@ -430,19 +419,6 @@ class Window(Gtk.ApplicationWindow):
             row.append(b)
             self.action_buttons.append(b)
             self.dev.append(row)
-            self.dev.append(Gtk.Separator())
-            # the JSF debug below a line: the switch, its label on the right, then the button that shows its lines
-            row = Gtk.Box(spacing=8)
-            sw = Gtk.Switch(active=bool(self.st.get('jsf_debug')), valign=Gtk.Align.CENTER, name='debug',
-                            tooltip_text=T(model.TIP_KEYS['debug']))
-            sw.connect('notify::active', lambda s, _p: self.start('debug', 'on' if s.get_active() else 'off'))
-            row.append(sw)
-            row.append(Gtk.Label(label=T('gui.debug'), tooltip_text=T(model.TIP_KEYS['debug']), margin_end=4))
-            b = button(T('gui.debug_log'), self.start, 'debug-log', tip=model.TIP_KEYS['debug-log'])
-            b.set_name('debug-log')
-            row.append(b)
-            self.dev.append(row)
-            self.action_buttons += [sw, b]
             self.content.append(self.dev)
         self.set_busy(self.busy)
 
@@ -508,8 +484,10 @@ class Window(Gtk.ApplicationWindow):
         text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True)
         text.append(label(m['name'], 'heading'))
         text.append(label(m['description'], 'dim-label', wrap=True))
-        status = label(model.status_text(m), 'caption')
-        text.append(status)
+        status = None
+        if model.status_text(m):
+            status = label(model.status_text(m), 'caption')
+            text.append(status)
         row.append(text)
         buttons = {}
         for act in model.actions(m):
@@ -520,7 +498,58 @@ class Window(Gtk.ApplicationWindow):
             row.append(b)
             buttons[act] = b
             self.action_buttons.append(b)
-        self.rows[m['id']] = {'status': status, 'buttons': buttons}
+        controls = self.control_row(model.controls(m))
+        self.rows[m['id']] = {'status': status, 'buttons': buttons, 'controls': controls}
+        if not controls:
+            return row
+        # the controls below a line, under the status
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        for w in (row, Gtk.Separator(), controls):
+            card.append(w)
+        return card
+
+    def control_row(self, names):
+        """the controls of a card (model.controls), in one row: the analysis on the right edge, like the buttons of
+        the card, the others on the left; None when it has none"""
+        if not names:
+            return None
+        row = Gtk.Box(spacing=8, margin_top=8, margin_bottom=8, margin_start=10, margin_end=10)
+        right = None
+        for name in names:
+            if name == 'analyze':
+                # runs on a project folder, so it needs no userdir: the projects open in NetBeans, or any folder
+                b = Gtk.MenuButton(label=T('gui.analyze'), tooltip_text=T(model.TIP_KEYS['analyze']), name='analyze')
+                pop = Gtk.Popover()
+                items = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+                for p in self.st.get('jsf_projects', []):
+                    items.append(self.menu_item(p['name'], p['path'], pop, lambda path=p['path']: self.ask_explain(path)))
+                items.append(self.menu_item(T('cli.analyze_other'), None, pop, self.pick_project))
+                pop.set_child(items)
+                b.set_popover(pop)
+                b.set_hexpand(True)
+                b.set_halign(Gtk.Align.END)
+                right = b
+                continue
+            elif name == 'debug':
+                # the switch, its label on the right
+                b = Gtk.Switch(active=bool(self.st.get('jsf_debug')), valign=Gtk.Align.CENTER, name='debug',
+                               tooltip_text=T(model.TIP_KEYS['debug']))
+                b.connect('notify::active', lambda s, _p: self.start('debug', 'on' if s.get_active() else 'off'))
+                row.append(b)
+                self.action_buttons.append(b)
+                b = Gtk.Label(label=T('gui.debug'), tooltip_text=T(model.TIP_KEYS['debug']), margin_end=4)
+                row.append(b)
+                continue
+            elif name == 'debug-log':
+                b = button(T('gui.debug_log'), self.start, 'debug-log', tip=model.TIP_KEYS['debug-log'])
+                b.set_name('debug-log')
+            else:
+                continue
+            row.append(b)
+            self.action_buttons.append(b)
+        if right:
+            row.append(right)
+            self.action_buttons.append(right)
         return row
 
     # ---------- running an action ----------

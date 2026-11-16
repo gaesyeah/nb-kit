@@ -24,6 +24,8 @@ name = { en = "JSF checks", pt-BR = "Verificações de JSF" }
 description = { en = "Warnings in the xhtml editor", pt-BR = "Avisos no editor de xhtml" }
 version = 2                       # raise it when the tool changes, so the menu offers the update
 hint = { en = "the rules turn on and off in Tools > Options > Editor > JSF", pt-BR = "..." }   # optional, after the install
+controls = ["analyze"]            # optional: what its card (interface) and submenu (menu) offer besides installing
+dev_controls = ["debug", "debug-log"]   # optional: the same, only when nbkit runs from a clone
 
 [netbeans_module]                 # optional: a NetBeans module (jar) the tool installs
 jar = "nbkit-jsf.jar"             # the jar in this folder

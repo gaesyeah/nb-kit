@@ -379,6 +379,52 @@ pick_modules() {
   PICK=("${out[@]}")
 }
 
+# a control of a module in the menu (mod_controls): its line, and its plain name for the tip of the submenu
+control_label() {
+  case "$1" in
+    analyze) t cli.menu_analyze ;;
+    debug) if jsf_debug_on; then t cli.menu_debug "${G}$(jsf_debug_state)${N}"; else t cli.menu_debug "${D}$(jsf_debug_state)${N}"; fi ;;
+    debug-log) t cli.menu_debug_log ;;
+  esac
+}
+control_name() { case "$1" in debug) t gui.debug ;; *) control_label "$1" ;; esac; }
+# what a menu option does, below the menu (the same texts as the tooltips of the interface, where they fit)
+menu_tip() {
+  local names=() c
+  case "$1" in
+    install) t cli.tip_install ;;
+    reinstall) t cli.tip_reinstall ;;
+    uninstall) t cli.tip_uninstall ;;
+    quit) ;;
+    controls:*)
+      while read -r c; do names+=("$(control_name "$c")"); done < <(mod_controls "${1#controls:}")
+      printf -v c '%s, ' "${names[@]}"; t cli.tip_submenu "${c%, }" ;;
+    *) t "gui.tip_${1//-/_}" ;;
+  esac
+}
+# the submenu of a module with more than one control; the chosen one in CTL (empty: went back with Esc).
+# The debug switches there and the submenu stays
+module_controls() {
+  local id="$1" ctls=() labels=() c
+  mapfile -t ctls < <(mod_controls "$id")
+  CTL=""; MENU_START=0
+  while :; do
+    labels=(); MENU_TIPS=()
+    for c in "${ctls[@]}"; do labels+=("$(control_label "$c")"); MENU_TIPS+=("$(menu_tip "$c")"); done
+    echo "  ${B}$(mod_label "$id")${N}"
+    MENU_HINT="$(t cli.submenu_hint)" menu "${labels[@]}"
+    MENU_TIPS=()
+    printf '\e[%dA\r\e[J' "$(( ${#labels[@]} + 1 ))"
+    [ "$MENU_IDX" -lt 0 ] && return 0
+    MENU_START=$MENU_IDX
+    if [ "${ctls[$MENU_IDX]}" = debug ]; then
+      if jsf_debug_on; then jsf_debug off >/dev/null; else jsf_debug on >/dev/null; fi
+      continue
+    fi
+    CTL="${ctls[$MENU_IDX]}"; return 0
+  done
+}
+
 if [ $MENU = 1 ]; then
   header
   userdir_line
@@ -402,7 +448,12 @@ if [ $MENU = 1 ]; then
     if [ ${#current[@]} -gt 0 ]; then opts+=("$(t cli.menu_reinstall)"); acts+=(reinstall); fi
     if [ ${#installed[@]} -gt 0 ]; then opts+=("$(t cli.menu_uninstall)"); acts+=(uninstall); fi
     if can_check; then opts+=("$(t cli.menu_check)"); acts+=(check); fi
-    opts+=("$(t cli.menu_analyze)"); acts+=(analyze)
+    # what each module offers besides installing: one control is shown itself, more go into a submenu
+    for id in "${MODS[@]}"; do
+      mapfile -t ctls < <(mod_controls "$id")
+      if [ ${#ctls[@]} = 1 ]; then opts+=("$(control_label "${ctls[0]}")"); acts+=("${ctls[0]}")
+      elif [ ${#ctls[@]} -gt 1 ]; then opts+=("$(mod_label "$id")"); acts+=("controls:$id"); fi
+    done
     nbk="$(all_backups | wc -l)"
     if [ "$nbk" -gt 0 ]; then opts+=("$(t cli.menu_backups "$nbk")"); acts+=(backups); fi
     if self_installed; then
@@ -411,8 +462,7 @@ if [ $MENU = 1 ]; then
     else
       opts+=("$(t cli.menu_install_self)"); acts+=(install-self)
     fi
-    # the release zip has no tests/
-    if [ -f "$NBKIT_DIR/tests/run.sh" ]; then
+    if nbkit_clone; then
       opts+=("$(t cli.menu_test)"); acts+=(test)
       # "(up to date)": nothing changed since the last build (it still builds, asking first)
       if [ -f "$NBKIT_DIR/src/build.sh" ] && [ -z "$(build_stale)" ]; then
@@ -421,29 +471,23 @@ if [ $MENU = 1 ]; then
         opts+=("$(t cli.menu_build)")
       fi
       acts+=(build)
-      if jsf_debug_on; then st="${G}$(jsf_debug_state)${N}"; else st="${D}$(jsf_debug_state)${N}"; fi
-      opts+=("$(t cli.menu_debug "$st")"); acts+=(debug)
-      opts+=("$(t cli.menu_debug_log)"); acts+=(debug-log)
     fi
     opts+=("$(t cli.menu_quit)"); acts+=(quit)
-    # what each option does, below the menu (the same texts as the tooltips of the interface, where they fit)
     MENU_TIPS=()
-    for a in "${acts[@]}"; do
-      case "$a" in
-        install) k=cli.tip_install ;;
-        reinstall) k=cli.tip_reinstall ;;
-        uninstall) k=cli.tip_uninstall ;;
-        quit) k="" ;;
-        *) k="gui.tip_${a//-/_}" ;;
-      esac
-      MENU_TIPS+=("${k:+$(t "$k")}")
-    done
+    for a in "${acts[@]}"; do MENU_TIPS+=("$(menu_tip "$a")"); done
     menu "${opts[@]}"
     MENU_TIPS=()
     [ "$MENU_IDX" -lt 0 ] && { echo; exit 0; }
     act="${acts[$MENU_IDX]}"
-    MENU_START=$MENU_IDX
+    main_idx=$MENU_IDX
     back() { printf '\e[%dA\r\e[J' "${#opts[@]}"; }
+    if [[ "$act" == controls:* ]]; then
+      module_controls "${act#controls:}"
+      MENU_START=$main_idx
+      [ -n "$CTL" ] || { back; continue; }
+      act="$CTL"
+    fi
+    MENU_START=$main_idx
     case "$act" in
       quit) echo; exit 0 ;;
       test) echo; echo; exec bash "$NBKIT_DIR/tests/run.sh" ;;

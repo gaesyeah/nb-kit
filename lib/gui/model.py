@@ -82,7 +82,10 @@ def sections(st):
 
 
 def status_text(m):
-    s, inst, ver = m['status'], m.get('installed'), m['version']
+    """the status line of a card; '' with no userdir (status --json then gives no status)"""
+    s, inst, ver = m.get('status'), m.get('installed'), m['version']
+    if s is None:
+        return ''
     if s == 'ok':
         return T('gui.status_ok', inst)
     if s == 'old':
@@ -93,13 +96,21 @@ def status_text(m):
 
 
 def actions(m):
-    """the buttons of a module: install | update | reinstall, and uninstall when installed"""
-    s = m['status']
+    """the buttons of a module: install | update | reinstall, and uninstall when installed; none with no userdir"""
+    s = m.get('status')
+    if s is None:
+        return []
     if s == 'no':
         return ['install']
     if s == 'old':
         return ['update', 'uninstall']
     return ['reinstall', 'uninstall']
+
+
+def controls(m):
+    """what the card offers besides installing, below a line (analyze, debug...): status --json already leaves out
+    the development ones out of a clone"""
+    return m.get('controls', [])
 
 
 # tooltips of the buttons (lang/), by action

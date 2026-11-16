@@ -7,6 +7,9 @@ name = { en = "JSF checks", pt-BR = "Verificações de JSF" }
 description = { en = "Warnings in the xhtml editor: EL, ids, forms, templates", pt-BR = "Avisos no editor de xhtml: EL, ids, formulários, templates" }
 # raise it when the jar changes, so the menu offers the update
 version = 2
+# what its card (interface) and its submenu (menu) offer besides installing; the dev ones only in a clone
+controls = ["analyze"]
+dev_controls = ["debug", "debug-log"]
 # shown after the install
 hint = { en = "the rules turn on and off in Tools > Options > Editor > JSF", pt-BR = "as regras ligam e desligam em Tools > Options > Editor > JSF" }
 

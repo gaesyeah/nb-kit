@@ -14,6 +14,7 @@ cli.yn_yes=[S/n]
 cli.yn_no=[s/N]
 cli.menu_hint=↑↓ navegar   Enter escolher   Esc sair
 cli.submenu_hint=↑↓ navegar   Enter escolher   Esc voltar
+cli.tip_submenu=Abre: %s
 cli.enter_cancels=(Enter cancela)
 cli.which_userdir=Achei mais de um NetBeans. Em qual deles?
 cli.userdir_has_nbkit=(nbkit instalado)

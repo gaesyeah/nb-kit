@@ -34,6 +34,12 @@ def read_tool(folder):
     name = localized(need(tool, 'name', (str, dict), lambda k, key: key_error(k, 'tool.' + key)))
     version = need(tool, 'version', int, lambda k, key: key_error(k, 'tool.' + key))
     desc, hint = localized(tool.get('description', '')), localized(tool.get('hint', ''))
+    controls = []
+    for key in ('controls', 'dev_controls'):
+        names = tool.get(key, [])
+        if not isinstance(names, list) or not all(isinstance(n, str) and re.fullmatch(r'[a-z-]+', n) for n in names):
+            raise key_error('bad', 'tool.' + key)
+        controls.append(' '.join(names))
     jar = codename = sha = ''
     module = data.get('netbeans_module')
     if module is not None:
@@ -50,7 +56,7 @@ def read_tool(folder):
         raise ToolError(T('tool.nothing'))
     uninstall = data.get('uninstall', {})
     return (tid, name, desc, version, folder, hint, jar, codename, sha,
-            localized(uninstall.get('goes', '')), localized(uninstall.get('stays', '')))
+            localized(uninstall.get('goes', '')), localized(uninstall.get('stays', '')), *controls)
 
 
 for path in sorted(glob.glob(os.path.join(sys.argv[1], '*', 'tool.toml'))):

@@ -107,6 +107,7 @@ class Tools(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         self.assertIn("tool_register jsf 'JSF checks'", out)
         self.assertIn('nbkit-jsf.jar nbkit.jsf', out)
+        self.assertIn(" analyze 'debug debug-log'\n", out)
         self.assertNotIn('skipped', out)
 
     def test_netbeans_module_tool(self):
@@ -116,6 +117,13 @@ class Tools(unittest.TestCase):
         self.assertIn("tool_register a A '' 2 ", out)
         self.assertIn(f' Hint a.jar a.b {self.SHA} ', out)
         self.assertNotIn('source', out)
+
+    def test_controls(self):
+        """the controls of its card and its submenu: the ones always shown, then the development ones"""
+        self.tool('c', '[tool]\nname = "C"\nversion = 1\ncontrols = ["analyze"]\ndev_controls = ["debug", "debug-log"]\n', ['tool.sh'])
+        self.assertIn(" analyze 'debug debug-log'\n", self.load())
+        self.tool('c', '[tool]\nname = "C"\nversion = 1\n', ['tool.sh'])
+        self.assertIn(" '' ''\n", self.load())
 
     def test_tool_sh_is_loaded_after_registering(self):
         self.tool('b', '[tool]\nname = "B"\nversion = 1\n', ['tool.sh'])
@@ -134,6 +142,8 @@ class Tools(unittest.TestCase):
                        'file x.jar is missing'),
             'nothing': ('[tool]\nname = "X"\nversion = 1\n', 'the tool installs nothing'),
             'Bad_Id': ('[tool]\nname = "X"\nversion = 1\n', 'only have lowercase letters'),
+            'bad-controls': ('[tool]\nname = "X"\nversion = 1\ncontrols = "analyze"\n', 'invalid value for "tool.controls"'),
+            'bad-dev-controls': ('[tool]\nname = "X"\nversion = 1\ndev_controls = [1]\n', 'invalid value for "tool.dev_controls"'),
         }
         for tid, (toml, _) in cases.items():
             self.tool(tid, toml)

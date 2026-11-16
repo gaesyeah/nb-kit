@@ -15,10 +15,12 @@ mkdir -p "$WORK/bin" && printf '#!/bin/sh\ntouch "%s/launched"\n' "$WORK" > "$WO
 # green ok and red FAIL, like the other tests, when the output is a terminal (the window runs behind a pipe)
 color=0; [ -t 1 ] && color=1
 rc=0
-for scenario in actions closing dark decline laptop small; do
+for scenario in ${NBKIT_GUI_SCENARIOS:-actions closing dark decline laptop small nouserdir}; do
   # full HD; a laptop screen (1366x768) and a short one (1366x560) for the layout
   case "$scenario" in laptop) screen=1366x768 ;; small) screen=1366x560 ;; *) screen=1920x1080 ;; esac
   new_home "$WORK/home"
+  # nouserdir: a home where NetBeans never ran
+  [ "$scenario" = nouserdir ] && rm -rf "$WORK/home/.netbeans"
   # decline: a NetBeans with a launcher that does nothing, for the scenario where nbkit offers to open it
   if [ "$scenario" = decline ]; then
     rm -rf "$WORK/nb"; cp -r "$TESTS/netbeans" "$WORK/nb"; mkdir -p "$WORK/nb/bin"
@@ -26,10 +28,17 @@ for scenario in actions closing dark decline laptop small; do
     sed -i "s|Installation *=.*|Installation            = $WORK/nb/platform|" "$WORK/home/.netbeans/31/var/log/messages.log"
   fi
   # ">16bit keyvals": GTK on the virtual screen with newer keyboard layouts (Mint 22, KDE), harmless
-  NBKIT_TEST_COLOR=$color PATH="$WORK/bin:$PATH" HOME="$WORK/home" GSETTINGS_BACKEND=memory PYTHONPATH="$TESTS/python" PYTHONDONTWRITEBYTECODE=1 GDK_BACKEND=x11 NO_AT_BRIDGE=1 \
-    xvfb-run -a -s "-screen 0 ${screen}x24" "$GUI_PY" "$TESTS/python/gui_window.py" "$scenario" 2>&1 </dev/null \
-    | grep -v -e 'libEGL warning' -e 'Unable to acquire session bus' -e '>16bit keyvals' -e '^$'
-  [ "${PIPESTATUS[0]}" = 0 ] || rc=1
+  # into a file, not a pipe: a process left behind by the window cannot hold the test; unbuffered, so a window that
+  # stops shows up to where it got; a time limit here as well as in the window (gui_window.py stops itself first)
+  NBKIT_TEST_COLOR=$color PATH="$WORK/bin:$PATH" HOME="$WORK/home" GSETTINGS_BACKEND=memory PYTHONPATH="$TESTS/python" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 GDK_BACKEND=x11 NO_AT_BRIDGE=1 \
+    timeout -k 10 240 xvfb-run -a -s "-screen 0 ${screen}x24" "$GUI_PY" "$TESTS/python/gui_window.py" "$scenario" > "$WORK/window.log" 2>&1 </dev/null
+  code=$?
+  grep -v -e 'libEGL warning' -e 'Unable to acquire session bus' -e '>16bit keyvals' -e '^$' "$WORK/window.log"
+  if [ "$code" != 0 ]; then
+    rc=1
+    # stopped before its own summary (killed by the time limit, or crashed): say so as a failure
+    grep -q 'passed$' "$WORK/window.log" || fail "the window of the \"$scenario\" scenario stopped before the end (exit $code)"
+  fi
 done
 # one window: opening nbkit again only brings the open one to the front (needs a session bus, as on a desktop)
 if command -v dbus-run-session >/dev/null 2>&1; then

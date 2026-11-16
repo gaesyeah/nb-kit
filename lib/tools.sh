@@ -8,13 +8,13 @@
 # The Python part is lib/tools/load.py.
 
 declare -A TOOL_DIR=() TOOL_HINT=() TOOL_JAR=() TOOL_CODE=() TOOL_SUM=() TOOL_GOES=() TOOL_STAYS=()
-# tool_register <id> <name> <description> <version> <folder> <hint> <jar> <codename> <sha256> <goes> <stays>
+# tool_register <id> <name> <description> <version> <folder> <hint> <jar> <codename> <sha256> <goes> <stays> <controls> <dev controls>
 tool_register() {
   local id="$1" p f
   p="tool_${id//-/_}"
   nbkit_register "$id" "$p" tool "$2" "$3" "$4"
   TOOL_DIR[$id]="$5"; TOOL_HINT[$id]="$6"; TOOL_JAR[$id]="$7"; TOOL_CODE[$id]="$8"; TOOL_SUM[$id]="$9"
-  TOOL_GOES[$id]="${10}"; TOOL_STAYS[$id]="${11}"
+  TOOL_GOES[$id]="${10}"; TOOL_STAYS[$id]="${11}"; MOD_CTL[$id]="${12:-}"; MOD_DEVCTL[$id]="${13:-}"
   # the contract of every tool points to the engine; tool.sh (loaded right after) may redefine any of them
   for f in status paths install_steps uninstall_steps uninstall_summary install uninstall check; do
     eval "${p}_$f() { tool_$f $id \"\$@\"; }"

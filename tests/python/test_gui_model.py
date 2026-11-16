@@ -37,6 +37,19 @@ class Status(unittest.TestCase):
         self.assertEqual(model.actions(JSF), ['reinstall', 'uninstall'])
         self.assertEqual(model.actions(mod(JSF, status='new')), ['reinstall', 'uninstall'])
 
+    def test_controls_of_a_card(self):
+        """the controls status --json gives the module (already without the development ones out of a clone)"""
+        self.assertEqual(model.controls(mod(JSF, controls=['analyze', 'debug', 'debug-log'])), ['analyze', 'debug', 'debug-log'])
+        self.assertEqual(model.controls(THEME), [])
+
+    def test_card_without_a_userdir(self):
+        """with no userdir the module has no status: no status line and no install buttons, only its controls"""
+        card = {'id': 'jsf', 'category': 'tool', 'name': 'JSF checks', 'version': '2', 'controls': ['analyze']}
+        self.assertEqual(model.status_text(card), '')
+        self.assertEqual(model.actions(card), [])
+        self.assertEqual(model.controls(card), ['analyze'])
+        self.assertEqual(model.sections({'modules': [card]}), [('tool', [card])])
+
     def test_status_runs_nbkit(self):
         calls = []
 

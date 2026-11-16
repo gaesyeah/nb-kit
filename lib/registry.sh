@@ -15,6 +15,17 @@ mod_call() {
   if declare -F "$fn" >/dev/null; then "$fn" "$@"; fi
 }
 mod_has() { declare -F "${MOD_FN[$1]}_$2" >/dev/null; }
+# development: nbkit runs from a clone of the repository (the release zip and install-self have no tests/);
+# what is only for development shows only then, in the menu, in status --json and so in the interface
+nbkit_clone() { [ -f "$NBKIT_DIR/tests/run.sh" ]; }
+# what the module offers besides installing (its card in the interface, its submenu in the menu), one per line:
+# MOD_CTL, then MOD_DEVCTL in a clone
+declare -A MOD_CTL=() MOD_DEVCTL=()
+mod_controls() {
+  local c
+  for c in ${MOD_CTL[$1]:-}; do echo "$c"; done
+  if nbkit_clone; then for c in ${MOD_DEVCTL[$1]:-}; do echo "$c"; done; fi
+}
 mod_status() { mod_call "$1" status; }  # no | ok | old:<v> | new:<v>
 # compares the installed version (file nbkit/<id>.version, or the legacy one given in $2) with this nbkit's
 version_status() {

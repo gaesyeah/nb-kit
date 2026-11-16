@@ -14,6 +14,7 @@ cli.yn_yes=[Y/n]
 cli.yn_no=[y/N]
 cli.menu_hint=↑↓ move   Enter choose   Esc quit
 cli.submenu_hint=↑↓ move   Enter choose   Esc back
+cli.tip_submenu=Opens: %s
 cli.enter_cancels=(Enter cancels)
 cli.which_userdir=Found more than one NetBeans. Which one?
 cli.userdir_has_nbkit=(nbkit installed)

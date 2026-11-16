@@ -184,6 +184,8 @@ check "status --json is valid JSON" test "$(jget "$json" "type(d).__name__")" = 
 check "status --json finds the userdir" test "$(jget "$json" "d['userdir'] == '$U' and [u['path'] for u in d['userdirs']] == ['$U']")" = True
 check "status --json lists the modules, not installed" test "$(jget "$json" "[(m['id'], m['status'], m['installed']) for m in d['modules']]")" = "[('one-dark-pro-mix', 'no', None), ('jsf', 'no', None)]"
 check "status --json knows it runs from a clone" test "$(jget "$json" "d['clone'], d['netbeans_running'], d['can_check'], d['backups']")" = "(True, False, False, [])"
+check "status --json gives each module its controls: the JSF ones, development ones included in a clone" \
+  test "$(jget "$json" "[(m['id'], m['controls']) for m in d['modules']]")" = "[('one-dark-pro-mix', []), ('jsf', ['analyze', 'debug', 'debug-log'])]"
 E="$WORK/events"
 out="$(NBKIT_UI_EVENTS="$E" nbkit install)"; rc=$?
 check "install with events exits with 0" test "$rc" = 0
@@ -201,7 +203,9 @@ check "status --json lists the backup, marked as the original" test "$(jget "$js
 out="$(nbkit status)"
 contains "status without --json is for people" "$out" "JSF checks"
 out="$(HOME="$WORK/empty" bash "$NBKIT_DIR/nbkit.sh" status --json </dev/null 2>&1)"; rc=$?
-check "status --json without NetBeans still answers" test "$rc/$(jget "$out" "d['userdir'], d['modules']")" = "0/(None, [])"
+check "status --json without NetBeans still answers" test "$rc/$(jget "$out" "d['userdir']")" = "0/None"
+check "and lists only the modules with controls, without a status (the JSF card, to analyze)" \
+  test "$(jget "$out" "[(m['id'], m['name'], m['controls'], 'status' in m) for m in d['modules']]")" = "[('jsf', 'JSF checks', ['analyze', 'debug', 'debug-log'], False)]"
 out="$(HOME="$WORK/empty" bash "$NBKIT_DIR/nbkit.sh" status </dev/null 2>&1)"; rc=$?
 check "status without NetBeans is an error" test "$rc" = 1
 rm -f "$E"
@@ -478,14 +482,24 @@ menu_items() {
 }
 items="$(menu_items "$NBKIT_DIR/nbkit.sh")"
 contains "by subject: the modules, nbkit itself, development, quit" "$items" \
-  "Reinstall|Uninstall|Analyze a JSF project|Backups|Put nbkit on the system|Run the tests|Build the modules|JSF debug: off|Show the JSF debug lines|Quit"
+  "Reinstall|Uninstall|JSF checks|Backups|Put nbkit on the system|Run the tests|Build the modules|Quit"
 # below the menu, what the chosen option does (the tooltips of the interface): ↓ moves to the next one
 out="$(printf '\033[B\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh'" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
 contains "below the menu, what the chosen option does" "$out" "Installs the same version again"
 contains "and it follows the cursor" "$out" "Removes modules and gives NetBeans back"
+# the JSF controls: a submenu named after the module, its tip lists what it opens
+out="$(printf '\033[B\033[B\033\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+contains "the tip of the JSF entry says what it opens" "$out" "Opens: Analyze a JSF project, JSF debug, Show the JSF debug lines"
+out="$(printf '\033[B\033[B\r\033\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+contains "the JSF submenu: analyze, then the debug and its lines (in a clone)" \
+  "$(sed -n 's/^  [> ] \([A-Z]\)/\1/p' <<<"$out" | sed 's/ (.*//' | paste -sd '|')" "|Quit|Analyze a JSF project|JSF debug: off|Show the JSF debug lines"
+contains "each item of the submenu has its tip" "$out" "Runs the JSF checks on every xhtml of a project folder"
+printf '\033[B\033[B\r\033[B\r\033\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null >/dev/null 2>&1
+contains "the debug of the submenu turns the JSF debug on" "$(nbkit status --json)" '"jsf_debug":true'
+nbkit debug jsf off >/dev/null
 HOME="$H" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null >/dev/null 2>&1
 contains "once nbkit is on the system, updating and taking it out take its place" "$(menu_items "$NBKIT_DIR/nbkit.sh")" \
-  "Reinstall|Uninstall|Analyze a JSF project|Backups|Update nbkit|Take nbkit out of the system|Run the tests|Build the modules|JSF debug: off|Show the JSF debug lines|Quit"
+  "Reinstall|Uninstall|JSF checks|Backups|Update nbkit|Take nbkit out of the system|Run the tests|Build the modules|Quit"
 HOME="$H" bash "$NBKIT_DIR/nbkit.sh" uninstall-self </dev/null >/dev/null 2>&1
 
 echo "nbkit on the system (install-self)"
@@ -510,6 +524,12 @@ check "status --json says when nbkit is not on the system" bash -c "HOME='$H' ba
 HOME="$H" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null >/dev/null 2>&1
 check "and when it is, running from that copy" bash -c "HOME='$H' '$H/.local/bin/nbkit' status --json </dev/null | grep -q '\"self_installed\":true,\"self_running\":true'"
 check "the installed copy is not a clone (no tests, no development section)" test ! -e "$SD/tests"
+json="$(HOME="$H" "$H/.local/bin/nbkit" status --json </dev/null 2>&1)"
+check "out of a clone, the JSF controls are only the analysis (no debug)" \
+  test "$(jget "$json" "[m['controls'] for m in d['modules'] if m['id'] == 'jsf']")" = "[['analyze']]"
+items="$(menu_items "$SD/nbkit.sh")"
+contains "and the menu shows the analysis itself, with no submenu" "$items" "|Analyze a JSF project|Update nbkit|"
+lacks "nor the development items" "$items" "Run the tests"
 # a newer release, served from a file: the zip of a copy with another version
 mkdir -p "$WORK/rel/nbkit"
 tar -C "$NBKIT_DIR" --exclude=./.git -cf - . | tar -C "$WORK/rel/nbkit" -xf -
@@ -611,13 +631,13 @@ L="$P/a folder with a very long name/that goes on and on/web"
 mkdir -p "$L/src/main/webapp" && : > "$L/src/main/webapp/i.xhtml"
 printf 'openProjectsURLs.0=file:%s/\n' "${L// /%20}" > "$U/config/Preferences/org/netbeans/modules/projectui.properties"
 nbkit install >/dev/null
-out="$(printf '\033[B\033[B\r\033\033' | HOME="$H" timeout 30 script -qec "stty cols 60; bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 \
+out="$(printf '\033[B\033[B\r\r\033\033' | HOME="$H" timeout 30 script -qec "stty cols 60; bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 \
   | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
 contains "the menu lists the JSF projects to analyze" "$out" "Other folder..."
 
 contains "a long path is cut at the start, so the line fits" "$out" "… with a very long name/that goes on and on/web"
 check "no line of the list is wider than the terminal" python3 -c 'import sys; sys.exit(any(len(l) > 60 for l in sys.argv[1].splitlines() if l.lstrip(" >").startswith("web ")))' "$out"
-asked="$(printf '\033[B\033[B\r\r' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+asked="$(printf '\033[B\033[B\r\r\r' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
 contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain how each name of the EL of one file was resolved? [y/N]"
 
 out="$(nbkit --lang en debug jsf maybe)"; rc=$?
