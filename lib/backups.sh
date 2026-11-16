@@ -29,6 +29,11 @@ backup_owner() {
   done < <(all_backups)
   return 1
 }
+# what is specific to this backup (module's own backup_detail; a plain tool.sh backup with none says so)
+backup_detail() {
+  if mod_has "$1" backup_detail; then mod_call "$1" backup_detail "$2"
+  else t cli.backup_detail_none; fi
+}
 # confirm_restore <id> <file> and confirm_delete_backup <id> <file>: explain and ask (menu, arguments and interface)
 confirm_restore() {
   t cli.restore_back_to "$(bk_date "$2")" "$(mod_call "$1" backup_desc "$2")"; echo
@@ -88,6 +93,15 @@ browse_backups() {
       del)
         printf '\e[?25h\n\n'
         if confirm_delete_backup "$id" "$f"; then rm -f "$f"; ok "$(t cli.backup_deleted)"; sleep 0.8; fi ;;
+      d)
+        printf '\e[H\e[2J'
+        echo "${B}nbkit${N} ${D}v$NBKIT_VERSION${N}"
+        echo "  ${B}$(bk_date "$f")${N}   $(bk_size "$f")   $(mod_call "$id" backup_desc "$f")"
+        echo
+        backup_detail "$id" "$f" | sed 's/^/  /'
+        echo
+        printf '  %s%s%s' "$D" "$(t cli.press_any_key)" "$N"
+        IFS= read -rsn1 j </dev/tty || true ;;
       '')
         printf '\e[?25h\n\n'
         if confirm_restore "$id" "$f"; then RESTORE_BK="$f"; RESTORE_ID="$id"; break; fi ;;

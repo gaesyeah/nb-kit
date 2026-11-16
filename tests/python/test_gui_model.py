@@ -63,6 +63,30 @@ class Status(unittest.TestCase):
         with self.assertRaises(model.StatusError):
             model.status(run=garbage)
 
+    def test_backup_detail_runs_nbkit(self):
+        calls = []
+
+        def run(argv, **kw):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, '  2 keys of yours\n', '')
+        self.assertEqual(model.backup_detail('/u', '/u/x.tar.gz', run=run), '2 keys of yours')
+        self.assertEqual(calls[0][1:], [model.NBKIT, 'backup-detail', '/u/x.tar.gz', '/u'])
+
+    def test_backup_detail_without_a_userdir(self):
+        calls = []
+
+        def run(argv, **kw):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, '', '')
+        model.backup_detail(file='/x.tar.gz', run=run)
+        self.assertEqual(calls[0][1:], [model.NBKIT, 'backup-detail', '/x.tar.gz'])
+
+    def test_backup_detail_errors(self):
+        def failing(argv, **kw):
+            return subprocess.CompletedProcess(argv, 1, '', '\x1b[31mError:\x1b[0m not a backup')
+        with self.assertRaisesRegex(model.StatusError, '^Error: not a backup$'):
+            model.backup_detail('/u', '/x', run=failing)
+
 
 class Look(unittest.TestCase):
     def test_dark_preference(self):

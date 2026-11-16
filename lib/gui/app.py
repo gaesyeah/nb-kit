@@ -701,14 +701,15 @@ class Window(Gtk.ApplicationWindow):
             text.append(label(f"{names.get(b['module'], b['module'])}: {top}", 'heading'))
             text.append(label(b['description'], 'dim-label', wrap=True))
             row.append(text)
+            details = button(T('gui.details'), self.show_backup_detail, b['file'], tip=model.TIP_KEYS['details'])
             restore = button(T('gui.restore'), self.backup_action, d, 'restore', b['file'], tip=model.TIP_KEYS['restore'])
             delete = button(T('gui.delete'), self.backup_action, d, 'delete-backup', b['file'], tip=model.TIP_KEYS['delete'])
             delete.add_css_class('destructive-action')
-            for w in (restore, delete):
+            for w in (details, restore, delete):
                 w.set_valign(Gtk.Align.CENTER)
                 row.append(w)
             rows.append(row)
-            self.backup_rows.append({'file': b['file'], 'restore': restore, 'delete': delete})
+            self.backup_rows.append({'file': b['file'], 'details': details, 'restore': restore, 'delete': delete})
         box.append(framed(rows))
         close = button(T('gui.close'), d.destroy)
         close.set_halign(Gtk.Align.END)
@@ -721,6 +722,22 @@ class Window(Gtk.ApplicationWindow):
         dialog.destroy()
         self.backups_window = None
         self.start(action, path)
+
+    def show_backup_detail(self, path):
+        try:
+            self.backup_detail_text = model.backup_detail(self.userdir, path)
+        except model.StatusError as e:
+            self.backup_detail_text = str(e)
+        d = Gtk.Window(title=T('gui.backup_detail_title'), transient_for=self, modal=True, default_width=480)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_top=14, margin_bottom=14,
+                      margin_start=14, margin_end=14)
+        box.append(label(self.backup_detail_text, wrap=True))
+        close = button(T('gui.close'), d.destroy)
+        close.set_halign(Gtk.Align.END)
+        box.append(close)
+        d.set_child(box)
+        self.backup_detail_window = d
+        d.present()
 
     # ---------- about ----------
     def show_about(self):

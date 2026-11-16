@@ -39,6 +39,38 @@ check "base profile left untouched" cmp -s "$U/config/Editors/FontsColors/FlatLa
   "$U/config/Editors/text/x-java/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml"
 check "a backup of the original state was made" ls "$U"/nbkit-theme-backup-*.tar.gz
 
+echo "Backup detail"
+B0="$(ls "$U"/nbkit-theme-backup-*.tar.gz)"
+out="$(nbkit backup-detail "$B0")"; rc=$?
+check "backup-detail exits with 0" test "$rc" = 0
+contains "backup detail lists your first UI key" "$out" "@myKey=#123456"
+contains "backup detail lists your second UI key" "$out" "Component.arc=8"
+contains "backup detail says they are yours, from before nbkit" "$out" "2 keys of yours in the interface"
+contains "backup detail finds the font it held" "$out" "Fira Code 15"
+contains "backup detail compares colors with the NetBeans installation" "$out" "compared with the FlatLaf Dark defaults"
+contains "backup detail says the UI will be replaced" "$out" "restoring replaces: UI"
+lacks "backup detail does not claim the colors change (base profile untouched)" "$out" "restoring removes"
+lacks "backup detail does not claim the colors are removed either" "$out" "restoring brings back"
+out="$(nbkit backup-detail "$NBKIT_DIR/LICENSE" 2>&1)"; rc=$?
+check "backup-detail refuses a file that is not a backup" test "$rc" = 1
+contains "backup-detail names the file" "$out" "is not a backup of any module of this userdir"
+out="$(nbkit backup-detail 2>&1)"; rc=$?
+check "backup-detail without a file exits with 1" test "$rc" = 1
+contains "backup-detail says what it needs" "$out" "backup-detail needs the backup file"
+
+echo "Backup detail: colors matched against the real NetBeans defaults (not just the legacy signature)"
+H2="$WORK/home2"; U2="$H2/.netbeans/31"
+new_home "$H2"
+# "error" is exactly what tests/netbeans ships as the NetBeans default for FlatLafDark (mime ""): must NOT be
+# reported (a wrong mime for the base, e.g. "config/Editors", would miss the match and report it anyway)
+sed -i 's|</fontscolors>|    <fontcolor name="error" waveUnderlined="ff9e2927"/>\n</fontscolors>|' \
+  "$U2/config/Editors/FontsColors/FlatLafDark/org-netbeans-modules-editor-settings-CustomFontsColors-tokenColorings.xml"
+HOME="$H2" bash "$NBKIT_DIR/nbkit.sh" install </dev/null >/dev/null 2>&1
+B2="$(ls "$U2"/nbkit-theme-backup-*.tar.gz)"
+out="$(HOME="$H2" bash "$NBKIT_DIR/nbkit.sh" backup-detail "$B2" </dev/null)"
+lacks "a color identical to the real NetBeans default is not reported" "$out" "error: waveUnderlined"
+contains "a color different from the real default is still reported" "$out" "font Fira Code 15"
+
 echo "Reinstall"
 installed="$(fingerprint "$H")"
 out="$(nbkit install)"; rc=$?

@@ -103,7 +103,7 @@ ACTION=""; UD=""; SEL=(); JSON=0; FORCE=(); BKF=""
 for a in "$@"; do
   case "$a" in
     -h|--help|help) usage; exit 0 ;;
-    install|uninstall|check|status|restore|delete-backup|gui|test|build|install-self|uninstall-self|update-self)
+    install|uninstall|check|status|restore|delete-backup|backup-detail|gui|test|build|install-self|uninstall-self|update-self)
       [ -z "$ACTION" ] && ACTION="$a" || die "$(t cli.repeated_command "$a")" ;;
     --json) JSON=1 ;;
     --force) FORCE=(--force) ;;
@@ -535,6 +535,11 @@ case "$ACTION" in
       echo
     fi
     if [ "$ACTION" = restore ]; then do_restore "$id" "$f"; else rm -f "$f"; ok "$(t cli.backup_deleted)"; fi ;;
+  backup-detail)
+    [ -n "$BKF" ] || die "$(t cli.need_backup "$ACTION")"
+    row="$(backup_owner "$BKF")" || die "$(t cli.not_a_backup "$BKF")"
+    id="${row%%$'\t'*}"; f="${row#*$'\t'}"
+    backup_detail "$id" "$f" ;;
   install)
     [ ${#SEL[@]} -gt 0 ] || SEL=("${MODS[@]}")
     # one theme at a time

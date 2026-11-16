@@ -19,7 +19,7 @@ theme_register() {
   local id="$1" p="$2" f
   nbkit_register "$id" "$p" theme "$3" "$4" "$5"
   THEME_DIRS[$id]="$6"
-  for f in status paths uninstall_summary rollback backups backup_desc install_steps uninstall_steps \
+  for f in status paths uninstall_summary rollback backups backup_desc backup_detail install_steps uninstall_steps \
            restore_steps install uninstall restore check; do
     eval "${p}_$f() { theme_use $id $p; theme_$f \"\$@\"; }"
   done
@@ -83,13 +83,21 @@ theme_legacy_restore_base() {
 # told from yours by how they were written: by a script (name= first in every entry, NetBeans writes the attributes
 # in alphabetical order), with no font and only colors of the old installer's palette.
 THEME_LEGACY_PALETTE="ff203d49 ff21252b ff282c34 ff2c313c ff2e3440 ff2f3339 ff323842 ff393739 ff3a3a3a ff3b4048 ff3c4049 ff40444b ff404859 ff415849 ff45484f ff474d59 ff495162 ff515a6b ff528bff ff53232a ff53562a ff554941 ff56b6c2 ff61afef ff7f848e ff808080 ff82674f ff9876aa ff98c379 ffa9b7c6 ffabb2bf ffbe5046 ffc24038 ffc5c5c5 ffc678dd ffd19a66 ffe06c75 ffe5c07b ffffef28 ffffffff"
+# a color file written by the old installer: by a script (name= first in every entry, NetBeans writes the
+# attributes in alphabetical order), with no font and only colors of its own palette. Used to clean it up
+# (theme_legacy_custom_out) and, read-only, to tell it apart from your own colors in a backup (theme_backup_detail).
+theme_legacy_installer_file() {
+  local f="$1"
+  grep -q '<fontcolor' "$f" || return 1
+  grep -q '<font name=' "$f" && return 1
+  grep -o '<fontcolor [a-zA-Z]*=' "$f" | grep -qvx '<fontcolor name=' && return 1
+  grep -oE '"ff[0-9a-f]{6}"' "$f" | tr -d '"' | grep -qvxF -f <(tr ' ' '\n' <<<"$THEME_LEGACY_PALETTE") && return 1
+  return 0
+}
 theme_legacy_custom_out() {
   local f n=0
   while IFS= read -r -d '' f; do
-    grep -q '<fontcolor' "$f" || continue
-    grep -q '<font name=' "$f" && continue
-    grep -o '<fontcolor [a-zA-Z]*=' "$f" | grep -qvx '<fontcolor name=' && continue
-    grep -oE '"ff[0-9a-f]{6}"' "$f" | tr -d '"' | grep -qvxF -f <(tr ' ' '\n' <<<"$THEME_LEGACY_PALETTE") && continue
+    theme_legacy_installer_file "$f" || continue
     rm -f "$f"; n=$((n + 1))
   done < <(find "$C/Editors" -path "*/FontsColors/$THEME_BASE/$COLORS_PREFIX-*.xml" -print0 2>/dev/null)
   if [ "$n" -gt 0 ]; then info "$(t theme.legacy_custom_out "$n" "$THEME_BASE_NAME")"; fi
@@ -167,19 +175,88 @@ theme_backups() {
 }
 
 declare -A THEME_BKDESC=()
+# what a listing of paths (tar -tzf format, one per line) is: UI and/or base profile colors; empty if none.
+# Used for a backup's own listing and, in theme_backup_detail, for the subsets that differ between two listings.
+theme_describe_targets() {
+  local l="$1" n p=()
+  if grep -qx "$LAFT" <<<"$l"; then p+=("$(t theme.bk_ui "$THEME_LAF_FILE")"); fi
+  n="$(grep -oE "^config/Editors/[^/]+/[^/]+/FontsColors/$THEME_BASE/" <<<"$l" | sort -u | wc -l || true)"
+  if [ "${n:-0}" -gt 0 ]; then p+=("$(t theme.bk_colors_n "$THEME_BASE_NAME" "$n")")
+  elif grep -q "^config/Editors/FontsColors/$THEME_BASE/" <<<"$l"; then p+=("$(t theme.bk_colors "$THEME_BASE_NAME")"); fi
+  [ ${#p[@]} -gt 0 ] || return 1
+  IFS=+; echo "${p[*]}" | sed 's/+/ + /g'
+}
 # what is inside: UI and/or base profile colors
 theme_backup_desc() {
-  local l n p=()
   if [ -z "${THEME_BKDESC[$1]:-}" ]; then
-    l="$(tar -tzf "$1" 2>/dev/null || true)"
-    if grep -qx "$LAFT" <<<"$l"; then p+=("$(t theme.bk_ui "$THEME_LAF_FILE")"); fi
-    n="$(grep -oE "^config/Editors/[^/]+/[^/]+/FontsColors/$THEME_BASE/" <<<"$l" | sort -u | wc -l || true)"
-    if [ "${n:-0}" -gt 0 ]; then p+=("$(t theme.bk_colors_n "$THEME_BASE_NAME" "$n")")
-    elif grep -q "^config/Editors/FontsColors/$THEME_BASE/" <<<"$l"; then p+=("$(t theme.bk_colors "$THEME_BASE_NAME")"); fi
-    [ ${#p[@]} -gt 0 ] || p=("$(t theme.bk_empty)")
-    THEME_BKDESC[$1]="$(IFS=+; echo "${p[*]}" | sed 's/+/ + /g')"
+    THEME_BKDESC[$1]="$(theme_describe_targets "$(tar -tzf "$1" 2>/dev/null || true)")" || THEME_BKDESC[$1]="$(t theme.bk_empty)"
   fi
   echo "${THEME_BKDESC[$1]}"
+}
+# the files of TARGETS that exist right now in the userdir, in the same listing format as tar -tzf
+theme_target_listing() {
+  local t
+  for t in "${TARGETS[@]}"; do
+    if [ "$t" = "$LAFT" ]; then [ -f "$UD/$t" ] && echo "$t"
+    else find "$UD/$t" -type f 2>/dev/null | sed "s#^$UD/##" || true; fi
+  done
+  return 0
+}
+
+# detail of what is specific to this backup: contents, interface keys and colors (old installer vs yours,
+# compared with the NetBeans defaults read from the installation, in backup_detail.py), the editor font it
+# held, and what restoring now would bring back, replace or remove (by content, not just presence: see
+# theme_restore_backup, which wipes every TARGETS path before laying down the backup's own content)
+theme_backup_detail() {
+  local f="$1" tmp bl cl blf clf only_b only_c both changed cf relp mime typ legacy rel d manifest notes=()
+  bl="$(tar -tzf "$f" 2>/dev/null || true)"
+  if d="$(theme_describe_targets "$bl")"; then notes+=("$d"); else notes+=("$(t theme.bk_empty)"); fi
+
+  tmp="$(tmpdir)"
+  tar -xzf "$f" -C "$tmp" 2>/dev/null || true
+
+  manifest="$tmp/.nbkit-colors-manifest"
+  if grep -q "FontsColors/$THEME_BASE/" <<<"$bl"; then
+    while IFS= read -r -d '' cf; do
+      relp="${cf#"$tmp"/}"
+      # the mime base_profile() uses: "" for the base, "text/x-java" for config/Editors/text/x-java/...
+      case "${relp#config/Editors/}" in
+        FontsColors/*) mime="" ;;
+        */FontsColors/*) mime="${relp#config/Editors/}"; mime="${mime%%/FontsColors/*}" ;;
+        *) continue ;;
+      esac
+      case "$cf" in
+        *-highlights.xml) typ=highlight ;;
+        *-annotations.xml) typ=annotation ;;
+        *) typ=token ;;
+      esac
+      if theme_legacy_installer_file "$cf"; then legacy=1; else legacy=0; fi
+      printf '%s\t%s\t%s\t%s\n' "$legacy" "$mime" "$typ" "$relp"
+    done < <(find "$tmp/config/Editors" -path "*/FontsColors/$THEME_BASE/$COLORS_PREFIX-*.xml" -print0 2>/dev/null) > "$manifest"
+  fi
+
+  while IFS= read -r line; do [ -n "$line" ] && notes+=("$line"); done \
+    < <("$NBKIT_PY" "$THEMES_LIB/backup_detail.py" "$UD" "$tmp" "$THEME_BASE" "$COLORS_PREFIX" "$LAFT" "$manifest")
+
+  cl="$(theme_target_listing)"
+  # tar -tzf also lists the directory entries themselves: only the files matter for this comparison
+  blf="$(grep -v '/$' <<<"$bl" | grep -v '^$' | sort)"
+  clf="$(grep -v '^$' <<<"$cl" | sort)"
+  only_b="$(comm -23 <(echo "$blf") <(echo "$clf") 2>/dev/null || true)"
+  only_c="$(comm -13 <(echo "$blf") <(echo "$clf") 2>/dev/null || true)"
+  both="$(comm -12 <(echo "$blf") <(echo "$clf") 2>/dev/null || true)"
+  changed=""
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    cmp -s "$tmp/$rel" "$UD/$rel" 2>/dev/null || changed+="$rel"$'\n'
+  done <<<"$both"
+
+  if d="$(theme_describe_targets "$only_b")"; then notes+=("$(t theme.bd_restores "$d")"); fi
+  if d="$(theme_describe_targets "$changed")"; then notes+=("$(t theme.bd_replaces "$d")"); fi
+  if d="$(theme_describe_targets "$only_c")"; then notes+=("$(t theme.bd_removes "$d")"); fi
+  if [ -z "$only_b" ] && [ -z "$changed" ] && [ -z "$only_c" ]; then notes+=("$(t theme.bd_nothing_changes)"); fi
+
+  printf '%s\n' "${notes[@]}"
 }
 
 theme_install_steps() { echo 9; }

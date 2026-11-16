@@ -62,6 +62,15 @@ SECTION_KEYS = {'tool': 'gui.section_tool', 'theme': 'gui.section_theme'}
 ACTION_KEYS = {'install': 'gui.install', 'update': 'gui.update', 'reinstall': 'gui.reinstall', 'uninstall': 'gui.uninstall'}
 
 
+def backup_detail(userdir=None, file=None, run=subprocess.run):
+    """nbkit.sh backup-detail <file>: what is specific to that backup, as plain text"""
+    argv = ['bash', NBKIT, 'backup-detail', file] + ([userdir] if userdir else [])
+    p = run(argv, capture_output=True, text=True, stdin=subprocess.DEVNULL, env=child_env())
+    if p.returncode != 0:
+        raise StatusError(plain(p.stderr or p.stdout).strip())
+    return plain(p.stdout).strip()
+
+
 def sections(st):
     """[(category, [modules])]: tools first, then themes; only categories that have modules"""
     out = []
@@ -98,7 +107,8 @@ TIP_KEYS = {'install': 'gui.tip_install', 'update': 'gui.tip_update', 'reinstall
             'uninstall': 'gui.tip_uninstall', 'install-all': 'gui.tip_install_all', 'reinstall-all': 'gui.tip_reinstall_all',
             'uninstall-all': 'gui.tip_uninstall_all', 'backups': 'gui.tip_backups', 'check': 'gui.tip_check',
             'test': 'gui.tip_test', 'build': 'gui.tip_build', 'restore': 'gui.tip_restore', 'delete': 'gui.tip_delete',
-            'analyze': 'gui.tip_analyze', 'debug': 'gui.tip_debug', 'debug-log': 'gui.tip_debug_log'}
+            'analyze': 'gui.tip_analyze', 'debug': 'gui.tip_debug', 'debug-log': 'gui.tip_debug_log',
+            'details': 'gui.tip_backup_detail'}
 BULK_KEYS = {'install': 'gui.install_all', 'reinstall': 'gui.reinstall_all', 'uninstall': 'gui.uninstall_all'}
 
 
