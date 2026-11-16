@@ -710,5 +710,14 @@ chmod +x "$WORK/jdkm/bin/javac" "$WORK/jdkm/bin/jar"
 HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdkm" bash "$B/src/build.sh" >/dev/null 2>&1 </dev/null
 check "after a build, nothing to build" test "$(jget "$(bnk status --json)" "d['build']")" = "[]"
 contains "and the manifest keeps the module's own lines" "$(manifest_of "$B/modules/tools/jsf/nbkit-jsf.jar")" "OpenIDE-Module: nbkit.jsf"
+# only the module whose code changed is built: the other jars stay byte for byte (no new jar in git for nothing)
+# (the time of each file: the real jar tool writes the time of each entry, so a jar written again differs)
+before="$(stat -c '%n %y' "$B/lib/jars/nbkit-core.jar" "$B/lib/jars/nbkit-colors.jar"; cat "$B/lib/jars/SHA256SUMS")"
+echo "// changed again" >> "$B/src/nbkit-jsf/src/nbkit/jsf/El.java"
+out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdkm" bash "$B/src/build.sh" --lang en 2>&1 </dev/null)"
+check "with only the JSF code changed, only nbkit-jsf is built" test "$(grep -o 'Building [a-z-]*' <<<"$out" | paste -sd ' ')" = "Building nbkit-jsf"
+check "the jars of the other modules are not written again, and their sums stay" \
+  test "$(stat -c '%n %y' "$B/lib/jars/nbkit-core.jar" "$B/lib/jars/nbkit-colors.jar"; cat "$B/lib/jars/SHA256SUMS")" = "$before"
+check "and then nothing is left to build" test "$(jget "$(bnk status --json)" "d['build']")" = "[]"
 
 finish

@@ -3,8 +3,8 @@
 # installation, and updates their sha256 (lib/jars/SHA256SUMS and modules/tools/jsf/tool.toml).
 #   bash src/build.sh [netbeans folder] [--test] [--force]
 #   --test: runs the JSF tests (tests/jsf.sh) after building; --force: builds even when the jars are up to date; --help
-# Builds only when the code of a module changed since its jar was built (lib/buildmark.sh); otherwise it says so
-# and, in a terminal, asks whether to build anyway.
+# Builds only the modules whose code changed since their jar was built (lib/buildmark.sh), so the other jars stay
+# as they are; with nothing changed it says so and, in a terminal, asks whether to build them all anyway.
 # Without the folder: NB_HOME, or the NetBeans that last used ~/.netbeans. Needs a JDK as new as the Java of the NetBeans
 # jars (17 or newer), found by itself: JAVA_HOME, the JDK NetBeans uses, the PATH, /usr/lib/jvm.
 set -euo pipefail
@@ -34,11 +34,15 @@ if [ $HELP = 1 ]; then t build.usage; exit 0; fi
 [ -z "$BAD" ] || die "$(t build.unknown_option "$BAD")"
 
 # ---------- anything to build? ----------
-# the questions follow nbkit.sh (NBKIT_INTERACTIVE: the menu, the interface); run by itself, a terminal
+# the questions follow nbkit.sh (NBKIT_INTERACTIVE: the menu, the interface); run by itself, a terminal.
+# BUILD: the modules to build, only those whose code changed; all with --force or when asked to build anyway
+BUILD=()
+for e in "${BUILD_MODULES[@]}"; do BUILD+=("${e%%:*}"); done
 if [ $FORCE = 0 ]; then
   STALE="$(build_stale_text)"
   if [ -n "$STALE" ]; then
     info "$(t build.changed "$STALE")"
+    mapfile -t BUILD < <(build_stale | cut -f1)
   else
     ok "$(t build.current)"
     ask=0
@@ -170,8 +174,10 @@ build() {
 }
 sum_of() { sha256sum "$1" | cut -d' ' -f1; }
 
-TOTAL=$(( ${#BUILD_MODULES[@]} + 1 ))
-for e in "${BUILD_MODULES[@]}"; do build "${e%%:*}" "$NBKIT_DIR/${e#*:}"; done
+TOTAL=$(( ${#BUILD[@]} + 1 ))
+for e in "${BUILD_MODULES[@]}"; do
+  if [[ " ${BUILD[*]} " == *" ${e%%:*} "* ]]; then build "${e%%:*}" "$NBKIT_DIR/${e#*:}"; fi
+done
 
 step "$(t build.step_sums)"
 (cd "$NBKIT_DIR/lib/jars" && sha256sum nbkit-colors.jar nbkit-core.jar > SHA256SUMS)
