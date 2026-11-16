@@ -206,4 +206,8 @@ contains "and whether the project is a web module" "$out" "line: info${T}web-mod
 contains "read back: the rules that did not run, and why (no marks there is not agreement)" "$out" \
   "not run: {text_html_=html-error-checking off text/facelets, text_x-el_Identifiers=web-module no}"
 contains "with both on, every rule ran" "$out" "all ran: {}"
+contains "web module: yes when Identifiers applied to some EL of the project" "$out" "web module, Identifiers applied to some EL: yes"
+contains "no when there was EL and it never applied" "$out" "web module, EL but Identifiers never applied: no"
+contains "unknown with no EL at all" "$out" "web module, no EL: unknown"
+contains "unknown is not taken as not run (no EL, no EL marks to miss)" "$out" "unknown web module: {}"
 finish

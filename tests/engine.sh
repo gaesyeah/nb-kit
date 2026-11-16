@@ -411,6 +411,10 @@ fi
 
 # jar refuses a manifest line over 512 bytes ("line too long"): long ones go on continuation lines
 check "no module manifest has a line jar refuses" test -z "$(awk 'length > 511 {print FILENAME}' "$NBKIT_DIR"/src/*/manifest.mf)"
+# no module depends on what NetBeans' Features on Demand can keep off in a new userdir: it would not load (the list is
+# written from a NetBeans installation by tests/python/netbeans_fod.py; run it again when NetBeans changes version)
+fod="$(python3 "$TESTS/python/netbeans_fod.py" --check "$TESTS/expected/netbeans-fod.txt" "$NBKIT_DIR"/src/*/manifest.mf 2>&1)"
+check "no module depends on what Features on Demand can keep off (it would not load)${fod:+: $fod}" test -z "$fod"
 
 echo "Questions of the theme only when interactive"
 # the font of the theme installed on the machine: the build asks whether to keep yours, but only with the

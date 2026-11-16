@@ -39,7 +39,6 @@ import org.netbeans.modules.parsing.api.Snapshot;
 import org.netbeans.modules.parsing.api.Source;
 import org.netbeans.modules.parsing.api.UserTask;
 import org.netbeans.modules.parsing.api.indexing.IndexingManager;
-import org.netbeans.modules.web.api.webmodule.WebModule;
 import org.netbeans.spi.options.OptionsPanelController;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
@@ -110,9 +109,8 @@ final class Collector {
             String setting = html == null ? "" : html.get("mimetypesWithEnabledHtmlErrorChecking", "");
             info.put(NetBeansMarks.INFO_HTML_ERRORS, (NetBeansMarks.htmlErrorChecking(setting, NetBeansMarks.FACELETS) ? "on " : "off ")
                     + NetBeansMarks.FACELETS);
-            info.put(NetBeansMarks.INFO_WEB_MODULE, WebModule.getWebModule(fo) != null ? "yes" : "no");
-            Watcher.debug("collect: " + NetBeansMarks.INFO_HTML_ERRORS + " " + info.get(NetBeansMarks.INFO_HTML_ERRORS) + ", "
-                    + NetBeansMarks.INFO_WEB_MODULE + " " + info.get(NetBeansMarks.INFO_WEB_MODULE));
+            // web module or not: whether EL's Identifiers applied ({ EL parts seen, parts where it applied }, see run)
+            int[] el = new int[2];
             List<File> pages = Workspace.pages(dir);
             Watcher.debug("collect: " + pages.size() + " xhtml file(s)");
             for (File page : pages) {
@@ -130,12 +128,16 @@ final class Collector {
                     @Override
                     public void run(ResultIterator it) throws Exception {
                         String text = it.getSnapshot().getText().toString();
-                        walk(it, text, rel, found);
+                        walk(it, text, rel, found, el);
                     }
                 }).get();
                 Watcher.debug("collect: " + rel + ": " + found.size() + " mark(s)");
                 marks.addAll(found);
             }
+            info.put(NetBeansMarks.INFO_WEB_MODULE, NetBeansMarks.webModule(el[0], el[1]));
+            Watcher.debug("collect: " + NetBeansMarks.INFO_HTML_ERRORS + " " + info.get(NetBeansMarks.INFO_HTML_ERRORS) + ", "
+                    + NetBeansMarks.INFO_WEB_MODULE + " " + info.get(NetBeansMarks.INFO_WEB_MODULE) + " (EL parts " + el[0]
+                    + ", Identifiers applied to " + el[1] + ")");
         }
         NetBeansMarks.write(out, info, hashes, marks);
         NetBeansMarks.done(CACHE, out);
@@ -166,16 +168,16 @@ final class Collector {
     }
 
     /** the page and each language embedded in it */
-    private static void walk(ResultIterator it, String text, String rel, List<NetBeansMarks.Mark> out) throws Exception {
+    private static void walk(ResultIterator it, String text, String rel, List<NetBeansMarks.Mark> out, int[] el) throws Exception {
         for (Embedding e : it.getEmbeddings()) {
-            walk(it.getResultIterator(e), text, rel, out);
+            walk(it.getResultIterator(e), text, rel, out, el);
         }
         if (it.getParserResult() instanceof ParserResult result) {
-            run(result, text, rel, out);
+            run(result, text, rel, out, el);
         }
     }
 
-    private static void run(ParserResult result, String text, String rel, List<NetBeansMarks.Mark> out) {
+    private static void run(ParserResult result, String text, String rel, List<NetBeansMarks.Mark> out, int[] el) {
         Snapshot snapshot = result.getSnapshot();
         String mime = snapshot.getMimeType();
         HintsManager real = HintsManager.getManagerForMimeType(mime);
@@ -199,10 +201,16 @@ final class Collector {
         provider.computeHints(manager, context, hints);
         // which rules applied to the page (e.g. EL's Identifiers only in a web module): a page with no mark says why
         List<String> applied = new ArrayList<>();
+        boolean identifiers = false;
         for (List<? extends AstRule> rules : manager.getHints(false, context).values()) {
             for (AstRule r : rules) {
                 applied.add(r.getId() + (real.isEnabled(r) ? "" : " (off)"));
+                identifiers |= r.getId().equals("Identifiers");
             }
+        }
+        if (mime.equals("text/x-el")) {
+            el[0]++;
+            el[1] += identifiers ? 1 : 0;
         }
         Watcher.debug("collect: " + rel + ": " + mime + ": rules that apply " + applied + ", " + hints.size() + " hint(s), "
                 + unhandled.size() + " other error(s)");

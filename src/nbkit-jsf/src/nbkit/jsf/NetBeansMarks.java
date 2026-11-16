@@ -34,7 +34,11 @@ public final class NetBeansMarks {
     public static final String HEADER = "# nbkit NetBeans marks 1";
     /** "on|off &lt;mime&gt;": HTML error checking for the content of JSF pages; off, no HTML rule runs (Missing CSS Class...) */
     public static final String INFO_HTML_ERRORS = "html-error-checking";
-    /** "yes|no": the project is a web module for NetBeans; no, EL's Identifiers never applies */
+    /**
+     * "yes|no|unknown": the project is a web module for NetBeans; no, EL's Identifiers never applies. Taken from what
+     * NetBeans decided on the pages (see webModule), not from its web module API, which a Features on Demand that
+     * keeps Java off would stop the whole module from loading with.
+     */
     public static final String INFO_WEB_MODULE = "web-module";
     /** the content mime of a JSF page in NetBeans (web.jsfapi JsfUtils.JSF_XHTML_FILE_MIMETYPE) */
     public static final String FACELETS = "text/facelets";
@@ -108,6 +112,15 @@ public final class NetBeansMarks {
         boolean listed = List.of(setting == null ? new String[0] : setting.split(";")).contains(mime);
         boolean html = mime.equals("text/html") || mime.equals("text/xhtml");
         return html != listed;
+    }
+
+    /**
+     * Web module or not, from NetBeans itself: its EL rule Identifiers applies only in one (Identifiers.appliesTo is
+     * WebModule.getWebModule != null). elSnapshots: the EL parts of the pages; applied: those where Identifiers
+     * applied. With no EL there is nothing to tell (and no EL mark to miss).
+     */
+    public static String webModule(int elSnapshots, int applied) {
+        return applied > 0 ? "yes" : elSnapshots > 0 ? "no" : "unknown";
     }
 
     /** the NetBeans rules that did not run at all (rule id prefix of the marks), each with the info line that says why */

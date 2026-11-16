@@ -84,5 +84,14 @@ public class RunNetBeansMarks {
         on.put(NetBeansMarks.INFO_WEB_MODULE, "yes");
         NetBeansMarks.write(out, on, Map.of(), List.of());
         System.out.println("all ran: " + NetBeansMarks.notRun(NetBeansMarks.read(out)));
+
+        // web module, from what NetBeans itself decided: EL's Identifiers applies only in one (Identifiers.appliesTo)
+        System.out.println("web module, Identifiers applied to some EL: " + NetBeansMarks.webModule(3, 1));
+        System.out.println("web module, EL but Identifiers never applied: " + NetBeansMarks.webModule(3, 0));
+        System.out.println("web module, no EL: " + NetBeansMarks.webModule(0, 0));
+        Map<String, String> unknown = new LinkedHashMap<>();
+        unknown.put(NetBeansMarks.INFO_WEB_MODULE, "unknown");
+        NetBeansMarks.write(out, unknown, Map.of(), List.of());
+        System.out.println("unknown web module: " + NetBeansMarks.notRun(NetBeansMarks.read(out)));
     }
 }
