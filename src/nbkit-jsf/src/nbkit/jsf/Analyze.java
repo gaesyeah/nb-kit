@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * Runs the JSF checks on every xhtml of a project, without NetBeans: "nbkit analyze jsf <project>" (lib/analyze.sh).
@@ -27,12 +26,7 @@ public final class Analyze {
         for (int i = 1; i < args.length; i++) {
             cp.add(new File(args[i]));
         }
-        List<File> files = new ArrayList<>();
-        for (File w : Workspace.webrootsOf(project, null)) {
-            try (Stream<Path> s = Files.walk(w.toPath())) {
-                s.filter(p -> p.toString().endsWith(".xhtml")).sorted().forEach(p -> files.add(p.toFile()));
-            }
-        }
+        List<File> files = Workspace.pages(project);
         if (files.isEmpty()) {
             System.out.println(Msg.t("analyze.none", project));
             System.exit(2);

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="http://xmlns.jcp.org/jsf/html">
+<h:head>
+    <title>nbkit collector test</title>
+    <link rel="stylesheet" href="resources/css/app.css"/>
+</h:head>
+<h:body>
+    <!-- case 1: a property the bean does not have (real error: NetBeans and nbkit mark nmae) -->
+    <h:outputText value="#{greeter.nmae}"/>
+    <!-- case 2: a text literal's concat inside the argument of a bean method (NetBeans false positive: it checks concat against what count returns, an int) -->
+    <h:outputText value="#{greeter.count('a'.concat('b'))}"/>
+    <!-- case 3: a property of T through the project's generic Holder of T (NetBeans false positive: it does not follow generics) -->
+    <h:outputText value="#{greeter.person.value.name}"/>
+    <!-- case 4: a CSS class in no stylesheet, a typo of one (NetBeans Missing CSS Class looks only at class, not at styleClass; nbkit speaks only when a close name exists) -->
+    <div class="real-clas">case 4</div>
+    <!-- case 4b: the same typo in a JSF component's styleClass (only nbkit marks it: NetBeans looks only at class) -->
+    <h:panelGroup styleClass="real-clas">case 4b</h:panelGroup>
+    <div class="real-class">a class that exists</div>
+</h:body>
+</html>

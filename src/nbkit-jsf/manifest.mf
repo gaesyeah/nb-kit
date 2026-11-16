@@ -19,4 +19,12 @@ OpenIDE-Module-Module-Dependencies: org.netbeans.spi.editor.hints/0 > 1.39,
   org.openide.modules > 7.0,
   org.openide.loaders > 7.0,
   org.netbeans.modules.autoupdate.services > 1.40,
-  org.openide.awt > 7.18
+  org.openide.awt > 7.18,
+  org.netbeans.modules.csl.api/2 > 2.0,
+  org.netbeans.modules.csl.types/1 > 1.0,
+  org.netbeans.modules.parsing.api/1 > 9.0,
+  org.netbeans.modules.parsing.indexing > 9.0,
+  org.netbeans.modules.projectapi/1 > 1.0,
+  org.netbeans.modules.projectuiapi.base/1 > 1.0,
+  org.netbeans.modules.editor.mimelookup/1 > 1.0,
+  org.netbeans.api.web.webmodule > 1.0

@@ -2,7 +2,10 @@ package nbkit.jsf.nb;
 
 import org.openide.modules.ModuleInstall;
 
-/** Module start and exit: the NetBeans rules nbkit replaces (see NetBeansOverrides) and NetBeans' JSF support (see NetBeansJsf). */
+/**
+ * Module start and exit: the NetBeans rules nbkit replaces (see NetBeansOverrides), NetBeans' JSF support (see
+ * NetBeansJsf) and the collection of NetBeans' marks on request (see Collector).
+ */
 public final class Installer extends ModuleInstall {
 
     @Override
@@ -14,6 +17,11 @@ public final class Installer extends ModuleInstall {
         }
         try {
             NetBeansJsf.checkLater();
+        } catch (RuntimeException ex) {
+            // never breaks NetBeans
+        }
+        try {
+            Collector.start();
         } catch (RuntimeException ex) {
             // never breaks NetBeans
         }

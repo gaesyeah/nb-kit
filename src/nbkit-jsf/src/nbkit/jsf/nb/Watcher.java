@@ -57,6 +57,13 @@ final class Watcher implements DocumentListener {
         }
     }
 
+    /** a step with no file of its own (the collection, see Collector) */
+    static void debug(String what) {
+        if (DEBUG.exists()) {
+            LOG.log(Level.INFO, "nbkit JSF debug: {0}", what);
+        }
+    }
+
     private Watcher(Document d) {
         doc = new WeakReference<>(d);
         task = RP.create(this::run);

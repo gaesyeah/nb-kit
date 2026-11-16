@@ -162,4 +162,48 @@ contains "already on: it only writes that down" "$out" "null active=true noask=f
 contains "handled and on: nothing" "$out" "activated active=true noask=false -> NOTHING"
 contains "handled and turned off later: it asks, never turns it on by itself" "$out" "found active=false noask=false -> ASK"
 contains "after Don't ask again: nothing" "$out" "activated active=false noask=true -> NOTHING"
+
+# what NetBeans marks, collected by the module on request (nb/Collector) and read by the comparator: request, hash,
+# positions and the collection file, all in the core (no NetBeans)
+compile -cp "$W/nbkit" -d "$W/marks" "$J/test/RunNetBeansMarks.java"
+mkdir -p "$W/cache"
+out="$("$JAVA" -cp "$W/nbkit:$W/marks" RunNetBeansMarks "$W/cache" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"
+T=$'\t'
+contains "the request is ~/.cache/nbkit/collect-request, like the debug file" "$out" "request file: /collect-request"
+contains "no request file: nothing to do" "$out" "no request: null"
+contains "an empty request: nothing to do" "$out" "empty request: null"
+contains "the request is the project path, blanks around it ignored" "$out" "request: /work/my project"
+contains "~ in the request is the home folder" "$out" "request with ~: HOME/Documents/app"
+contains "the hash of each xhtml is its sha256" "$out" "sha256 abc: ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+contains "offset 0 is line 1, column 1" "$out" "offset 0 -> 1:1"
+contains "after a line break, the next line" "$out" "offset 3 -> 2:1"
+contains "a CRLF line break counts once" "$out" "offset 7 -> 3:1"
+contains "the end of the text is still a position" "$out" "offset 9 -> 3:3"
+contains "one collection per project, under collect/" "$out" "output: /collect/my project-"
+contains "the same project always writes the same file" "$out" "same project, same output: true"
+contains "a project of the same name elsewhere, another file" "$out" "another project, another output: true"
+contains "the file starts saying what it is" "$out" "line: # nbkit NetBeans marks 1"
+contains "then the versions, date and project, one per line" "$out" "line: info${T}netbeans${T}31"
+contains "then each xhtml with its hash" "$out" "line: file${T}src/main/webapp/a.xhtml${T}ba7816bf"
+contains "each mark: file, line, column, offsets, rule, severity, on/off in the settings, message" "$out" \
+  "line: mark${T}src/main/webapp/a.xhtml${T}2${T}5${T}12${T}20${T}text_x-el_Identifiers${T}WARNING${T}off${T}Unknown property \"x\"\\twith a tab\\nand a line \\\\ backslash"
+contains "a rule that is on says so" "$out" "text_html_MissingClassRule${T}WARNING${T}on${T}Class y not found"
+contains "reading gives the info back" "$out" "read info: {project=/work/my project, netbeans=31}"
+contains "and the hashes" "$out" "read hashes: {src/main/webapp/a.xhtml=ba7816bf"
+contains "and exactly the marks written (tabs, line breaks and backslashes too)" "$out" "read back the same marks: true"
+contains "it is written whole or not at all (no temporary file left)" "$out" "no temporary file left: true"
+contains "the done marker comes after, saying where the collection is" "$out" "done marker: true"
+contains "a request is taken: its project, and the request and the old done marker are gone" "$out" \
+  "take: /work/next request left: false old done left: false"
+contains "a request is answered once" "$out" "take again: null"
+contains "an empty request is dropped too" "$out" "take an empty request: null request left: false"
+contains "HTML error checking: JSF pages (text/facelets) are off unless turned on" "$out" "setting='' text/facelets: false"
+contains "turned on, they are on" "$out" "setting='text/facelets' text/facelets: true"
+contains "plain xhtml is on by default" "$out" "setting='' text/xhtml: true"
+contains "listed, an HTML mime is turned off" "$out" "setting='text/xhtml;text/facelets' text/xhtml: false"
+contains "the collection says whether HTML error checking ran" "$out" "line: info${T}html-error-checking${T}off text/facelets"
+contains "and whether the project is a web module" "$out" "line: info${T}web-module${T}no"
+contains "read back: the rules that did not run, and why (no marks there is not agreement)" "$out" \
+  "not run: {text_html_=html-error-checking off text/facelets, text_x-el_Identifiers=web-module no}"
+contains "with both on, every rule ran" "$out" "all ran: {}"
 finish

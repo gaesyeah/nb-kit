@@ -89,6 +89,17 @@ public final class Workspace {
         return webInf != null ? webInf.getParentFile() : file.getParentFile();
     }
 
+    /** every xhtml of the project's web folders, sorted (analyze and the NetBeans collection look at the same pages) */
+    public static List<File> pages(File project) throws IOException {
+        List<File> files = new ArrayList<>();
+        for (File w : webrootsOf(project, null)) {
+            try (var s = Files.walk(w.toPath())) {
+                s.filter(p -> p.toString().endsWith(".xhtml")).sorted().forEach(p -> files.add(p.toFile()));
+            }
+        }
+        return files;
+    }
+
     public static List<File> webrootsOf(File project, File file) {
         List<File> r = new ArrayList<>();
         for (String p : new String[]{"src/main/webapp", "src/main/resources/META-INF/resources", "src/main/resources/static",

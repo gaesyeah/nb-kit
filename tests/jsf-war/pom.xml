@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A small JSF web project to open in a real NetBeans: what NetBeans marks on it is collected by the JSF module
+  (nbkit/jsf/nb/Collector) and compared with nbkit's own checks. Not built by the test suite.
+  What NetBeans 31 needs (its source, apache/netbeans):
+  - packaging war and src/main/webapp: a web module (maven.j2ee WebModuleProviderImpl), so JSF support and EL's
+    Identifiers rule apply;
+  - jakarta.inject-api: @Named beans are found by the CDI model (web.beans), which needs the annotation to resolve;
+  - no Faces jar: with none on the classpath NetBeans uses the facelet libraries it brings (web.jsf.editor
+    DefaultFaceletLibraries, JSF 2.2), so the pages use the xmlns.jcp.org namespaces.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>jsf-war</artifactId>
+    <version>1</version>
+    <packaging>war</packaging>
+
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <failOnMissingWebXml>false</failOnMissingWebXml>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>jakarta.inject</groupId>
+            <artifactId>jakarta.inject-api</artifactId>
+            <version>2.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>
