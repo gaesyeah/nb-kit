@@ -2,11 +2,11 @@
   <ui:define name="content">
     <h:panelGroup id="kindBox" binding="#{kindPanel}"/>
     <p:dialog widgetVar="kindDialog"/>
-    <ui:include src="/parts/kinds/#{customerVM.title}.xhtml">
+    <ui:include src="/parts/kinds/#{customerVM.title}.xhtml"><!--S:tpl.dynamic-->
       <ui:param name="kindLabel" value="x"/><!--I:origin-->
       <ui:param name="kindUnused" value="x"/><!--W:unused-->
     </ui:include>
-    <ui:include src="../parts/rel/#{customerVM.title}.xhtml">
+    <ui:include src="../parts/rel/#{customerVM.title}.xhtml"><!--S:tpl.dynamic-->
       <ui:param name="relLabel" value="x"/><!--I:origin-->
     </ui:include>
   </ui:define>

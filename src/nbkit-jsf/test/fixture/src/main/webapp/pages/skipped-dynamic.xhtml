@@ -1,0 +1,8 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <!-- skipped, apart from the other cases: a src or widgetVar with EL changes what the whole page can reach -->
+    <ui:include src="/parts/none/#{customerVM.title}.xhtml"/><!--S:tpl.dynamic-->
+    <p:panel widgetVar="#{customerVM.title}"/>
+    <p:commandButton value="x" onclick="PF('nowhere').show()"/><!--S:widgetvar.dynamic-->
+  </ui:define>
+</ui:composition>

@@ -2,18 +2,18 @@
   <!-- the buttons that send the form only show while the input is disabled: never written -->
   <h:form>
     <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--I:el.readonly-->
-    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/>
+    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/><!--S:nav.el-->
   </h:form>
   <h:form>
     <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--I:el.readonly-->
     <h:selectBooleanCheckbox value="#{lockVM.flag}"><p:ajax/></h:selectBooleanCheckbox>
-    <h:panelGroup rendered="#{lockVM.busy}"><h:commandButton value="Save" action="#{lockVM.save}"/></h:panelGroup>
+    <h:panelGroup rendered="#{lockVM.busy}"><h:commandButton value="Save" action="#{lockVM.save}"/></h:panelGroup><!--S:nav.el-->
   </h:form>
   <!-- a button that sends it enabled, or something nbkit cannot follow: still a warning -->
   <h:form>
     <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--W:el.readonly-->
-    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/>
-    <p:commandButton value="Save" action="#{lockVM.save}"/>
+    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/><!--S:nav.el-->
+    <p:commandButton value="Save" action="#{lockVM.save}"/><!--S:nav.el-->
   </h:form>
   <h:form>
     <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--W:el.readonly-->
@@ -21,11 +21,11 @@
   </h:form>
   <h:form>
     <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"/><!--W:el.readonly-->
-    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/>
-    <p:remoteCommand name="go" action="#{lockVM.save}"/>
+    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/><!--S:nav.el-->
+    <p:remoteCommand name="go" action="#{lockVM.save}"/><!--S:nav.el-->
   </h:form>
   <h:form>
     <h:inputText value="#{lockVM.code}" disabled="#{lockVM.busy}"><p:ajax/></h:inputText><!--W:el.readonly-->
-    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/>
+    <p:commandButton value="Save" action="#{lockVM.save}" rendered="#{lockVM.busy}"/><!--S:nav.el-->
   </h:form>
 </ui:composition>

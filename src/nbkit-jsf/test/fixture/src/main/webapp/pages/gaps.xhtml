@@ -6,7 +6,7 @@
     <c:set var="first" value="#{customerVM.items}"/>
     <h:outputText value="#{first.size()}"/>
     <ui:param name="mixed" value="#{customerVM.title} x"/>
-    <h:outputText value="#{mixed.anything}"/>
+    <h:outputText value="#{mixed.anything}"/><!--S:el.untyped-->
     <ui:repeat value="#{customerVM.items}" var="row" varStatus="st">
       <h:outputText value="#{row.name} #{st.index + 1} #{st.first} #{st.last} #{st.even} #{st.odd} #{st.begin} #{st.end} #{st.step} #{st.current}"/>
       <h:outputText value="#{st.indx}"/><!--E:el.member-->

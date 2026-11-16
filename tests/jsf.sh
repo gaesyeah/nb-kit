@@ -27,8 +27,11 @@ compile -cp "$W/api.jar" -d "$W/pf" "${src[@]}"
 cp -r "$J/test/libs/primefaces/META-INF" "$W/pf/"
 quiet "$JAR" cf "$W/primefaces.jar" -C "$W/pf" .
 # the sample project classes, the analyzer (without the NetBeans part in nb/) and the runner
+# a library the sample project is built with but that the checks are not given ("class not in the classpath")
+mapfile -t src < <(java_files "$J/test/libs/outside")
+compile -d "$W/outside" "${src[@]}"
 mapfile -t src < <(java_files "$J/test/fixture/src/main/java")
-compile -cp "$W/api.jar" -d "$W/app" "${src[@]}"
+compile -cp "$W/api.jar:$W/outside" -d "$W/app" "${src[@]}"
 mapfile -t src < <(java_files "$J/src/nbkit/jsf" -maxdepth 1)
 compile -d "$W/nbkit" "${src[@]}"
 cp "$J"/res/nbkit/jsf/Bundle*.properties "$W/nbkit/nbkit/jsf/"
@@ -112,6 +115,13 @@ contains "analyze says what Replace with writes" "$out" "Replace with number"
 contains "analyze says where Go to goes" "$out" "Go to src/main/java/app/OrderPagination.java:4"
 contains "analyze says Maven was not used" "$out" "Without the libraries of the project"
 contains "analyze ends with a summary" "$out" "xhtml files,"
+# what the checks could not check, and why (src/nbkit-jsf/test/fixture: S: marks)
+contains "then what was not checked, by kind of reason" "$out" "Not checked:"
+contains "the limits of any static check" "$out" "Limits of any static check"
+contains "and the gaps nbkit can close" "$out" "Gaps nbkit can close"
+contains "each reason with its rule and count" "$out" "Map or Object value (the rest of the expression is not checked)  [el.member]:"
+contains "and where, file:line:column" "$out" "src/main/webapp/pages/skipped.xhtml:4:"
+contains "the class of the stylesheets that has no rule and no close name" "$out" "class with no CSS rule and no close name (often a JavaScript or component hook)  [css.class]:"
 rm -rf "$W/proj/target"
 out="$(analyze "$W/proj")"; rc=$?
 check "analyze refuses a Maven project not compiled" test "$rc" = 1
@@ -137,6 +147,22 @@ contains "a loop variable gets the type of the items" "$out" "order: OrderPagina
 contains "it says where the checking found something missing" "$out" "order: OrderPagination → numbr: does not exist (see the error above)"
 contains "a member only an implementation has is said so, not taken as unknown" "$out" "order: OrderPagination → note: only in an implementation, OrderViewModelImpl"
 contains "the errors of the file come first" "$out" "Property 'numbr' does not exist in OrderPagination"
+out="$(analyze "$W/proj" --explain pages/skipped.xhtml)"
+contains "--explain lists what was not checked in the file" "$out" "Not checked in this file:"
+contains "line by line, with the rule and the reason" "$out" "  4:"
+contains "and the text" "$out" "[el.member]  Map or Object value (the rest of the expression is not checked)"
+# a reason with more than 20 places: 20 of them, "and N more", and how to see all of one file
+for i in $(seq 1 25); do printf '<h:panelGroup xmlns:h="jakarta.faces.html" styleClass="#{customerVM.title}"/>\n'; done \
+  | { echo '<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:ui="jakarta.faces.facelets" template="/WEB-INF/templates/main.xhtml"><ui:define name="content">'; cat; echo '</ui:define></ui:composition>'; } > "$W/proj/src/main/webapp/pages/many.xhtml"
+out="$(analyze "$W/proj")"
+check "a long list stops at 20 places and says how many more" grep -qE '^      and [0-9]+ more$' <<<"$out"
+contains "and says how to see everything of one file" "$out" "nbkit analyze jsf $W/proj --explain <file>"
+rm "$W/proj/src/main/webapp/pages/many.xhtml"
+# a project with no compiled classes: its beans are unknown, so unknown names are not checked
+mkdir -p "$W/bare/src/main/webapp" "$W/bare/target/classes" && printf '<project/>' > "$W/bare/pom.xml"
+printf '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html"><h:body><h:outputText value="#{someBean.x}"/></h:body></html>\n' > "$W/bare/src/main/webapp/a.xhtml"
+out="$(analyze "$W/bare")"
+contains "with no compiled classes, unknown names are a skipped reason" "$out" "no compiled classes: the beans are not known  [el.unknown]: 1"
 lacks "and only that file" "$out" "customers.xhtml"
 out="$(NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false bash "$NBKIT_DIR/nbkit.sh" --lang en analyze jsf --explain "$W/proj/src/main/webapp/pages/orders.xhtml" </dev/null 2>&1)"; rc=$?
 check "--explain with only the file finds its project" test "$rc" = 0

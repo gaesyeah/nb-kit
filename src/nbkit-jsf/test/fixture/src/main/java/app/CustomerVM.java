@@ -16,4 +16,5 @@ public class CustomerVM {
   public CustomerRows getCustomerRows() { return null; }
   public java.util.List<Contact> getContacts() { return null; }
   public Customer[] getArray() { return null; }
+  public outside.Thing getThing() { return null; }
 }

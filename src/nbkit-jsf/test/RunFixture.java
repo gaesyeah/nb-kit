@@ -18,10 +18,11 @@ public class RunFixture {
         System.out.println("beans: " + new TreeSet<>(ws.beans.keySet()) + " (" + (System.currentTimeMillis() - t0) + " ms)");
         for (File f : files) {
             String text = Files.readString(f.toPath());
-            List<Rules.Problem> ps = Analyzer.run(ws, f, text, Rules.ALL_ON);
+            Analyzer.Result res = Analyzer.analyze(ws, f, text, Rules.ALL_ON, null);
+            List<Rules.Problem> ps = res.problems;
             String[] lines = text.split("\n", -1);
             Set<String> expected = new TreeSet<>(), got = new TreeSet<>();
-            Pattern m = Pattern.compile("<!--((?:[EWI]:[\\w.]+\\s*)+)-->");
+            Pattern m = Pattern.compile("<!--((?:[EWIS]:[\\w.]+\\s*)+)-->");
             for (int i = 0; i < lines.length; i++) {
                 Matcher mm = m.matcher(lines[i]);
                 while (mm.find()) for (String x : mm.group(1).trim().split("\\s+")) expected.add((i + 1) + " " + x);
@@ -38,6 +39,14 @@ public class RunFixture {
                 for (Rules.Target t : p.targets) go.append("  → ").append(web.toPath().relativize(t.file.toPath().toAbsolutePath())).append(':').append(t.line);
                 if (p.replacement != null) go.append("  ⇒ ").append(p.replacement);
                 msgs.put(k, p.message + "  «" + text.substring(p.start, Math.min(p.end, text.length())).replace("\n", " ") + "»" + go);
+            }
+            // what a rule could not check: S:<reason> on its line
+            for (Rules.Skipped k : res.skipped) {
+                int line = 1;
+                while (line < lines.length && starts[line] <= k.start) line++;
+                String key = line + " S:" + k.reason;
+                got.add(key);
+                msgs.put(key, "[" + k.rule + "] " + k.message + "  «" + text.substring(k.start, Math.min(k.end, text.length())).replace("\n", " ") + "»");
             }
             System.out.println("== " + web.toPath().relativize(f.toPath()));
             for (String k : got) System.out.println((expected.contains(k) ? "  ok   " : "  EXTRA ") + k + "  " + msgs.get(k));

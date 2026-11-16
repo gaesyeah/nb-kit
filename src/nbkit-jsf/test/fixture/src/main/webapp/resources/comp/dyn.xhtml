@@ -1,0 +1,10 @@
+<ui:component xmlns="http://www.w3.org/1999/xhtml" xmlns:cc="jakarta.faces.composite" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets">
+  <cc:interface>
+    <cc:attribute name="which"/>
+    <cc:attribute name="other"/>
+  </cc:interface>
+  <cc:implementation>
+    <!-- an attribute read by a name known only at runtime: which ones are unused cannot be told -->
+    <h:outputText value="#{cc.attrs[cc.attrs.which]}"/><!--S:cc.dynamic--><!--S:el.untyped-->
+  </cc:implementation>
+</ui:component>

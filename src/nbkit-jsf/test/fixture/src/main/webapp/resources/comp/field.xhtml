@@ -5,7 +5,7 @@
     <cc:clientBehavior name="changed" event="change" targets="in"/>
   </cc:interface>
   <cc:implementation>
-    <h:outputLabel value="#{cc.attrs.label}" for="in"/>
-    <h:inputText id="in" value="#{cc.attrs.labell}"/><!--E:cc.attrs-->
+    <h:outputLabel value="#{cc.attrs.label}" for="in"/><!--S:el.untyped-->
+    <h:inputText id="in" value="#{cc.attrs.labell}"/><!--E:cc.attrs--><!--S:el.untyped-->
   </cc:implementation>
 </ui:component>

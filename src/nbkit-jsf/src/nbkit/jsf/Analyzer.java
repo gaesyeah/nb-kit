@@ -61,6 +61,7 @@ public final class Analyzer {
     final File file;
     final Predicate<String> on;
     final List<Problem> out = new ArrayList<>();
+    final List<Rules.Skipped> skipped = new ArrayList<>();
     List<Explained> explain;
     FileFacts ff;
     Xml.Doc doc;
@@ -90,6 +91,24 @@ public final class Analyzer {
 
     /** run, also writing into explain (when not null) how each name with a chain was resolved */
     public static List<Problem> run(Workspace ws, File file, String text, Predicate<String> on, List<Explained> explain) {
+        return analyze(ws, file, text, on, explain).problems;
+    }
+
+    /** what one run found: the problems, what the rules could not check (and why), and how each EL name was resolved */
+    public static final class Result {
+        public final List<Problem> problems;
+        public final List<Rules.Skipped> skipped;
+        public final List<Explained> explained;
+
+        Result(List<Problem> problems, List<Rules.Skipped> skipped, List<Explained> explained) {
+            this.problems = problems;
+            this.skipped = skipped;
+            this.explained = explained;
+        }
+    }
+
+    /** the whole result, computed once (explain: null, or the list to fill with how each EL name was resolved) */
+    public static Result analyze(Workspace ws, File file, String text, Predicate<String> on, List<Explained> explain) {
         Analyzer a = new Analyzer(ws, file, on);
         a.explain = explain;
         ws.override(a.file, text);
@@ -99,7 +118,20 @@ public final class Analyzer {
             ws.override(a.file, null);
         }
         a.out.sort((x, y) -> Integer.compare(x.start, y.start));
-        return a.out;
+        a.skipped.sort((x, y) -> Integer.compare(x.start, y.start));
+        return new Result(a.out, a.skipped, explain);
+    }
+
+    /** a rule (when on) could not check [start, end): the reason is a key of Rules.SKIP_REASONS */
+    void skip(String rule, String reason, int start, int end) {
+        if (on.test(rule) && skipped.stream().noneMatch(k -> k.start == start && k.reason.equals(reason))) {
+            skipped.add(new Rules.Skipped(rule, reason, start, end));
+        }
+    }
+
+    /** an attribute's whole value */
+    void skip(String rule, String reason, Xml.Attr a) {
+        skip(rule, reason, a.offset(0), a.offset(a.value.length()));
     }
 
     void report(String rule, Severity s, int start, int end, String msg) {
@@ -684,6 +716,14 @@ public final class Analyzer {
     // ---------- name and type rules (1 to 6, 19) ----------
 
     void names() {
+        // a variable whose name is EL (var="#{...}"): which name it declares is known only at runtime
+        for (Xml.Element e : doc.all) {
+            for (Xml.Attr a : e.attrs) {
+                if (isVarAttr(a.name) && a.value.contains("{") && !Workspace.inRemove(e)) {
+                    skip("el.unknown", "var.el", a);
+                }
+            }
+        }
         for (Site s : sites) {
             String attrName = s.attr == null ? null : s.attr.name;
             for (El.Lambda l : s.x.lambdas) {
@@ -750,9 +790,13 @@ public final class Analyzer {
                 String loop = fromComponentLoop(s.el, r.name);
                 if (loop != null) {
                     note(pos, s.x.off(r.b), "origin.name", r.name, List.of(loop));
+                    if (!r.chain.isEmpty()) {
+                        skip("el.member", "el.untyped", pos, s.x.off(r.b));
+                    }
                     continue;
                 }
                 if (!ws.beansKnown) {
+                    skip("el.unknown", "el.nobeans", pos, s.x.off(r.b));
                     continue;
                 }
                 if (!ext.complete) {
@@ -983,9 +1027,20 @@ public final class Analyzer {
         return b == null ? null : b.type;
     }
 
+    /** why the last walk stopped before the end without reporting anything (a Rules.SKIP_REASONS key), and where */
+    String stopReason;
+    El.Member stopAt;
+
+    String stop(String reason, El.Member m) {
+        stopReason = reason;
+        stopAt = m;
+        return null;
+    }
+
     /** walks the chain; returns the final type (or null). Reports missing members. */
     String walk(Site s, El.Ref r, int upto, boolean reportMissing) {
         lastGeneric = null;
+        stopReason = null;
         int k0 = chainStart(r);
         String generic = rootGeneric(s, r, new HashSet<>());
         String cur = ClassModel.erase(generic);
@@ -1001,7 +1056,7 @@ public final class Analyzer {
             }
             if (stream) {
                 if (!m.call || m.name == null) {
-                    return null;
+                    return stop("el.stream", m);
                 }
                 if (!EL_STREAM.contains(m.name)) {
                     if (reportMissing) {
@@ -1013,8 +1068,17 @@ public final class Analyzer {
                 }
                 continue;
             }
-            if (cur == null || m.name == null || !ws.classes.complete(cur) || dynamicType(cur)) {
-                return null;
+            if (cur == null) {
+                return stop("el.untyped", m);
+            }
+            if (m.name == null) {
+                return stop("el.index", m);
+            }
+            if (!ws.classes.complete(cur)) {
+                return stop("el.incomplete", m);
+            }
+            if (dynamicType(cur)) {
+                return stop("el.dynamic", m);
             }
             if (m.call && m.name.equals("stream") && m.argCount == 0 && ws.classes.isA(cur, "java/lang/Iterable")) {
                 stream = true;
@@ -1025,8 +1089,8 @@ public final class Analyzer {
             if (m.call) {
                 List<ClassModel.MethodInfo> ms = mm.methods.get(m.name);
                 if (ms == null) {
-                    if (reportMissing) {
-                        missing(s, m, cur, mm, true);
+                    if (reportMissing && !missing(s, m, cur, mm, true)) {
+                        return stop("el.impl", m);
                     }
                     return null;
                 }
@@ -1037,7 +1101,7 @@ public final class Analyzer {
                     }
                 }
                 if (pick == null) {
-                    return null;
+                    return stop("el.overload", m);
                 }
                 generic = ws.classes.resolve(generic, pick);
                 cur = typeOf(generic, pick.returnType());
@@ -1077,8 +1141,8 @@ public final class Analyzer {
                 }
                 return null;
             }
-            if (reportMissing) {
-                missing(s, m, cur, mm, false);
+            if (reportMissing && !missing(s, m, cur, mm, false)) {
+                return stop("el.impl", m);
             }
             return null;
         }
@@ -1119,13 +1183,14 @@ public final class Analyzer {
         return e != null ? e : ClassModel.classOf(desc);
     }
 
-    void missing(Site s, El.Member m, String cur, ClassModel.Members mm, boolean call) {
+    /** reports a member the type does not have; false (nothing reported) when an implementation has it */
+    boolean missing(Site s, El.Member m, String cur, ClassModel.Members mm, boolean call) {
         // EL looks the member up on the object at runtime: when the declared type is an interface or a superclass,
         // a member that some implementation has may be there
         for (String impl : ws.implementations(cur)) {
             ClassModel.Members im = impl.equals(cur) ? mm : ws.classes.members(impl);
             if (im.getters.containsKey(m.name) || im.methods.containsKey(m.name)) {
-                return;
+                return false;
             }
         }
         Set<String> opts = new HashSet<>(mm.getters.keySet());
@@ -1133,6 +1198,7 @@ public final class Analyzer {
         String hint = closest(m.name, opts);
         report("el.member", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t(call ? "el.member.method" : "el.member.property", m.name, ClassModel.display(cur)) + Msg.hint(hint),
                 javaTarget(cur, hint), swap(s.x.off(m.a), s.x.off(m.b), m.name, hint));
+        return true;
     }
 
     boolean dynamicType(String t) {
@@ -1253,10 +1319,32 @@ public final class Analyzer {
             }
             return;
         }
-        if (r.chain.isEmpty() || rootType(s, r, new HashSet<>()) == null) {
+        if (r.chain.isEmpty()) {
+            return;
+        }
+        if (rootType(s, r, new HashSet<>()) == null) {
+            // a scope map with a key that is no bean (sessionScope.x): its value is only known at runtime; a bundle
+            // (f:loadBundle, faces-config resource-bundle): a known type, whose keys could be read from its .properties
+            String why = SCOPES.contains(r.name) && !hasDecl(s, r) ? "el.dynamic" : bundle(s, r) ? "el.bundle" : "el.untyped";
+            skip("el.member", why, s.x.off(r.a), s.x.off(r.b));
             return;
         }
         walk(s, r, r.chain.size(), true);
+        if (stopReason != null) {
+            skip("el.member", stopReason, s.x.off(stopAt.a), s.x.off(stopAt.b));
+        }
+    }
+
+    /** the name is a resource bundle here: the f:loadBundle var it refers to, or a resource-bundle var of faces-config */
+    boolean bundle(Site s, El.Ref r) {
+        String attrName = s.attr == null ? null : s.attr.name;
+        Decl found = null;
+        for (Decl d : decls) {
+            if (d.name.equals(r.name) && visible(d, s.el, attrName, s.x.off(r.a)) && (found == null || d.el.start >= found.el.start)) {
+                found = d;
+            }
+        }
+        return found != null ? found.kind.equals("f:loadBundle") : ws.facesVars.contains(r.name);
     }
 
     /** the generic type (with type arguments) of the last member the last walk reached */
@@ -2111,6 +2199,7 @@ public final class Analyzer {
                 }
                 if (r.chain.size() < 2 || r.chain.get(1).name == null) {
                     dynamic = true;
+                    skip("unused", "cc.dynamic", s.x.off(r.a), s.x.off(r.b));
                     continue;
                 }
                 El.Member m = r.chain.get(1);
@@ -2199,6 +2288,9 @@ public final class Analyzer {
         List<Object[]> r = new ArrayList<>();
         for (Xml.Element e : d.all) {
             List<File> candidates = new ArrayList<>();
+            if (e.is("h", "outputStylesheet") && e.value("name") != null && e.value("name").contains("{") && f.equals(file)) {
+                skip("css.class", "css.sheet.el", e.attr("name")); // its classes are not known
+            }
             if (e.is("h", "outputStylesheet") && e.value("name") != null && !e.value("name").contains("{")) {
                 File res = ws.resourceFile(e.value("library"), e.value("name"));
                 if (res != null) {
@@ -2257,12 +2349,18 @@ public final class Analyzer {
                 }
             }
         }
-        if (where.isEmpty()) {
-            return;
-        }
         for (Xml.Element e : doc.all) {
             for (Xml.Attr a : e.attrs) {
-                if (!a.name.equals("class") && !a.name.equals("styleClass")) {
+                if (!a.name.equals("class") && !a.name.equals("styleClass") || a.value.isBlank()) {
+                    continue;
+                }
+                if (a.value.contains("{")) {
+                    skip("css.class", "css.el", a);
+                }
+                if (where.isEmpty()) {
+                    if (!a.value.contains("{")) {
+                        skip("css.class", "css.nosheet", a);
+                    }
                     continue;
                 }
                 Matcher m = Pattern.compile("[^\\s]+").matcher(a.value);
@@ -2281,6 +2379,8 @@ public final class Analyzer {
                         if (hint != null) {
                             report("css.class", Severity.INFO, s0, s1, Msg.t("css.none", c) + Msg.hint(hint, where.get(hint).get(0)),
                                     targets(where.get(hint).get(0)), swap(s0, s1, c, hint));
+                        } else {
+                            skip("css.class", "css.none", s0, s1);
                         }
                     }
                 }
@@ -2306,6 +2406,8 @@ public final class Analyzer {
             if ((t.equals("p:ajax") || t.equals("f:ajax")) && e.value("event") != null && !e.value("event").contains("{")
                     && e.parent != null && e.parent != doc.root) {
                 ajaxEvent(e);
+            } else if ((t.equals("p:ajax") || t.equals("f:ajax")) && e.value("event") != null) {
+                skip("ajax.event", "ajax.el", e.attr("event"));
             }
             // 24
             if (t.equals("h:outputStylesheet") || t.equals("h:outputScript") || t.equals("h:graphicImage")
@@ -2317,12 +2419,16 @@ public final class Analyzer {
                 Xml.Attr a = e.attr("action");
                 if (a != null && !a.value.contains("{") && !a.value.isBlank()) {
                     navigation(a);
+                } else if (a != null && a.value.contains("{")) {
+                    skip("nav.missing", "nav.el", a); // the outcome is what the method returns
                 }
             }
             if (Set.of("h:button", "h:link", "p:button", "p:linkButton", "p:menuitem").contains(t)) {
                 Xml.Attr a = e.attr("outcome");
                 if (a != null && !a.value.contains("{") && !a.value.isBlank()) {
                     navigation(a);
+                } else if (a != null && a.value.contains("{")) {
+                    skip("nav.missing", "nav.el", a);
                 }
             }
             // 28
@@ -2444,6 +2550,9 @@ public final class Analyzer {
     }
 
     void resource(Xml.Element e, String library, Xml.Attr nameAttr) {
+        if (nameAttr != null && (nameAttr.value.contains("{") || library != null && library.contains("{"))) {
+            skip("res.missing", "res.el", nameAttr);
+        }
         if (nameAttr == null || nameAttr.value.contains("{") || library != null && library.contains("{")) {
             return;
         }
@@ -2586,6 +2695,9 @@ public final class Analyzer {
             String t = tag(e);
             boolean jsf = Ns.isJsfTag(e) && !Ns.lib(e.ns).equals("?");
             String id = e.value("id");
+            if (jsf && id != null && id.contains("{")) {
+                skip("id.duplicate", "idattr.el", e.attr("id"));
+            }
             if (jsf && id != null && !id.contains("{")) {
                 Xml.Element nc = doc.root;
                 Xml.Element forEach = null;
@@ -2622,6 +2734,8 @@ public final class Analyzer {
                         || a.name.equals("target") && (t.equals("p:defaultCommand") || t.equals("p:printer"));
                 if (search && !a.value.contains("{")) {
                     searchExpr(e, a, us, localIds);
+                } else if (search) {
+                    skip("id.missing", "id.el", a);
                 }
                 if (a.name.startsWith("on")) {
                     widgetRefs(a.value, i -> a.offset(i), us);
@@ -2663,6 +2777,8 @@ public final class Analyzer {
             if (!found && !dynamic) {
                 report("js.widgetvar", Severity.WARNING, off.applyAsInt(m.start(2)), off.applyAsInt(m.end(2)),
                         Msg.t("js.widgetvar", wv));
+            } else if (!found) {
+                skip("js.widgetvar", "widgetvar.dynamic", off.applyAsInt(m.start(2)), off.applyAsInt(m.end(2)));
             } else if (found && !ff.widgetVars.contains(wv)) {
                 note(off.applyAsInt(m.start(2)), off.applyAsInt(m.end(2)), "origin.widgetvar", wv,
                         elsewhere("widgetVar", wv, x -> x.widgetVars.contains(wv)));
@@ -2737,6 +2853,9 @@ public final class Analyzer {
                         swap(a0, a1, last, hint));
             } else if (missingIn > 0 && !dynamic) {
                 report("id.missing", Severity.WARNING, a0, a1, Msg.t("id.missing.some", last));
+            } else if (missingIn > 0) {
+                // missing where some page that includes this builds its ids with EL
+                skip("id.missing", "id.dynamic", a0, a1);
             } else if (missingIn == 0 && !ff.ids.contains(last)) {
                 note(a0, a1, "origin.id", last, elsewhere("id", last, x -> x.ids.contains(last)));
             } else if (a.name.equals("update") || a.name.equals("render")) {
@@ -2887,6 +3006,9 @@ public final class Analyzer {
             Xml.Attr a = in.el.attr(in.kind.equals("include") ? "src" : "template");
             if (!in.dynamic && in.target == null && a != null) {
                 report("tpl.path", Severity.ERROR, a.offset(0), a.offset(a.value.length()), Msg.t("tpl.path", in.path));
+            }
+            if (in.dynamic && a != null) {
+                skip("tpl.path", "tpl.dynamic", a);
             }
             if (in.kind.equals("include") || in.target == null) {
                 continue;

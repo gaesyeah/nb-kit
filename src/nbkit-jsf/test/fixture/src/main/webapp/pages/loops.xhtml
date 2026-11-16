@@ -5,7 +5,7 @@
       <h:outputText value="#{row.nmae}"/><!--E:el.member-->
     </ui:repeat>
     <ui:repeat value="#{customerVM.contacts}" var="contact">
-      <h:outputText value="#{contact.phone} #{contact.company}"/>
+      <h:outputText value="#{contact.phone} #{contact.company}"/><!--S:el.impl-->
       <h:outputText value="#{contact.fax}"/><!--E:el.member-->
     </ui:repeat>
     <c:forEach items="#{customerVM.array}" var="it">
@@ -14,7 +14,7 @@
     <p:dataTable value="#{customerVM.items}" var="r">
       <p:column><h:outputText value="#{r.nmae}"/></p:column><!--E:el.member-->
     </p:dataTable>
-    <h:outputText value="#{customerVM.contact.company}"/>
+    <h:outputText value="#{customerVM.contact.company}"/><!--S:el.impl-->
     <h:outputText value="#{customerVM.contact.faxx}"/><!--E:el.member-->
     <ui:repeat value="#{customerVM.rows}" var="cr">
       <h:outputText value="#{cr.name}"/>
@@ -25,7 +25,7 @@
       <h:outputText value="#{fixed.nmae}"/><!--E:el.member-->
     </ui:repeat>
     <ui:repeat value="#{customerVM.map}" var="entry">
-      <h:outputText value="#{entry.whatever}"/>
+      <h:outputText value="#{entry.whatever}"/><!--S:el.untyped-->
     </ui:repeat>
   </ui:define>
 </ui:composition>

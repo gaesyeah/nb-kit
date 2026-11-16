@@ -6,7 +6,7 @@
   <!-- #{customerVM.save()} --><!--W:comment.el-->
   <ui:remove><h:outputText value="#{removedDoesNotCount}"/></ui:remove>
   <p>Text&nbsp;here &amp; ok &#160;</p><!--E:xml.entity-->
-  <p:commandButton value="outside" action="#{customerVM.save}"/><!--E:form.outside-->
+  <p:commandButton value="outside" action="#{customerVM.save}"/><!--E:form.outside--><!--S:nav.el-->
   <p:commandButton value="js" type="button" onclick="PF('dlg').show()"/>
   <h:inputText value="#{customerVM.customer.name}"/><!--W:form.outside-->
   <h:form id="a">
@@ -15,7 +15,7 @@
     <h:commandButton value="nav3" action="home"/>
     <h:form id="b"/><!--E:form.nested-->
     <p:dialog widgetVar="dlg" appendTo="@(body)">
-      <p:commandButton value="in the dialog" action="#{customerVM.save}"/><!--E:form.dialog-->
+      <p:commandButton value="in the dialog" action="#{customerVM.save}"/><!--E:form.dialog--><!--S:nav.el-->
     </p:dialog>
     <p:fileUpload mode="simple" value="#{customerVM.title}"/><!--W:form.upload-->
   </h:form>

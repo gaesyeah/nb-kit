@@ -16,7 +16,7 @@ lacks "nor the engine" "$out" "Engine (fake NetBeans)"
 contains "and says the result" "$out" "all tests passed"
 
 out="$(run "$NBKIT_DIR/src/nbkit-jsf/test/RunNetBeansMarks.java")"; rc=$?
-if [ "$rc" = 0 ] && grep -q "skipped" <<<"$out"; then
+if [ "$rc" = 0 ] && grep -q "skipped: JDK" <<<"$out"; then
   pass "a Run*.java of the JSF: skipped, no JDK here"
 else
   check "a Run*.java of the JSF runs the JSF tests, which compile and check it: exits with 0" test "$rc" = 0

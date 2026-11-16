@@ -1,6 +1,6 @@
 <ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui">
   <h:outputText value="#{kindLabel}"/><!--I:origin-->
-  <h:outputText value="#{kindPanel.id}" title="#{msg['hello']}"/><!--I:origin-->
+  <h:outputText value="#{kindPanel.id}" title="#{msg['hello']}"/><!--I:origin--><!--S:el.bundle S:el.untyped-->
   <p:commandButton value="ok" update="kindBox"/><!--I:origin-->
   <p:commandButton value="ok" type="button" onclick="PF('kindDialog').show()"/><!--I:origin-->
   <h:outputText value="#{kindMissing}"/><!--E:el.unknown-->

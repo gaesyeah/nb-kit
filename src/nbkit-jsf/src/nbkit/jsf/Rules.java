@@ -99,4 +99,45 @@ public final class Rules {
     }
 
     public static final Predicate<String> ALL_ON = r -> true;
+
+    /**
+     * Two kinds of reasons a rule could not check something: a limit of any static check (the value is only known
+     * when the page runs) or a gap nbkit can close (it could know, with more work)
+     */
+    public enum SkipGroup { STATIC, GAP }
+
+    /** reason -> its group; the text of each is the key skip.&lt;reason&gt; of the Bundle */
+    public static final Map<String, SkipGroup> SKIP_REASONS = new LinkedHashMap<>();
+
+    static {
+        for (String r : new String[]{"el.dynamic", "el.index", "var.el", "id.el", "id.dynamic", "idattr.el", "widgetvar.dynamic",
+            "tpl.dynamic", "css.el", "css.sheet.el", "res.el", "ajax.el", "cc.dynamic"}) {
+            SKIP_REASONS.put(r, SkipGroup.STATIC);
+        }
+        for (String r : new String[]{"el.incomplete", "el.impl", "el.untyped", "el.stream", "el.overload", "el.bundle", "el.nobeans", "css.none",
+            "css.nosheet", "nav.el"}) {
+            SKIP_REASONS.put(r, SkipGroup.GAP);
+        }
+    }
+
+    /** something a rule could not check, and why (what it used to leave out in silence) */
+    public static final class Skipped {
+        public final String rule, reason, message;
+        public final SkipGroup group;
+        public final int start, end;
+
+        public Skipped(String rule, String reason, int start, int end) {
+            this.rule = rule;
+            this.reason = reason;
+            this.group = SKIP_REASONS.get(reason);
+            this.message = Msg.t("skip." + reason);
+            this.start = start;
+            this.end = Math.max(end, start + 1);
+        }
+
+        @Override
+        public String toString() {
+            return "skipped " + rule + " " + reason + " [" + start + "-" + end + "]";
+        }
+    }
 }

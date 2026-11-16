@@ -1,0 +1,21 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:ui="jakarta.faces.facelets" xmlns:p="http://primefaces.org/ui" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <!-- what the checks could not check, and why: S: the reason (the skipped list of nbkit analyze jsf) -->
+    <h:outputText value="#{customerVM.map.anything.more}"/><!--S:el.dynamic-->
+    <h:outputText value="#{customerVM.customer[customerVM.title].name}"/><!--S:el.index-->
+    <h:outputText value="#{customerVM.thing.name}"/><!--S:el.incomplete-->
+    <h:outputText value="#{customerVM.contact.company.length()}"/><!--S:el.impl-->
+    <ui:param name="loose" value="#{customerVM.title} x"/>
+    <h:outputText value="#{loose.anything}"/><!--S:el.untyped-->
+    <h:outputText value="#{customerVM.items.stream().findFirst().get().name}"/><!--S:el.stream-->
+    <h:outputText value="#{customerVM.format('a', 'b').length()}"/><!--S:el.overload-->
+    <ui:repeat value="#{customerVM.items}" var="#{customerVM.title}"/><!--S:var.el-->
+    <p:commandButton value="x" update="#{customerVM.title}"/><!--S:id.el-->
+    <h:panelGroup id="#{customerVM.title}"/><!--S:idattr.el-->
+    <h:panelGroup styleClass="#{customerVM.title}"/><!--S:css.el-->
+    <div class="zz-hook">hook</div><!--S:css.none-->
+    <h:outputStylesheet name="#{customerVM.title}"/><!--S:css.sheet.el S:res.el-->
+    <h:commandButton value="x"><f:ajax event="#{customerVM.title}"/></h:commandButton><!--S:ajax.el-->
+    <h:commandButton value="Save" action="#{customerVM.save}"/><!--S:nav.el-->
+  </ui:define>
+</ui:composition>

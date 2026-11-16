@@ -5,7 +5,7 @@
   <cc:implementation>
     <ui:repeat value="#{cc.attrs.model.frames}" var="frame">
       <div data-interval="#{not empty frame.intervalMs ? frame.intevalMs : 3000}"></div><!--E:el.member-->
-      <h:outputText value="#{frame.content.anything}"/>
+      <h:outputText value="#{frame.content.anything}"/><!--S:el.dynamic-->
     </ui:repeat>
   </cc:implementation>
 </ui:component>

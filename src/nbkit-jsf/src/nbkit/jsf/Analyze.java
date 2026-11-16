@@ -5,7 +5,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Runs the JSF checks on every xhtml of a project, without NetBeans: "nbkit analyze jsf <project>" (lib/analyze.sh).
@@ -42,12 +45,22 @@ public final class Analyze {
             }
         }
         Workspace ws = Workspace.get(files.get(0), cp);
+        // what was not checked, by reason: "<message>  [<rule>]" -> "file:line:col" of each
+        Map<String, List<String>> notChecked = new LinkedHashMap<>();
+        Map<String, Rules.SkipGroup> groupOf = new HashMap<>();
         int[] count = new int[Rules.Severity.values().length];
         int withProblems = 0;
         for (File f : files) {
             String text = Files.readString(f.toPath());
             List<Analyzer.Explained> how = explain == null ? null : new ArrayList<>();
-            List<Rules.Problem> ps = Analyzer.run(ws, f, text, Rules.ALL_ON, how);
+            Analyzer.Result res = Analyzer.analyze(ws, f, text, Rules.ALL_ON, how);
+            List<Rules.Problem> ps = res.problems;
+            for (Rules.Skipped k : res.skipped) {
+                int[] lc = lineCol(text, k.start);
+                String key = k.message + "  [" + k.rule + "]";
+                notChecked.computeIfAbsent(key, x -> new ArrayList<>()).add(project.toPath().relativize(f.toPath()) + ":" + lc[0] + ":" + lc[1]);
+                groupOf.put(key, k.group);
+            }
             if (!ps.isEmpty()) {
                 withProblems++;
                 System.out.println((color ? "\u001b[1m" : "") + project.toPath().relativize(f.toPath()) + (color ? "\u001b[0m" : ""));
@@ -78,13 +91,63 @@ public final class Analyze {
                     System.out.println("  " + lc[0] + ":" + lc[1] + "  #{" + x.expr + "}\n      " + x.steps);
                 }
                 System.out.println();
+                if (!res.skipped.isEmpty()) {
+                    System.out.println((color ? "\u001b[1m" : "") + Msg.t("skip.file") + (color ? "\u001b[0m" : ""));
+                    for (Rules.Skipped k : res.skipped) {
+                        int[] lc = lineCol(text, k.start);
+                        System.out.println("  " + lc[0] + ":" + lc[1] + "  [" + k.rule + "]  " + k.message + "  «"
+                                + text.substring(k.start, Math.min(k.end, text.length())).replace('\n', ' ') + "»");
+                    }
+                    System.out.println();
+                }
             }
         }
         int e = count[Rules.Severity.ERROR.ordinal()];
         System.out.println();
         System.out.println(Msg.t("analyze.summary", files.size(), withProblems, e, count[Rules.Severity.WARNING.ordinal()],
                 count[Rules.Severity.INFO.ordinal()]));
+        if (explain == null) {
+            printNotChecked(notChecked, groupOf, project, color);
+        }
         System.exit(0);
+    }
+
+    /**
+     * what was not checked, by group and then by reason (most first), with up to 20 places each; when a list is cut,
+     * how to see everything of one file
+     */
+    static void printNotChecked(Map<String, List<String>> notChecked, Map<String, Rules.SkipGroup> groupOf, File project, boolean color) {
+        if (notChecked.isEmpty()) {
+            return;
+        }
+        int[] per = new int[Rules.SkipGroup.values().length];
+        notChecked.forEach((k, l) -> per[groupOf.get(k).ordinal()] += l.size());
+        System.out.println();
+        System.out.println((color ? "\u001b[1m" : "") + Msg.t("skip.header", per[0] + per[1], per[Rules.SkipGroup.STATIC.ordinal()],
+                per[Rules.SkipGroup.GAP.ordinal()]) + (color ? "\u001b[0m" : ""));
+        boolean cut = false;
+        for (Rules.SkipGroup g : Rules.SkipGroup.values()) {
+            List<String> keys = notChecked.keySet().stream().filter(k -> groupOf.get(k) == g)
+                    .sorted((a, b) -> notChecked.get(b).size() - notChecked.get(a).size()).toList();
+            if (keys.isEmpty()) {
+                continue;
+            }
+            System.out.println("  " + Msg.t("skip.group." + g.name()));
+            for (String k : keys) {
+                List<String> where = notChecked.get(k);
+                System.out.println("    " + k + ": " + where.size());
+                for (String w : where.subList(0, Math.min(20, where.size()))) {
+                    System.out.println("      " + w);
+                }
+                if (where.size() > 20) {
+                    System.out.println("      " + Msg.t("skip.more", where.size() - 20));
+                    cut = true;
+                }
+            }
+        }
+        if (cut) {
+            System.out.println("  " + Msg.t("skip.howto", project));
+        }
     }
 
     static int[] lineCol(String text, int offset) {
