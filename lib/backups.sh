@@ -51,7 +51,7 @@ confirm_delete_backup() {
 }
 # browses the backups: Enter restores, Del deletes, Esc goes back. A confirmed restore goes to RESTORE_ID/RESTORE_BK
 browse_backups() {
-  local -a rows; local i=0 n j k rest line id f first mods
+  local -a rows; local i=0 n j k line id f first mods
   RESTORE_BK=""; RESTORE_ID=""
   printf '\e[?1049h'; trap 'printf "\e[?25h\e[?1049l"; exit 130' INT
   while :; do
@@ -74,17 +74,7 @@ browse_backups() {
     done
     echo
     printf '  %s%s%s' "$D" "$(t cli.backups_hint)" "$N"
-    IFS= read -rsn1 k </dev/tty || k=q
-    if [ "$k" = $'\e' ]; then
-      rest=""; IFS= read -rsn2 -t 0.05 rest </dev/tty || true
-      case "$rest" in
-        '[A'|OA) k=up ;;
-        '[B'|OB) k=down ;;
-        '[3') IFS= read -rsn1 -t 0.05 j </dev/tty || true; k=del ;;
-        '') k=q ;;
-        *) k=x ;;
-      esac
-    fi
+    menu_key; k="$KEY"
     id="${rows[i]%%$'\t'*}"; f="${rows[i]#*$'\t'}"
     case "$k" in
       up|k) i=$(( (i + n - 1) % n )) ;;

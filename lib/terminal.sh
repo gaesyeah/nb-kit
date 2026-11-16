@@ -86,10 +86,39 @@ ask_yn() {
 }
 
 # ---------- interactive terminal: arrow key menu, spinner, header ----------
+# menu_key: the next key in KEY: up, down, del, '' (Enter), q (Esc, or q itself) or what was typed. Read one character at a
+# time: after an Esc, only [ or O make an arrow key; anything else typed right after it (another Esc: pressed twice
+# fast, back twice) is its own key, kept in MENU_PENDING for the next read (that may be the menu above, after a
+# submenu) instead of being lost
+MENU_PENDING=""
+menu_key() {
+  local k c=""
+  if [ -n "$MENU_PENDING" ]; then
+    k="$MENU_PENDING"; MENU_PENDING=""
+    # a kept Esc is known to be alone: nothing after it belongs to it
+    if [ "$k" = $'\e' ]; then KEY=q; return 0; fi
+  else
+    IFS= read -rsn1 k </dev/tty || { KEY=q; return 0; }
+  fi
+  if [ "$k" != $'\e' ]; then KEY="$k"; return 0; fi
+  IFS= read -rsn1 -t 0.05 c </dev/tty || true
+  case "$c" in
+    '') KEY=q ;;
+    '['|O)
+      IFS= read -rsn1 -t 0.05 c </dev/tty || true
+      case "$c" in
+        A) KEY=up ;;
+        B) KEY=down ;;
+        3) KEY=del; IFS= read -rsn1 -t 0.05 c </dev/tty || true ;;   # Delete: \e[3~
+        *) KEY=x ;;
+      esac ;;
+    *) KEY=q; MENU_PENDING="$c" ;;
+  esac
+}
 # arrow key menu; result in MENU_IDX (-1 = left with Esc or q). MENU_HINT changes the legend; MENU_TIPS (one per
 # option, like the tooltips of the interface) shows what the chosen one does, on a line of its own
 menu() {
-  local -a o=("$@") tips=(); local n=$# i=${MENU_START:-0} j k rest l=0 tip
+  local -a o=("$@") tips=(); local n=$# i=${MENU_START:-0} j k l=0 tip
   [ "$i" -lt "$n" ] || i=0
   # each tip folded to the width of the terminal, all with as many lines as the longest one, so the menu keeps
   # its height while the cursor moves (a line wrapped by the terminal would break the redrawing)
@@ -110,11 +139,7 @@ menu() {
       for ((j = 0; j < l; j++)); do printf '\r\e[K  %s%s%s\n' "$D" "${tip%%$'\n'*}" "$N"; [[ "$tip" == *$'\n'* ]] && tip="${tip#*$'\n'}" || tip=""; done
     fi
     printf '\r\e[K  %s%s%s' "$D" "${MENU_HINT:-$(t cli.menu_hint)}" "$N"
-    IFS= read -rsn1 k </dev/tty || k=q
-    if [ "$k" = $'\e' ]; then
-      rest=""; IFS= read -rsn2 -t 0.05 rest </dev/tty || true
-      case "$rest" in '[A'|OA) k=up ;; '[B'|OB) k=down ;; '') k=q ;; *) k=x ;; esac
-    fi
+    menu_key; k="$KEY"
     case "$k" in
       up|k) i=$(( (i + n - 1) % n )) ;;
       down|j) i=$(( (i + 1) % n )) ;;

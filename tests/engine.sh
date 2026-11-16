@@ -10,6 +10,14 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 H="$WORK/home"; U="$H/.netbeans/31"
 nbkit() { HOME="$H" bash "$NBKIT_DIR/nbkit.sh" "$@" </dev/null 2>&1; }
+# keys <keys> <command>: types the keys (printf escapes) into the command, run in a terminal (script); its output, with no
+# colors and no \r, goes in KEYS_OUT. The command must end by itself: one that only ends at the time limit fails
+keys() {
+  # shellcheck disable=SC2059
+  KEYS_OUT="$(printf "$1" | HOME="$H" timeout 30 script -qec "$2" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'
+    exit "${PIPESTATUS[1]}")"
+  check "it ends by itself, not at the time limit (keys $1)" test "$?" != 124
+}
 EXPECTED="$TESTS/expected/install.sha1"
 
 echo "Install"
@@ -479,30 +487,35 @@ check "and changes nothing (it used to install everything)" test "$before" = "$(
 echo "The menu"
 new_home "$H"
 nbkit install >/dev/null
-# the options of the menu in a terminal (script), then Esc to quit; one line, in order
+# the options of the menu in a terminal (script), then Esc to quit: ITEMS, one line, in order
 menu_items() {
-  printf '\033' | HOME="$H" timeout 30 script -qec "bash '$1'" /dev/null 2>&1 | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' \
-    | tr -d '\r' | sed -n 's/^  [> ] \([A-Z]\)/\1/p' | sed 's/ (.*//' | paste -sd '|'
+  keys '\033' "bash '$1'"
+  ITEMS="$(sed -n 's/^  [> ] \([A-Z]\)/\1/p' <<<"$KEYS_OUT" | sed 's/ (.*//' | paste -sd '|')"
 }
-items="$(menu_items "$NBKIT_DIR/nbkit.sh")"
-contains "by subject: the modules, nbkit itself, development, quit" "$items" \
+menu_items "$NBKIT_DIR/nbkit.sh"
+contains "by subject: the modules, nbkit itself, development, quit" "$ITEMS" \
   "Reinstall|Uninstall|JSF checks|Backups|Put nbkit on the system|Run the tests|Build the modules|Quit"
 # below the menu, what the chosen option does (the tooltips of the interface): ↓ moves to the next one
-out="$(printf '\033[B\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh'" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+keys '\033[B\033' "bash '$NBKIT_DIR/nbkit.sh'"; out="$KEYS_OUT"
 contains "below the menu, what the chosen option does" "$out" "Installs the same version again"
 contains "and it follows the cursor" "$out" "Removes modules and gives NetBeans back"
 # the JSF controls: a submenu named after the module, its tip lists what it opens
-out="$(printf '\033[B\033[B\033\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+keys '\033[B\033[B\033\033' "bash '$NBKIT_DIR/nbkit.sh' --lang en"; out="$KEYS_OUT"
 contains "the tip of the JSF entry says what it opens" "$out" "Opens: Analyze a JSF project, JSF debug, Show the JSF debug lines"
-out="$(printf '\033[B\033[B\r\033\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+# two Escs in a row (typed fast): back out of the submenu, then out of the menu
+keys '\033[B\033[B\r\033\033' "bash '$NBKIT_DIR/nbkit.sh' --lang en"; out="$KEYS_OUT"
 contains "the JSF submenu: analyze, then the debug and its lines (in a clone)" \
   "$(sed -n 's/^  [> ] \([A-Z]\)/\1/p' <<<"$out" | sed 's/ (.*//' | paste -sd '|')" "|Quit|Analyze a JSF project|JSF debug: off|Show the JSF debug lines"
 contains "each item of the submenu has its tip" "$out" "Runs the JSF checks on every xhtml of a project folder"
-printf '\033[B\033[B\r\033[B\r\033\033' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null >/dev/null 2>&1
+keys '\033[B\033[B\r\033[B\r\033\033' "bash '$NBKIT_DIR/nbkit.sh' --lang en"
+# the list of backups reads its keys the same way: two Escs leave it and then the menu
+keys '\033[B\033[B\033[B\r\033\033' "bash '$NBKIT_DIR/nbkit.sh' --lang en"
+contains "the backups list opens from the menu" "$KEYS_OUT" "(original, used on uninstall)"
 contains "the debug of the submenu turns the JSF debug on" "$(nbkit status --json)" '"jsf_debug":true'
 nbkit debug jsf off >/dev/null
 HOME="$H" bash "$NBKIT_DIR/nbkit.sh" install-self </dev/null >/dev/null 2>&1
-contains "once nbkit is on the system, updating and taking it out take its place" "$(menu_items "$NBKIT_DIR/nbkit.sh")" \
+menu_items "$NBKIT_DIR/nbkit.sh"
+contains "once nbkit is on the system, updating and taking it out take its place" "$ITEMS" \
   "Reinstall|Uninstall|JSF checks|Backups|Update nbkit|Take nbkit out of the system|Run the tests|Build the modules|Quit"
 HOME="$H" bash "$NBKIT_DIR/nbkit.sh" uninstall-self </dev/null >/dev/null 2>&1
 
@@ -531,7 +544,7 @@ check "the installed copy is not a clone (no tests, no development section)" tes
 json="$(HOME="$H" "$H/.local/bin/nbkit" status --json </dev/null 2>&1)"
 check "out of a clone, the JSF controls are only the analysis (no debug)" \
   test "$(jget "$json" "[m['controls'] for m in d['modules'] if m['id'] == 'jsf']")" = "[['analyze']]"
-items="$(menu_items "$SD/nbkit.sh")"
+menu_items "$SD/nbkit.sh"; items="$ITEMS"
 contains "and the menu shows the analysis itself, with no submenu" "$items" "|Analyze a JSF project|Update nbkit|"
 lacks "nor the development items" "$items" "Run the tests"
 # a newer release, served from a file: the zip of a copy with another version
@@ -635,13 +648,12 @@ L="$P/a folder with a very long name/that goes on and on/web"
 mkdir -p "$L/src/main/webapp" && : > "$L/src/main/webapp/i.xhtml"
 printf 'openProjectsURLs.0=file:%s/\n' "${L// /%20}" > "$U/config/Preferences/org/netbeans/modules/projectui.properties"
 nbkit install >/dev/null
-out="$(printf '\033[B\033[B\r\r\033\033' | HOME="$H" timeout 30 script -qec "stty cols 60; bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 \
-  | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+keys '\033[B\033[B\r\r\033\033' "stty cols 60; bash '$NBKIT_DIR/nbkit.sh' --lang en"; out="$KEYS_OUT"
 contains "the menu lists the JSF projects to analyze" "$out" "Other folder..."
 
 contains "a long path is cut at the start, so the line fits" "$out" "… with a very long name/that goes on and on/web"
 check "no line of the list is wider than the terminal" python3 -c 'import sys; sys.exit(any(len(l) > 60 for l in sys.argv[1].splitlines() if l.lstrip(" >").startswith("web ")))' "$out"
-asked="$(printf '\033[B\033[B\r\r\r' | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+keys '\033[B\033[B\r\r\r' "bash '$NBKIT_DIR/nbkit.sh' --lang en"; asked="$KEYS_OUT"
 contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain how each name of the EL of one file was resolved? [y/N]"
 
 out="$(nbkit --lang en debug jsf maybe)"; rc=$?
@@ -689,10 +701,10 @@ out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdka" bash "$B/src/build.sh" --forc
 contains "build.sh --force builds anyway" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
 out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdka" bash "$B/nbkit.sh" build --force 2>&1 </dev/null)"
 contains "nbkit build --force too" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
-asked="$(printf 'n\r' | HOME="$H" timeout 30 script -qec "bash '$B/src/build.sh' --lang en" /dev/null 2>&1 | tr -d '\r')"
+keys 'n\r' "bash '$B/src/build.sh' --lang en"; asked="$KEYS_OUT"
 contains "in a terminal it asks whether to build anyway" "$asked" "Build anyway? [y/N]"
 contains "and, with no, builds nothing" "$asked" "Nothing was built."
-menu_out="$(printf '\033' | HOME="$H" timeout 30 script -qec "bash '$B/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+keys '\033' "bash '$B/nbkit.sh' --lang en"; menu_out="$KEYS_OUT"
 contains "the menu shows the build as up to date" "$menu_out" "Build the modules (up to date)"
 # what makes a jar out of date: its code changed, it has no mark (built before it existed), it is missing
 echo "// changed" >> "$B/src/nbkit-jsf/src/nbkit/jsf/El.java"
@@ -701,7 +713,7 @@ rm "$B/lib/jars/nbkit-colors.jar"
 json="$(bnk status --json)"
 check "status --json lists each jar to build and why" test "$(jget "$json" "[(b['module'], b['reason']) for b in d['build']]")" = \
   "[('nbkit-core', 'unmarked'), ('nbkit-colors', 'missing'), ('nbkit-jsf', 'changed')]"
-menu_out="$(printf '\033' | HOME="$H" timeout 30 script -qec "bash '$B/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')"
+keys '\033' "bash '$B/nbkit.sh' --lang en"; menu_out="$KEYS_OUT"
 lacks "then the menu does not call it up to date" "$menu_out" "(up to date)"
 out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdka" bash "$B/src/build.sh" --lang en 2>&1 </dev/null)"
 contains "build.sh says what changed" "$out" "Changed since the last build: nbkit-core (jar from before the build mark), nbkit-colors (no jar), nbkit-jsf (code changed)"

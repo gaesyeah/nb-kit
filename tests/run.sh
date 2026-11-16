@@ -2,7 +2,13 @@
 # Runs every nbkit test: lint (shellcheck, pyflakes), Python unit tests, the end-to-end engine tests,
 # the JSF checks and the graphical interface (on a virtual screen). Missing tools are offered for install first (with a terminal to ask); a part whose tool
 # is still missing is skipped with a warning. Also: bash nbkit.sh test
+#   bash tests/run.sh <file>: only the tests of that file, while working on something (the whole suite runs once at the
+#   end): a test of tests/python, tests/engine.sh, jsf.sh, gui.sh, runner.sh, or a Run*.java of src/nbkit-jsf/test (they
+#   run inside jsf.sh, a few seconds). Only here, not in the menu nor the interface: in v5 the tests are written again in
+#   Java (JaCoCo), and that is when to decide.
 set -uo pipefail
+# the file, as given from where you are (before the cd below)
+FILE=""; [ $# -gt 0 ] && FILE="$(realpath -m -- "$1")"
 TESTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NBKIT_DIR="$(dirname "$TESTS")"
 cd "$NBKIT_DIR" || exit 1
@@ -68,9 +74,9 @@ lint_python() {
   p="$(pyflakes_cmd)" || { t test.skipped_tool pyflakes; echo; return 3; }
   "$p" -m pyflakes lib/*.py lib/themes/*.py lib/tools/*.py lib/gui/*.py tests/python/*.py && echo "  ${G}ok${N}    $(t test.no_warnings)"
 }
-# unittest's own "OK" / "FAILED" lines, in green and red like the rest
+# unittest's own "OK" / "FAILED" lines, in green and red like the rest; $1: only that file (test_x.py)
 python_tests() {
-  "$PY" -m unittest discover -s tests/python -t tests/python 2>&1 \
+  "$PY" -m unittest discover -s tests/python -t tests/python -p "${1:-test*.py}" 2>&1 \
     | sed -e "s/^OK/${G}OK${N}/" -e "s/^\(FAILED\|FAIL:\|ERROR:\)/${R}\1${N}/"
   return "${PIPESTATUS[0]}"
 }
@@ -79,6 +85,15 @@ jsf_tests() {
   bash tests/jsf.sh
 }
 
+if [ -n "$FILE" ]; then
+  [ -e "$FILE" ] || { echo "${R}$(t test.no_file "$FILE")${N}"; exit 2; }
+  case "$FILE" in
+    "$TESTS"/python/test_*.py) part "${FILE#"$NBKIT_DIR"/}" python_tests "$(basename "$FILE")" ;;
+    "$TESTS"/engine.sh|"$TESTS"/gui.sh|"$TESTS"/runner.sh) part "${FILE#"$NBKIT_DIR"/}" bash "$FILE" ;;
+    "$TESTS"/jsf.sh|"$NBKIT_DIR"/src/nbkit-jsf/test/Run*.java) part "tests/jsf.sh" jsf_tests ;;
+    *) echo "${R}$(t test.not_a_test "$FILE")${N}"; exit 2 ;;
+  esac
+else
 install_tools
 part "shellcheck" lint_shell
 part "pyflakes" lint_python
@@ -86,6 +101,8 @@ part "$(t test.part_python)" python_tests
 part "$(t test.part_engine)" bash tests/engine.sh
 part "$(t test.part_jsf)" jsf_tests
 part "$(t test.part_gui)" bash tests/gui.sh
+part "$(t test.part_runner)" bash tests/runner.sh
+fi
 
 if [ ${#skipped[@]} -gt 0 ]; then echo "${Y}$(t test.skipped)${N} ${skipped[*]}"; fi
 if [ ${#failed[@]} -gt 0 ]; then echo "${R}${B}$(t test.failed)${N} ${failed[*]}"; exit 1; fi
