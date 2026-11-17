@@ -21,6 +21,8 @@
     <div class="zz-hook">case 6</div>
     <!-- case 7: a bean method called with the wrong number of arguments, count takes one (nbkit error el.member, saying it takes 1 argument; NetBeans Identifiers marks it too: agree) -->
     <h:outputText value="#{greeter.count('a', 'b')}"/>
+    <!-- case 8: a property only the implementation has, getPet() is declared Pet and returns a Dog (skipped by nbkit, el.impl: EL finds it at runtime; NetBeans Identifiers marks it: NetBeans false positive) -->
+    <h:outputText value="#{greeter.pet.bark}"/>
     <div class="real-class">a class that exists</div>
 </h:body>
 </html>

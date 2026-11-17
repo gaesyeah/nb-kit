@@ -14,6 +14,10 @@ public class Greeter {
         return text.length();
     }
 
+    public Pet getPet() {
+        return new Dog();
+    }
+
     public Holder<Person> getPerson() {
         return new Holder<>(new Person("Ana"));
     }
