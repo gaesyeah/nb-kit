@@ -261,4 +261,23 @@ contains "and read again when a .js changes" "$out" "js after: [second]"
 contains "the keys of a bundle are read again when its .properties changes" "$out" "keys after: [one, two]"
 contains "and the signature NetBeans watches changes with them (the open pages are checked again)" "$out" "the files' signature changes: true"
 
+# the comparison with NetBeans: pages/compare.xhtml crossed with a fake collection, one case per category
+compile -cp "$W/nbkit" -d "$W/compare" "$J/test/RunComparison.java"
+out="$("$JAVA" -Duser.language=en -cp "$W/nbkit:$W/compare" RunComparison "$J/test/fixture" "$W/app" "$W/api.jar" "$W/primefaces.jar" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"
+sec="$(sed -n '/^== all rules ran/,/^== HTML checking off/p' <<<"$out")"
+contains "both mark the same place: they agree" "$sec" "line 4: AGREE Identifiers / el.member"
+contains "nbkit resolves a text literal inside a method argument: a NetBeans false positive, and why" "$sec" \
+  "line 5: NETBEANS_FALSE_POSITIVE Identifiers / null why: text literal inside a method argument: 'a': String"
+contains "nbkit follows the generics: a NetBeans false positive, and why" "$sec" "line 6: NETBEANS_FALSE_POSITIVE Identifiers / null why: type resolved through generics:"
+contains "nbkit skipped it: NetBeans catches what nbkit skipped, with the reason" "$sec" "line 7: NETBEANS_CATCHES_SKIPPED Identifiers / el.member skipped el.dynamic"
+contains "only in an implementation: a NetBeans false positive" "$sec" "line 8: NETBEANS_FALSE_POSITIVE Identifiers / null why: only in an implementation"
+contains "nbkit marks what NetBeans does not: only nbkit" "$sec" "line 9: NBKIT_ONLY null / el.member"
+contains "a missing class both mark: they agree" "$sec" "line 10: AGREE MissingClassRule / css.class"
+lacks "a NetBeans rule with no pair in nbkit (the HTML validator) stays out" "$sec" "Other"
+sec="$(sed -n '/^== HTML checking off/,/^pairs:/p' <<<"$out")"
+contains "a rule NetBeans did not run is not collected, saying why, instead of only nbkit" "$sec" \
+  "line 10: NOT_COLLECTED MissingClassRule / css.class why: html-error-checking off text/facelets"
+contains "the pairs NetBeans rule -> nbkit rules, and the one nbkit turns off (NetBeansOverrides reads them)" "$out" \
+  "MissingClassRule->[css.class] off org/netbeans/modules/csl/api/default/text_html_MissingClassRule"
+
 finish

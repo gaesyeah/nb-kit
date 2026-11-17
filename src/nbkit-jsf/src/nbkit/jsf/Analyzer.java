@@ -80,13 +80,21 @@ public final class Analyzer {
 
     /** one EL reference and how it was resolved, for "nbkit analyze jsf --explain" */
     public static final class Explained {
-        public final int offset;
+        /** where the reference starts and its last member ends */
+        public final int offset, end;
         public final String expr, steps;
+        /**
+         * the first step that is not a plain bean property (literal, argument, loop, implicit, generics, ccattrs; two
+         * joined with "." when both, e.g. literal.argument), null when all are plain: the why of a NetBeans false positive
+         */
+        public final String kind;
 
-        Explained(int offset, String expr, String steps) {
+        Explained(int offset, int end, String expr, String steps, String kind) {
             this.offset = offset;
+            this.end = end;
             this.expr = expr;
             this.steps = steps;
+            this.kind = kind;
         }
     }
 
@@ -1249,9 +1257,60 @@ public final class Analyzer {
             check(s, r);
         } finally {
             if (explain != null) {
-                explain.add(new Explained(s.x.off(r.a), s.x.text, steps(s, r)));
+                int end = r.chain.isEmpty() ? s.x.off(r.b) : s.x.off(r.chain.get(r.chain.size() - 1).b);
+                explain.add(new Explained(s.x.off(r.a), end, s.x.text, steps(s, r), whyKind(s, r)));
             }
         }
+    }
+
+    /** an open parenthesis (a call's arguments) before position i of an EL text, quotes skipped */
+    static boolean insideParens(String text, int i) {
+        int depth = 0;
+        char q = 0;
+        for (int k = 0; k < Math.min(i, text.length()); k++) {
+            char c = text.charAt(k);
+            if (q != 0) {
+                q = c == q ? 0 : q;
+            } else if (c == '\'' || c == '"') {
+                q = c;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            }
+        }
+        return depth > 0;
+    }
+
+    /** the first step of a reference that is not a plain bean property (see Explained.kind), or null */
+    String whyKind(Site s, El.Ref r) {
+        if (r.literal) {
+            return r.nested || insideParens(s.x.text, r.a) ? "literal.argument" : "literal";
+        }
+        if (r.nested) {
+            return "argument";
+        }
+        if (r.name.equals("cc")) {
+            return "ccattrs";
+        }
+        if ((IMPLICIT_TYPES.containsKey(r.name) || SCOPES.contains(r.name)) && !hasDecl(s, r)) {
+            return "implicit";
+        }
+        if (beanType(r.name) == null) {
+            return "loop"; // a variable of the page: a loop var, ui:param, c:set
+        }
+        String cur = beanType(r.name);
+        for (El.Member m : r.chain) {
+            if (cur == null || m.name == null || !ws.classes.complete(cur)) {
+                break;
+            }
+            ClassModel.MethodInfo gm = ws.classes.members(cur).getterMethods.get(m.name);
+            if (gm != null && gm.genericReturn().startsWith("T")) {
+                return "generics"; // declared as a type variable: its type came from a type argument
+            }
+            cur = gm == null ? null : ClassModel.classOf(gm.returnType());
+        }
+        return null;
     }
 
     /** "customerVM: CustomerVM → rows: Rows → ..." and where (and why) the checking stopped */

@@ -1,0 +1,13 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <!-- one crossing per line with a fake NetBeans collection (test/RunComparison.java) -->
+    <h:outputText value="#{customerVM.titl}"/><!--E:el.member-->
+    <h:outputText value="#{customerVM.format('a'.concat('b'))}"/>
+    <h:outputText value="#{orderMB.orderManager.entityHolderCommand.entity.total}"/>
+    <h:outputText value="#{customerVM.map.anything.more}"/><!--S:el.dynamic-->
+    <h:outputText value="#{customerVM.contact.company}"/><!--S:el.impl-->
+    <h:outputText value="#{customerVM.nmae}"/><!--E:el.member-->
+    <div class="zz-compare">x</div><!--W:css.class-->
+    <div>x</div>
+  </ui:define>
+</ui:composition>
