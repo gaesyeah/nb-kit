@@ -123,6 +123,85 @@ public final class NetBeansMarks {
         return applied > 0 ? "yes" : elSnapshots > 0 ? "no" : "unknown";
     }
 
+    /** the newest .class of the project when it was collected (classesTime), in milliseconds */
+    public static final String INFO_CLASSES = "classes";
+
+    /** the newest time of the project's own compiled classes (target/classes and the like): the same in NetBeans and analyze */
+    public static long classesTime(File project) {
+        long newest = 0;
+        for (String p : new String[]{"target/classes", "build/classes/java/main", "build/classes", "build/web/WEB-INF/classes"}) {
+            for (File f : classFiles(new File(project, p))) {
+                newest = Math.max(newest, f.lastModified());
+            }
+        }
+        return newest;
+    }
+
+    private static List<File> classFiles(File dir) {
+        List<File> r = new ArrayList<>();
+        if (dir.isDirectory()) {
+            try (var s = Files.walk(dir.toPath())) {
+                s.filter(p -> p.toString().endsWith(".class")).forEach(p -> r.add(p.toFile()));
+            } catch (IOException | RuntimeException ex) {
+                // ignore
+            }
+        }
+        return r;
+    }
+
+    /**
+     * What changed since a collection, one "kind name" per line: "netbeans 31 32" (the version of NetBeans now differs),
+     * "changed|new|removed <page>" (by the hashes), "classes <class>" (compiled after the collection). Empty: up to date.
+     * netbeansNow: the product version NetBeans runs now (null: not known, not compared).
+     */
+    public static List<String> changes(Collected c, File project, List<File> pages, String netbeansNow) throws IOException {
+        List<String> r = new ArrayList<>();
+        String was = c.info().getOrDefault("netbeans", "");
+        if (netbeansNow != null && !netbeansNow.isBlank() && !was.startsWith(netbeansNow.trim())) {
+            r.add("netbeans " + version(was) + " " + version(netbeansNow));
+        }
+        Map<String, String> now = new LinkedHashMap<>();
+        for (File p : pages) {
+            now.put(project.toPath().relativize(p.toPath()).toString().replace('\\', '/'), sha256(Files.readAllBytes(p.toPath())));
+        }
+        for (Map.Entry<String, String> e : now.entrySet()) {
+            String old = c.hashes().get(e.getKey());
+            if (old == null) {
+                r.add("new " + e.getKey());
+            } else if (!old.equals(e.getValue())) {
+                r.add("changed " + e.getKey());
+            }
+        }
+        for (String old : c.hashes().keySet()) {
+            if (!now.containsKey(old)) {
+                r.add("removed " + old);
+            }
+        }
+        String classes = c.info().get(INFO_CLASSES);
+        if (classes != null && classesTime(project) > Long.parseLong(classes)) {
+            for (String p : new String[]{"target/classes", "build/classes/java/main", "build/classes", "build/web/WEB-INF/classes"}) {
+                File root = new File(project, p);
+                for (File f : classFiles(root)) {
+                    if (f.lastModified() > Long.parseLong(classes) && !f.getName().contains("$")) {
+                        String n = root.toPath().relativize(f.toPath()).toString().replace('\\', '/').replace('/', '.');
+                        r.add("classes " + n.substring(0, n.length() - ".class".length()));
+                    }
+                }
+            }
+        }
+        return r;
+    }
+
+    /** "Apache NetBeans IDE 31 31-f8ac..." -> "31" (the first word with a digit after the product name) */
+    static String version(String product) {
+        for (String w : product.trim().split("\\s+")) {
+            if (!w.isEmpty() && Character.isDigit(w.charAt(0))) {
+                return w;
+            }
+        }
+        return product.trim();
+    }
+
     /** the NetBeans rules that did not run at all (rule id prefix of the marks), each with the info line that says why */
     public static Map<String, String> notRun(Collected c) {
         Map<String, String> r = new LinkedHashMap<>();

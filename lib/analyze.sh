@@ -117,6 +117,7 @@ analyze_one() {
   case "$NBKIT_LANG" in pt*) lang=pt ;; esac
   [ -n "$G" ] && color=1
   "$JAVA" -Duser.language=$lang -Dstdout.encoding=UTF-8 -Dnbkit.color=$color ${EXPLAIN:+"-Dnbkit.explain=$EXPLAIN"} \
+    ${NBKIT_COLLECTION:+"-Dnbkit.collection.file=$NBKIT_COLLECTION"} \
     -cp "$JAR" nbkit.jsf.Analyze "$1" ${cp[@]+"${cp[@]}"} \
     2> >(grep -v '^Picked up JAVA_TOOL_OPTIONS' >&2) || rc=$?
   return "$rc"

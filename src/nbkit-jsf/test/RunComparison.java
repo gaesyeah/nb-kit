@@ -26,6 +26,20 @@ public class RunComparison {
                 mark(f, text, "<div>x", 5, "text_html_Other", "an HTML validator mark"));
         print("all rules ran", NetBeansComparison.compare(f, r, marks, Map.of()), text);
         print("HTML checking off", NetBeansComparison.compare(f, r, marks.subList(0, 5), Map.of("text_html_", "html-error-checking off text/facelets")), text);
+        // -Dnbkit.write=<file>: the same marks as a collection of the project (as nb/Collector writes it), for analyze
+        String out = System.getProperty("nbkit.write");
+        if (out != null) {
+            java.util.Map<String, String> info = new java.util.LinkedHashMap<>();
+            info.put("project", proj.getPath());
+            info.put("netbeans", "Apache NetBeans IDE 31 31-test");
+            info.put("date", "2026-11-16T19:00:00Z");
+            info.put(NetBeansMarks.INFO_CLASSES, "" + (System.currentTimeMillis() + 60000));
+            java.util.Map<String, String> hashes = new java.util.LinkedHashMap<>();
+            for (File p : Workspace.pages(proj)) {
+                hashes.put(proj.toPath().relativize(p.toPath()).toString().replace('\\', '/'), NetBeansMarks.sha256(Files.readAllBytes(p.toPath())));
+            }
+            NetBeansMarks.write(new File(out), info, hashes, marks);
+        }
         System.out.println("pairs: " + NetBeansRules.ALL.stream().map(p -> p.shortName() + "->" + p.nbkit() + (p.replacedBy() == null ? "" : " off " + p.preferencesNode())).toList());
     }
 

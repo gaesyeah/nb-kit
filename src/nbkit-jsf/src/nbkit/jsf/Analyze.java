@@ -34,6 +34,21 @@ public final class Analyze {
             System.out.println(Msg.t("analyze.none", project));
             System.exit(2);
         }
+        // what NetBeans marks on the project (the collection of nb/Collector), when there is one
+        String cf = System.getProperty("nbkit.collection.file");
+        File collection = cf != null && !cf.isBlank() ? new File(cf) : NetBeansMarks.outputFile(NetBeansMarks.cache(), project);
+        NetBeansMarks.Collected collected = collection.isFile() ? NetBeansMarks.read(collection) : null;
+        if (System.getProperty("nbkit.collection.check") != null) {
+            // for lib/analyze.sh: "missing", or "ok"/"stale" with the date, then what changed (NetBeansMarks.changes)
+            if (collected == null) {
+                System.out.println("missing");
+            } else {
+                List<String> changes = NetBeansMarks.changes(collected, project, files, System.getProperty("nbkit.netbeans"));
+                System.out.println((changes.isEmpty() ? "ok " : "stale ") + collected.info().getOrDefault("date", ""));
+                changes.forEach(System.out::println);
+            }
+            System.exit(0);
+        }
         boolean color = "1".equals(System.getProperty("nbkit.color"));
         String explain = System.getProperty("nbkit.explain");
         if (explain != null) {
@@ -48,12 +63,21 @@ public final class Analyze {
         // what was not checked, by reason: "<message>  [<rule>]" -> "file:line:col" of each
         Map<String, List<String>> notChecked = new LinkedHashMap<>();
         Map<String, Rules.SkipGroup> groupOf = new HashMap<>();
+        // each crossing with NetBeans' marks and its place "file:line:col"
+        List<Object[]> comparison = new ArrayList<>();
         int[] count = new int[Rules.Severity.values().length];
         int withProblems = 0;
         for (File f : files) {
             String text = Files.readString(f.toPath());
-            List<Analyzer.Explained> how = explain == null ? null : new ArrayList<>();
+            List<Analyzer.Explained> how = explain == null && collected == null ? null : new ArrayList<>();
             Analyzer.Result res = Analyzer.analyze(ws, f, text, Rules.ALL_ON, how);
+            String rel = project.toPath().relativize(f.toPath()).toString().replace('\\', '/');
+            List<NetBeansComparison.Match> crossed = collected == null ? List.of()
+                    : NetBeansComparison.compare(rel, res, collected.marks(), NetBeansMarks.notRun(collected));
+            for (NetBeansComparison.Match x : crossed) {
+                int[] lc = lineCol(text, x.start());
+                comparison.add(new Object[]{x, rel + ":" + lc[0] + ":" + lc[1]});
+            }
             List<Rules.Problem> ps = res.problems;
             for (Rules.Skipped k : res.skipped) {
                 int[] lc = lineCol(text, k.start);
@@ -91,6 +115,15 @@ public final class Analyze {
                     System.out.println("  " + lc[0] + ":" + lc[1] + "  #{" + x.expr + "}\n      " + x.steps);
                 }
                 System.out.println();
+                if (!comparison.isEmpty()) {
+                    System.out.println((color ? "\u001b[1m" : "") + Msg.t("cmp.file") + (color ? "\u001b[0m" : ""));
+                    for (Object[] e : comparison) {
+                        NetBeansComparison.Match x = (NetBeansComparison.Match) e[0];
+                        String place = ((String) e[1]).substring(((String) e[1]).indexOf(':') + 1);
+                        System.out.println("  " + place + "  " + Msg.t("cmp.cat." + x.category().name()) + "  " + describe(x));
+                    }
+                    System.out.println();
+                }
                 if (!res.skipped.isEmpty()) {
                     System.out.println((color ? "\u001b[1m" : "") + Msg.t("skip.file") + (color ? "\u001b[0m" : ""));
                     for (Rules.Skipped k : res.skipped) {
@@ -108,6 +141,9 @@ public final class Analyze {
                 count[Rules.Severity.INFO.ordinal()]));
         if (explain == null) {
             printNotChecked(notChecked, groupOf, project, color);
+            if (collected != null) {
+                printComparison(comparison, collected, project, color);
+            }
         }
         System.exit(0);
     }
@@ -148,6 +184,67 @@ public final class Analyze {
         if (cut) {
             System.out.println("  " + Msg.t("skip.howto", project));
         }
+    }
+
+    /** "[Identifiers] Unknown property x  <- why", "[css.class] its message", "[el.member] skipped: reason" */
+    static String describe(NetBeansComparison.Match x) {
+        String nb = x.netbeansRule() == null || x.netbeansMessage() == null ? "" : "[" + x.netbeansRule() + "] " + x.netbeansMessage();
+        String nbkit = x.nbkitRule() == null ? "" : "[" + x.nbkitRule() + "] " + (x.skipReason() != null ? Msg.t("cmp.skipped", x.nbkitMessage()) : x.nbkitMessage());
+        return (nb + (nb.isEmpty() || nbkit.isEmpty() ? "" : "  /  ") + nbkit) + (x.why() == null ? "" : "  \u2190 " + x.why());
+    }
+
+    /** the comparison with NetBeans: counts per category, what was not collected, then the lists (up to 20 places each) */
+    static void printComparison(List<Object[]> comparison, NetBeansMarks.Collected c, File project, boolean color) {
+        Map<NetBeansComparison.Category, List<Object[]>> by = new java.util.EnumMap<>(NetBeansComparison.Category.class);
+        for (NetBeansComparison.Category k : NetBeansComparison.Category.values()) {
+            by.put(k, new ArrayList<>());
+        }
+        comparison.forEach(e -> by.get(((NetBeansComparison.Match) e[0]).category()).add(e));
+        System.out.println();
+        System.out.println((color ? "\u001b[1m" : "") + Msg.t("cmp.header", c.info().getOrDefault("date", "?"), c.info().getOrDefault("netbeans", "?").trim())
+                + (color ? "\u001b[0m" : ""));
+        System.out.println("  " + Msg.t("cmp.counts", by.get(NetBeansComparison.Category.AGREE).size(),
+                by.get(NetBeansComparison.Category.NETBEANS_FALSE_POSITIVE).size(), by.get(NetBeansComparison.Category.NETBEANS_CATCHES_SKIPPED).size(),
+                by.get(NetBeansComparison.Category.NBKIT_ONLY).size()));
+        for (Map.Entry<String, String> e : NetBeansMarks.notRun(c).entrySet()) {
+            System.out.println("  " + Msg.t("cmp.notrun", e.getKey().endsWith("_") ? Msg.t("cmp.rules.html") : e.getKey().substring(e.getKey().lastIndexOf('_') + 1), e.getValue()));
+        }
+        boolean cut = false;
+        cut |= list(Msg.t("cmp.cat.NETBEANS_FALSE_POSITIVE"), by.get(NetBeansComparison.Category.NETBEANS_FALSE_POSITIVE));
+        // what NetBeans catches and nbkit skipped, by the reason it skipped: the list of what to evolve in nbkit
+        List<Object[]> caught = by.get(NetBeansComparison.Category.NETBEANS_CATCHES_SKIPPED);
+        if (!caught.isEmpty()) {
+            System.out.println("  " + Msg.t("cmp.caught"));
+            Map<String, List<Object[]>> reasons = new LinkedHashMap<>();
+            caught.forEach(e -> reasons.computeIfAbsent(((NetBeansComparison.Match) e[0]).nbkitMessage(), k -> new ArrayList<>()).add(e));
+            for (Map.Entry<String, List<Object[]>> r : reasons.entrySet().stream().sorted((a, b) -> b.getValue().size() - a.getValue().size()).toList()) {
+                System.out.println("    " + r.getKey() + ": " + r.getValue().size());
+                cut |= places(r.getValue(), "      ");
+            }
+        }
+        cut |= list(Msg.t("cmp.cat.NBKIT_ONLY"), by.get(NetBeansComparison.Category.NBKIT_ONLY));
+        if (cut) {
+            System.out.println("  " + Msg.t("cmp.howto", project));
+        }
+    }
+
+    private static boolean list(String title, List<Object[]> l) {
+        if (l.isEmpty()) {
+            return false;
+        }
+        System.out.println("  " + title);
+        return places(l, "    ");
+    }
+
+    private static boolean places(List<Object[]> l, String indent) {
+        for (Object[] e : l.subList(0, Math.min(20, l.size()))) {
+            System.out.println(indent + e[1] + "  " + describe((NetBeansComparison.Match) e[0]));
+        }
+        if (l.size() > 20) {
+            System.out.println(indent + Msg.t("skip.more", l.size() - 20));
+            return true;
+        }
+        return false;
     }
 
     static int[] lineCol(String text, int offset) {

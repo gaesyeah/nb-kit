@@ -95,6 +95,7 @@ final class Collector {
         ModuleInfo self = Modules.getDefault().ownerOf(Collector.class);
         info.put("nbkit-jsf", self == null ? "" : self.getSpecificationVersion() + " " + self.getAttribute("NbKit-Source-Hash"));
         info.put("date", Instant.now().toString());
+        info.put(NetBeansMarks.INFO_CLASSES, "" + NetBeansMarks.classesTime(dir));
         Map<String, String> hashes = new LinkedHashMap<>();
         List<NetBeansMarks.Mark> marks = new ArrayList<>();
         FileObject fo = FileUtil.toFileObject(dir);
