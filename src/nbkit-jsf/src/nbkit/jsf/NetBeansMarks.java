@@ -245,6 +245,54 @@ public final class NetBeansMarks {
         return new int[]{line, end - lineStart + 1};
     }
 
+    /** what the NetBeans side does in a collection (nb/Collector); collect drives the steps and the notifications */
+    public interface CollectSteps {
+        /** opens the project if it is not open and waits for the scan; false: not a NetBeans project */
+        boolean open() throws Exception;
+
+        /** what NetBeans marks on one page (rel: its path in the project) */
+        List<Mark> marks(File page, String rel) throws Exception;
+
+        /** what is known after the pages: netbeans, nbkit-jsf, html-error-checking, web-module... */
+        Map<String, String> info();
+
+        /** shows a notification; what it returns is given back to clear */
+        Object notice(String title, String text);
+
+        void clear(Object notice);
+    }
+
+    /**
+     * One collection: a notification that it started (NetBeans can still be used), each page of the project in turn,
+     * the collection written, its done marker, then the first notification replaced by one with how many marks.
+     * Returns that number.
+     */
+    public static int collect(File dir, File cache, CollectSteps steps) throws Exception {
+        Object started = steps.notice(Msg.t("collect.title"), Msg.t("collect.started", dir.getName()));
+        Map<String, String> info = new LinkedHashMap<>();
+        info.put("project", dir.getPath());
+        info.put("date", java.time.Instant.now().toString());
+        info.put(INFO_CLASSES, "" + classesTime(dir));
+        Map<String, String> hashes = new LinkedHashMap<>();
+        List<Mark> marks = new ArrayList<>();
+        if (steps.open()) {
+            for (File page : Workspace.pages(dir)) {
+                String rel = dir.toPath().relativize(page.toPath()).toString().replace('\\', '/');
+                hashes.put(rel, sha256(Files.readAllBytes(page.toPath())));
+                marks.addAll(steps.marks(page, rel));
+            }
+            info.putAll(steps.info());
+        } else {
+            info.put("error", "not a NetBeans project: " + dir);
+        }
+        File out = outputFile(cache, dir);
+        write(out, info, hashes, marks);
+        done(cache, out);
+        steps.clear(started);
+        steps.notice(Msg.t("collect.title"), Msg.t("collect.done", marks.size()));
+        return marks.size();
+    }
+
     /** writes the collection whole (a temporary file renamed at the end): a reader never sees half of it */
     public static void write(File out, Map<String, String> info, Map<String, String> hashes, List<Mark> marks) throws IOException {
         StringBuilder sb = new StringBuilder(HEADER).append('\n');

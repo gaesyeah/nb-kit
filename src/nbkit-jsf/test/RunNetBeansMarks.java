@@ -93,5 +93,29 @@ public class RunNetBeansMarks {
         unknown.put(NetBeansMarks.INFO_WEB_MODULE, "unknown");
         NetBeansMarks.write(out, unknown, Map.of(), List.of());
         System.out.println("unknown web module: " + NetBeansMarks.notRun(NetBeansMarks.read(out)));
+
+        // the collection as nb/Collector runs it, with fake NetBeans steps: when each notification shows, and its text
+        File proj = new File(cache.getParentFile(), "collectproj");
+        new File(proj, "src/main/webapp").mkdirs();
+        Files.writeString(new File(proj, "pom.xml").toPath(), "<project/>");
+        Files.writeString(new File(proj, "src/main/webapp/a.xhtml").toPath(), "<html/>");
+        Files.writeString(new File(proj, "src/main/webapp/b.xhtml").toPath(), "<html/>");
+        List<String> events = new java.util.ArrayList<>();
+        int n = NetBeansMarks.collect(proj, cache, new NetBeansMarks.CollectSteps() {
+            public boolean open() { events.add("open the project, wait for the scan"); return true; }
+            public List<NetBeansMarks.Mark> marks(File page, String rel) {
+                events.add("marks of " + rel);
+                return List.of(new NetBeansMarks.Mark(rel, 1, 1, 0, 1, "text_x-el_Identifiers", "WARNING", true, "m"));
+            }
+            public Map<String, String> info() { return Map.of("netbeans", "Apache NetBeans IDE 31 x"); }
+            public Object notice(String title, String text) { events.add("notice " + title + " | " + text); return text; }
+            public void clear(Object notice) { events.add("clear " + notice); }
+        });
+        events.add("collection: " + NetBeansMarks.read(NetBeansMarks.outputFile(cache, proj)).marks().size() + " marks, done marker: "
+                + NetBeansMarks.doneFile(cache).exists());
+        for (String e : events) {
+            System.out.println("collect step: " + e);
+        }
+        System.out.println("collected: " + n);
     }
 }

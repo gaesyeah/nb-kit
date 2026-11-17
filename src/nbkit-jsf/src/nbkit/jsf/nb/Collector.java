@@ -2,7 +2,6 @@ package nbkit.jsf.nb;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.prefs.Preferences;
 import javax.swing.text.Document;
+import nbkit.jsf.Msg;
 import nbkit.jsf.NetBeansMarks;
 import nbkit.jsf.Workspace;
 import org.netbeans.api.editor.mimelookup.MimeLookup;
@@ -86,63 +86,71 @@ final class Collector {
         }
     }
 
+    /** the NetBeans steps of one collection; NetBeansMarks.collect drives them and says when to notify */
     private static void collect(File dir) throws Exception {
         Watcher.debug("collect: request for " + dir);
-        File out = NetBeansMarks.outputFile(CACHE, dir);
-        Map<String, String> info = new LinkedHashMap<>();
-        info.put("project", dir.getPath());
-        info.put("netbeans", System.getProperty("netbeans.productversion", "") + " " + System.getProperty("netbeans.buildnumber", ""));
-        ModuleInfo self = Modules.getDefault().ownerOf(Collector.class);
-        info.put("nbkit-jsf", self == null ? "" : self.getSpecificationVersion() + " " + self.getAttribute("NbKit-Source-Hash"));
-        info.put("date", Instant.now().toString());
-        info.put(NetBeansMarks.INFO_CLASSES, "" + NetBeansMarks.classesTime(dir));
-        Map<String, String> hashes = new LinkedHashMap<>();
-        List<NetBeansMarks.Mark> marks = new ArrayList<>();
-        FileObject fo = FileUtil.toFileObject(dir);
-        Project project = fo == null ? null : ProjectManager.getDefault().findProject(fo);
-        if (project == null) {
-            info.put("error", "not a NetBeans project: " + dir);
-        } else {
-            open(project);
-            waitScan();
-            // what NetBeans does not run at all here: no mark there is not agreement (NetBeansMarks.notRun)
-            Preferences html = MimeLookup.getLookup("text/html").lookup(Preferences.class);
-            String setting = html == null ? "" : html.get("mimetypesWithEnabledHtmlErrorChecking", "");
-            info.put(NetBeansMarks.INFO_HTML_ERRORS, (NetBeansMarks.htmlErrorChecking(setting, NetBeansMarks.FACELETS) ? "on " : "off ")
-                    + NetBeansMarks.FACELETS);
-            // web module or not: whether EL's Identifiers applied ({ EL parts seen, parts where it applied }, see run)
-            int[] el = new int[2];
-            List<File> pages = Workspace.pages(dir);
-            Watcher.debug("collect: " + pages.size() + " xhtml file(s)");
-            for (File page : pages) {
-                String rel = dir.toPath().relativize(page.toPath()).toString().replace('\\', '/');
-                hashes.put(rel, NetBeansMarks.sha256(Files.readAllBytes(page.toPath())));
+        // web module or not: whether EL's Identifiers applied ({ EL parts seen, parts where it applied }, see run)
+        int[] el = new int[2];
+        int n = NetBeansMarks.collect(dir, CACHE, new NetBeansMarks.CollectSteps() {
+            @Override
+            public boolean open() throws Exception {
+                FileObject fo = FileUtil.toFileObject(dir);
+                Project project = fo == null ? null : ProjectManager.getDefault().findProject(fo);
+                if (project == null) {
+                    return false;
+                }
+                Collector.open(project);
+                waitScan();
+                return true;
+            }
+
+            @Override
+            public List<NetBeansMarks.Mark> marks(File page, String rel) throws Exception {
+                List<NetBeansMarks.Mark> found = new ArrayList<>();
                 FileObject pfo = FileUtil.toFileObject(page);
                 if (pfo == null) {
-                    continue;
+                    return found;
                 }
-                List<NetBeansMarks.Mark> found = new ArrayList<>();
                 Source source = Source.create(pfo);
                 // the document is loaded here, not inside the parse (the rules want it; see run)
                 source.getDocument(true);
                 ParserManager.parseWhenScanFinished(Collections.singleton(source), new UserTask() {
                     @Override
                     public void run(ResultIterator it) throws Exception {
-                        String text = it.getSnapshot().getText().toString();
-                        walk(it, text, rel, found, el);
+                        walk(it, it.getSnapshot().getText().toString(), rel, found, el);
                     }
                 }).get();
                 Watcher.debug("collect: " + rel + ": " + found.size() + " mark(s)");
-                marks.addAll(found);
+                return found;
             }
-            info.put(NetBeansMarks.INFO_WEB_MODULE, NetBeansMarks.webModule(el[0], el[1]));
-            Watcher.debug("collect: " + NetBeansMarks.INFO_HTML_ERRORS + " " + info.get(NetBeansMarks.INFO_HTML_ERRORS) + ", "
-                    + NetBeansMarks.INFO_WEB_MODULE + " " + info.get(NetBeansMarks.INFO_WEB_MODULE) + " (EL parts " + el[0]
-                    + ", Identifiers applied to " + el[1] + ")");
-        }
-        NetBeansMarks.write(out, info, hashes, marks);
-        NetBeansMarks.done(CACHE, out);
-        Watcher.debug("collect: done, " + marks.size() + " mark(s) in " + out);
+
+            @Override
+            public Map<String, String> info() {
+                Map<String, String> info = new LinkedHashMap<>();
+                info.put("netbeans", System.getProperty("netbeans.productversion", "") + " " + System.getProperty("netbeans.buildnumber", ""));
+                ModuleInfo self = Modules.getDefault().ownerOf(Collector.class);
+                info.put("nbkit-jsf", self == null ? "" : self.getSpecificationVersion() + " " + self.getAttribute("NbKit-Source-Hash"));
+                // what NetBeans does not run at all here: no mark there is not agreement (NetBeansMarks.notRun)
+                Preferences html = MimeLookup.getLookup("text/html").lookup(Preferences.class);
+                String setting = html == null ? "" : html.get("mimetypesWithEnabledHtmlErrorChecking", "");
+                info.put(NetBeansMarks.INFO_HTML_ERRORS, (NetBeansMarks.htmlErrorChecking(setting, NetBeansMarks.FACELETS) ? "on " : "off ")
+                        + NetBeansMarks.FACELETS);
+                info.put(NetBeansMarks.INFO_WEB_MODULE, NetBeansMarks.webModule(el[0], el[1]));
+                Watcher.debug("collect: " + info);
+                return info;
+            }
+
+            @Override
+            public Object notice(String title, String text) {
+                return Notices.show(title, text);
+            }
+
+            @Override
+            public void clear(Object notice) {
+                ((org.openide.awt.Notification) notice).clear();
+            }
+        });
+        Watcher.debug("collect: done, " + n + " mark(s)");
     }
 
     /** opens the project in NetBeans when it is not open yet (its classpath and index come with it) */
