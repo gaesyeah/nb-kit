@@ -39,6 +39,8 @@ public final class Workspace {
 
     public final Map<String, Bean> beans = new ConcurrentHashMap<>();
     public final Set<String> facesVars = new HashSet<>();
+    /** var -> base-name of each resource-bundle of faces-config.xml */
+    public final Map<String, String> facesBundles = new HashMap<>();
     public final Set<String> navOutcomes = new HashSet<>();
     /** class of an EL resolver of the project itself (names it provides cannot be seen), or null */
     public String customElResolver;
@@ -243,6 +245,8 @@ public final class Workspace {
     private void scanAll() {
         beans.clear();
         facesVars.clear();
+        facesBundles.clear();
+        bundles.clear();
         navOutcomes.clear();
         tagTypes.clear();
         componentClasses.clear();
@@ -379,6 +383,13 @@ public final class Workspace {
             }
             for (String v : texts(d, "var")) {
                 facesVars.add(v);
+            }
+            NodeList rbs = d.getElementsByTagNameNS("*", "resource-bundle");
+            for (int i = 0; i < rbs.getLength(); i++) {
+                org.w3c.dom.Element rb = (org.w3c.dom.Element) rbs.item(i);
+                if (child(rb, "var") != null && child(rb, "base-name") != null) {
+                    facesBundles.put(child(rb, "var"), child(rb, "base-name"));
+                }
             }
             for (String v : texts(d, "managed-bean-name")) {
                 addBean(v, null, "faces-config");
@@ -564,6 +575,88 @@ public final class Workspace {
         } catch (IOException | RuntimeException ex) {
             // ignore
         }
+    }
+
+    // ---------- resource bundles ----------
+
+    /** one .properties of a bundle (messages.properties, messages_pt.properties...): its keys and their lines */
+    public static final class BundleFile {
+        public final String name;
+        /** null when it is inside a jar (no "Go to") */
+        public final File file;
+        public final Map<String, Integer> keys;
+
+        BundleFile(String name, File file, Map<String, Integer> keys) {
+            this.name = name;
+            this.file = file;
+            this.keys = keys;
+        }
+    }
+
+    private final Map<String, List<BundleFile>> bundles = new ConcurrentHashMap<>();
+
+    /**
+     * The .properties of a bundle base name (a.b.messages: a/b/messages.properties and its languages), read once:
+     * from src/main/resources, then the class folders and jars of the classpath (a name already found is not read again)
+     */
+    public List<BundleFile> bundle(String baseName) {
+        return bundles.computeIfAbsent(baseName, b -> {
+            String path = b.replace('.', '/');
+            String dir = path.contains("/") ? path.substring(0, path.lastIndexOf('/')) : "";
+            Pattern name = Pattern.compile(Pattern.quote(path.substring(path.lastIndexOf('/') + 1)) + "(_[A-Za-z0-9_]+)?\\.properties");
+            Map<String, BundleFile> found = new TreeMap<>();
+            List<File> roots = new ArrayList<>(List.of(new File(projectDir, "src/main/resources")));
+            roots.addAll(classRoots);
+            for (File root : roots) {
+                if (root.isDirectory()) {
+                    File[] fs = new File(root, dir).listFiles((d, n) -> name.matcher(n).matches());
+                    for (File f : fs == null ? new File[0] : fs) {
+                        try {
+                            found.putIfAbsent(f.getName(), new BundleFile(f.getName(), f, propertyKeys(Files.readString(f.toPath(), StandardCharsets.ISO_8859_1))));
+                        } catch (IOException ex) {
+                            // ignore
+                        }
+                    }
+                } else if (root.isFile()) {
+                    try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(root)) {
+                        for (var en = z.entries(); en.hasMoreElements();) {
+                            var e = en.nextElement();
+                            String n = e.getName().substring(e.getName().lastIndexOf('/') + 1);
+                            String d = e.getName().contains("/") ? e.getName().substring(0, e.getName().lastIndexOf('/')) : "";
+                            if (d.equals(dir) && name.matcher(n).matches() && !found.containsKey(n)) {
+                                try (var in = z.getInputStream(e)) {
+                                    found.put(n, new BundleFile(n, null, propertyKeys(new String(in.readAllBytes(), StandardCharsets.ISO_8859_1))));
+                                }
+                            }
+                        }
+                    } catch (IOException ex) {
+                        // ignore
+                    }
+                }
+            }
+            return new ArrayList<>(found.values());
+        });
+    }
+
+    /** key -> line of a .properties text (comments and continuation lines left out) */
+    static Map<String, Integer> propertyKeys(String text) {
+        Map<String, Integer> r = new LinkedHashMap<>();
+        String[] lines = text.split("\r?\n", -1);
+        boolean continued = false;
+        for (int i = 0; i < lines.length; i++) {
+            String l = lines[i].stripLeading();
+            boolean cont = continued;
+            continued = l.endsWith("\\") && !l.endsWith("\\\\");
+            if (cont || l.isEmpty() || l.startsWith("#") || l.startsWith("!")) {
+                continue;
+            }
+            int end = 0;
+            while (end < l.length() && "=: \t".indexOf(l.charAt(end)) < 0) {
+                end += l.charAt(end) == '\\' ? 2 : 1;
+            }
+            r.putIfAbsent(l.substring(0, Math.min(end, l.length())).replace("\\", ""), i + 1);
+        }
+        return r;
     }
 
     static Document xml(byte[] b) {

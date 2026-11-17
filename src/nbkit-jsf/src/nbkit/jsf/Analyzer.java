@@ -12,6 +12,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.TreeSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -1354,14 +1355,70 @@ public final class Analyzer {
         if (rootType(s, r, new HashSet<>()) == null) {
             // a scope map with a key that is no bean (sessionScope.x): its value is only known at runtime; a bundle
             // (f:loadBundle, faces-config resource-bundle): a known type, whose keys could be read from its .properties
-            String why = SCOPES.contains(r.name) && !hasDecl(s, r) ? "el.dynamic" : bundle(s, r) ? "el.bundle" : "el.untyped";
-            skip("el.member", why, s.x.off(r.a), s.x.off(r.b));
+            if (!(SCOPES.contains(r.name) && !hasDecl(s, r)) && bundle(s, r)) {
+                bundleKey(s, r);
+                return;
+            }
+            skip("el.member", SCOPES.contains(r.name) && !hasDecl(s, r) ? "el.dynamic" : "el.untyped", s.x.off(r.a), s.x.off(r.b));
             return;
         }
         walk(s, r, r.chain.size(), true);
         if (stopReason != null) {
             skip("el.member", stopReason, s.x.off(stopAt.a), s.x.off(stopAt.b));
         }
+    }
+
+    /**
+     * #{msg['key']} or #{msg.key} with a fixed key: looked up in every .properties of the bundle. In all: a blue note
+     * with Go to; in none: an error with the close key; only in some: a warning naming the files that lack it. A key
+     * known only at runtime, or a bundle not found, is skipped.
+     */
+    void bundleKey(Site s, El.Ref r) {
+        Decl d = bundleDecl(s, r);
+        String base = d != null ? d.el.value("basename") : ws.facesBundles.get(r.name);
+        List<Workspace.BundleFile> files = base == null || base.contains("{") ? List.of() : ws.bundle(base.trim());
+        if (files.isEmpty()) {
+            skip("el.member", "el.bundle", s.x.off(r.a), s.x.off(r.b));
+            return;
+        }
+        El.Member m = r.chain.get(0);
+        if (m.name == null) {
+            skip("el.member", "el.dynamic", s.x.off(m.a), s.x.off(m.b));
+            return;
+        }
+        int a = s.x.off(m.a), b = s.x.off(m.b);
+        List<Workspace.BundleFile> have = files.stream().filter(f -> f.keys.containsKey(m.name)).toList();
+        if (have.size() == files.size()) {
+            Workspace.BundleFile f = have.get(0);
+            report("bundle.key", Severity.INFO, a, b, Msg.t("bundle.key.found", m.name, f.name, f.keys.get(m.name)), keyTarget(f, m.name));
+        } else if (have.isEmpty()) {
+            Set<String> all = new TreeSet<>();
+            files.forEach(f -> all.addAll(f.keys.keySet()));
+            String hint = closest(m.name, all);
+            Workspace.BundleFile hf = hint == null ? null : files.stream().filter(f -> f.keys.containsKey(hint)).findFirst().orElse(null);
+            report("bundle.key", Severity.ERROR, a, b, Msg.t("bundle.key.none", m.name, base.trim())
+                    + Msg.hint(hint, hf == null ? null : Msg.t("origin.place", hf.name, hf.keys.get(hint))),
+                    hf == null ? List.of() : keyTarget(hf, hint), swap(a, b, m.name, hint));
+        } else {
+            List<String> lack = files.stream().filter(f -> !have.contains(f)).map(f -> f.name).toList();
+            report("bundle.key", Severity.WARNING, a, b, Msg.t("bundle.key.some", m.name, base.trim(), String.join(", ", lack)), keyTarget(have.get(0), m.name));
+        }
+    }
+
+    static List<Rules.Target> keyTarget(Workspace.BundleFile f, String key) {
+        return f.file == null ? List.of() : List.of(new Rules.Target(f.name + ":" + f.keys.get(key), f.file, f.keys.get(key)));
+    }
+
+    /** the f:loadBundle a name refers to here, or null */
+    Decl bundleDecl(Site s, El.Ref r) {
+        String attrName = s.attr == null ? null : s.attr.name;
+        Decl found = null;
+        for (Decl d : decls) {
+            if (d.name.equals(r.name) && visible(d, s.el, attrName, s.x.off(r.a)) && (found == null || d.el.start >= found.el.start)) {
+                found = d;
+            }
+        }
+        return found != null && found.kind.equals("f:loadBundle") ? found : null;
     }
 
     /** the name is a resource bundle here: the f:loadBundle var it refers to, or a resource-bundle var of faces-config */

@@ -96,6 +96,7 @@ public final class Rules {
         ALL.put("el.immediate", Msg.t("rule.el.immediate"));
         ALL.put("origin", Msg.t("rule.origin"));
         ALL.put("css.class", Msg.t("rule.css.class"));
+        ALL.put("bundle.key", Msg.t("rule.bundle.key"));
     }
 
     public static final Predicate<String> ALL_ON = r -> true;

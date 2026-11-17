@@ -3,7 +3,7 @@
   <ui:param name="notUsed" value="x"/><!--W:unused-->
   <h:outputText value="lost"/><!--E:tpl.define-->
   <ui:define name="content">
-    <h:outputText value="#{customerVM.title} #{msg['hello']} #{reportService.name} #{defaultCustomer.name} #{freshBean}"/><!--I:origin--><!--S:el.bundle-->
+    <h:outputText value="#{customerVM.title} #{msg['hello']} #{reportService.name} #{defaultCustomer.name} #{freshBean}"/><!--I:origin I:bundle.key-->
     <h:outputText value="#{customerVn.title}"/><!--E:el.unknown-->
     <h:outputText value="#{customerVM.titl}"/><!--E:el.member-->
     <h:outputText value="#{customerVM.customer.namee}"/><!--E:el.member-->

@@ -84,6 +84,11 @@ for fx in fixture fixture-resolver; do
       contains "a method called with the wrong number of arguments says how many it takes, and goes to it" "$out" \
         "The method 'format' of CustomerVM takes 1 argument, not 2.  «format»  → ../java/app/CustomerVM.java:14"
       contains "with overloads, every number it takes" "$out" "The method 'pick' of CustomerVM takes 1 or 3 arguments, not 2."
+      # a fixed key of a bundle: in every .properties, in none, or only in some
+      contains "a bundle key goes to where it is" "$out" "«save»  → ../resources/messages.properties:2"
+      contains "a key in no file of the bundle is an error, with the close one" "$out" "The key 'savee' is in no file of the bundle messages. Did you mean 'save'"
+      contains "and Trocar por" "$out" "«savee»  → ../resources/messages.properties:2  ⇒ save"
+      contains "a key only in some files says which ones lack it" "$out" "The key 'onlyBase' of the bundle messages is not in messages_pt.properties."
       contains "also after another call" "$out" "«toUpperCas»  ⇒ toUpperCase"
       contains "facesContext has its type (as in NetBeans)" "$out" "«requestContextPat»  ⇒ requestContextPath"
       contains "a bean read through its scope is that bean" "$out" "«titel»  → ../java/app/CustomerVM.java:12  ⇒ title"
