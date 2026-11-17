@@ -653,12 +653,51 @@ contains "the menu lists the JSF projects to analyze" "$out" "Other folder..."
 
 contains "a long path is cut at the start, so the line fits" "$out" "… with a very long name/that goes on and on/web"
 check "no line of the list is wider than the terminal" python3 -c 'import sys; sys.exit(any(len(l) > 60 for l in sys.argv[1].splitlines() if l.lstrip(" >").startswith("web ")))' "$out"
-keys '\033[B\033[B\r\r\r' "bash '$NBKIT_DIR/nbkit.sh' --lang en"; asked="$KEYS_OUT"
+# Enter for each question: the project, the explanation of a file, collecting what NetBeans marks (no)
+keys '\033[B\033[B\r\r\r\r' "bash '$NBKIT_DIR/nbkit.sh' --lang en"; asked="$KEYS_OUT"
 contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain how each name of the EL of one file was resolved? [y/N]"
 
 out="$(nbkit --lang en debug jsf maybe)"; rc=$?
 check "an unknown debug option fails" test "$rc" = 1
 contains "and shows how to use it" "$out" "Usage: nbkit debug jsf on|off|log [userdir]"
+
+echo "Analyze: collecting what NetBeans marks for a project of modules"
+if command -v java >/dev/null 2>&1 || ls /usr/lib/jvm/*/bin/java >/dev/null 2>&1; then
+  FH="$WORK/colhome"; FU="$FH/.netbeans/31"; new_home "$FH"
+  mkdir -p "$FU/modules" "$WORK/colnb/bin"; : > "$FU/modules/nbkit-jsf.jar"; printf 'nbkit/core/CloseOption' > "$FU/modules/nbkit-core.jar"
+  EV="$WORK/col-events"
+  # a NetBeans that only answers the collection requests of nbkit, writing down what happens to it
+  cat > "$WORK/colnb/bin/netbeans" <<'X'
+#!/bin/bash
+UD="$HOME/.netbeans/31"
+case " $* " in *" --nbkit-close "*) echo close >> "$COL_EVENTS"; pkill -f "nbkit-fake-""collector"; rm -f "$UD/lock"; exit 0 ;; esac
+echo open >> "$COL_EVENTS"
+: > "$UD/lock"; echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
+nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then p="$(cat "$r")"; rm "$r"; echo "collect ${p##*/}" >> "$COL_EVENTS"; mkdir -p "$HOME/.cache/nbkit/collect"; printf "# nbkit NetBeans marks 1\n" > "$HOME/.cache/nbkit/collect/x.tsv"; echo "$HOME/.cache/nbkit/collect/x.tsv" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.2; done' "nbkit-fake-""collector" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
+X
+  chmod +x "$WORK/colnb/bin/netbeans"
+  M2="$WORK/mono2"
+  for m in a b; do
+    mkdir -p "$M2/$m/src/main/webapp" "$M2/$m/target/classes"; printf '<project/>' > "$M2/$m/pom.xml"; printf '<html/>\n' > "$M2/$m/src/main/webapp/p.xhtml"
+  done
+  printf '<project/>' > "$M2/pom.xml"
+  : > "$EV"
+  out="$(HOME="$FH" NB_HOME="$WORK/colnb" COL_EVENTS="$EV" NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false bash "$NBKIT_DIR/nbkit.sh" --lang en analyze jsf "$M2" --netbeans </dev/null 2>&1)"
+  check "--netbeans on a project of 2 modules: opens NetBeans once, collects each module in turn, closes it once" \
+    test "$(paste -sd' ' "$EV")" = "open collect a collect b close"
+  : > "$EV"
+  # yes to collecting; the yes to closing only after the collections (a key typed while it waits cancels the wait)
+  KEYS_OUT="$({ printf 'y\r'; sleep 6; printf 'y\r'; } | timeout 60 script -qec "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2'" /dev/null 2>&1 \
+    | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
+  check "it ends by itself, not at the time limit" test "$?" != 124
+  check "in the interface or the menu it asks once for all the modules" test "$(grep -c 'Collect what NetBeans marks on these 2 modules' <<<"$KEYS_OUT")" = 1
+  contains "listing each module and why" "$KEYS_OUT" "a: no collection"
+  contains "the other one too" "$KEYS_OUT" "b: no collection"
+  check "and then opens once, collects both and closes once (asked at the end)" test "$(paste -sd' ' "$EV")" = "open collect a collect b close"
+  pkill -f "nbkit-fake-""collector" 2>/dev/null
+else
+  echo "  skipped: no Java here"
+fi
 
 echo "Build only when the code changed"
 # a copy of this nbkit, so its jars and src/ can be changed; mark_jar <jar> [mark]: the jar with that mark in its

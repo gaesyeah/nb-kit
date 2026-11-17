@@ -122,6 +122,115 @@ analyze_one() {
     2> >(grep -v '^Picked up JAVA_TOOL_OPTIONS' >&2) || rc=$?
   return "$rc"
 }
+# ---------- the comparison with NetBeans (what the JSF module collects in NetBeans, nb/Collector) ----------
+# the userdir with the JSF module (UD and CORE_JAR, for opening and closing NetBeans); none: 1
+collection_ud() {
+  local d
+  for d in $(list_userdirs); do
+    if [ -e "$d/modules/nbkit-jsf.jar" ]; then UD="$d"; CORE_JAR="$UD/modules/nbkit-core.jar"; return 0; fi
+  done
+  return 1
+}
+# the collection of a project: "missing", or "ok|stale <date>" and then one change per line (Analyze -Dnbkit.collection.check)
+collection_check() {
+  local nbv=""
+  if collection_ud; then nbv="$(sed -n 's/^ *Product Version *= *//p' "$UD/var/log/messages.log" 2>/dev/null | tail -1 | sed 's/ *(.*//')"; fi
+  "$JAVA" -Dnbkit.collection.check=1 ${NBKIT_COLLECTION:+"-Dnbkit.collection.file=$NBKIT_COLLECTION"} ${nbv:+"-Dnbkit.netbeans=$nbv"} \
+    -cp "$JAR" nbkit.jsf.Analyze "$1" 2> >(grep -v '^Picked up JAVA_TOOL_OPTIONS' >&2)
+}
+# up to 5 names, then "... and N more"
+few() {
+  local n=$# out
+  out="$(printf '%s, ' "${@:1:5}")"; out="${out%, }"
+  if [ "$n" -gt 5 ]; then out="$out $(t cli.and_more $((n - 5)))"; fi
+  printf '%s' "$out"
+}
+# what changed since the collection, a line per kind (the lines of collection_check after the first)
+collection_changes() {
+  local l nb="" changed=() new=() removed=() classes=()
+  for l in "$@"; do
+    case "$l" in
+      netbeans\ *) nb="${l#netbeans }" ;;
+      changed\ *) changed+=("${l#changed }") ;;
+      new\ *) new+=("${l#new }") ;;
+      removed\ *) removed+=("${l#removed }") ;;
+      classes\ *) classes+=("${l#classes }") ;;
+    esac
+  done
+  if [ -n "$nb" ]; then echo "      $(t cli.collect_change_netbeans "${nb% *}" "${nb#* }")"; fi
+  if [ ${#changed[@]} -gt 0 ]; then echo "      $(t cli.collect_change_changed "$(few "${changed[@]}")")"; fi
+  if [ ${#new[@]} -gt 0 ]; then echo "      $(t cli.collect_change_new "$(few "${new[@]}")")"; fi
+  if [ ${#removed[@]} -gt 0 ]; then echo "      $(t cli.collect_change_removed "$(few "${removed[@]}")")"; fi
+  if [ ${#classes[@]} -gt 0 ]; then echo "      $(t cli.collect_change_classes "$(few "${classes[@]}")")"; fi
+  return 0
+}
+# before analyzing: the projects (one, or the modules of a parent) whose collection is missing or out of date. Menu
+# and interface: asks once for all of them, listing each and what changed; --netbeans: collects without asking;
+# otherwise (arguments) only warns. A project not collected again is compared with its old collection all the same,
+# saying it may be out of date
+netbeans_collections() {
+  local d lines=() ask=0 need=() label
+  declare -A st=() date=() changes=()
+  for d in "$@"; do
+    mapfile -t lines < <(collection_check "$d")
+    [ "${lines[0]%% *}" = ok ] && continue
+    need+=("$d"); st[$d]="${lines[0]%% *}"; date[$d]="${lines[0]#* }"
+    changes[$d]="$(collection_changes "${lines[@]:1}")"
+  done
+  [ ${#need[@]} -gt 0 ] || return 0
+  { [ "${MENU:-0}" = 1 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && ask=1
+  local go=0
+  if [ "${NBKIT_NETBEANS:-}" = 1 ]; then
+    go=1
+  elif [ $ask = 1 ] && collection_ud; then
+    echo
+    if [ $# = 1 ]; then
+      [ -n "${changes[${need[0]}]}" ] && echo "${changes[${need[0]}]}"
+      if [ "${st[${need[0]}]}" = missing ]; then label="$(t cli.collect_ask_missing)"; else label="$(t cli.collect_ask_stale "${date[${need[0]}]}")"; fi
+    else
+      for d in "${need[@]}"; do
+        if [ "${st[$d]}" = missing ]; then echo "    $(t cli.collect_module_missing "${d##*/}")"
+        else echo "    $(t cli.collect_module_stale "${d##*/}" "${date[$d]}")"; [ -n "${changes[$d]}" ] && echo "${changes[$d]}"; fi
+      done
+      label="$(t cli.collect_ask_modules "${#need[@]}")"
+    fi
+    ask_yn "  $label" N && go=1
+  fi
+  COLLECTED=()
+  if [ $go = 1 ]; then collect_all $ask "${need[@]}"; fi
+  for d in "${need[@]}"; do
+    [[ " ${COLLECTED[*]} " == *" $d "* ]] && continue
+    [ $# -gt 1 ] && echo "  ${d##*/}"
+    if [ "${st[$d]}" = missing ]; then info "$(t cli.collect_missing)"; continue; fi
+    warn "$(t cli.collect_stale "${date[$d]}")"
+    [ -n "${changes[$d]}" ] && echo "${changes[$d]}"
+  done
+  return 0
+}
+collect_ended() { [ -f "$HOME/.cache/nbkit/collect-done" ] || [ "$(date +%s)" -ge "$COLLECT_UNTIL" ]; }
+# opens NetBeans once if it is closed, asks the JSF module to collect each project in turn, waiting for each
+# (NBKIT_COLLECT_TIMEOUT seconds, 600), and closes NetBeans once at the end if it opened it (asking, when someone can
+# answer). COLLECTED: the projects collected
+collect_all() {
+  local ask="$1" opened=0 c="$HOME/.cache/nbkit" limit="${NBKIT_COLLECT_TIMEOUT:-600}" d; shift
+  collection_ud || { warn "$(t cli.collect_no_module)"; return 1; }
+  if ! nb_running; then
+    find_launcher || { warn "$(t cli.collect_no_launcher)"; return 1; }
+    open_netbeans; opened=1
+    spin_until "$(t cli.waiting_open)" nb_running && spin_until "$(t cli.waiting_modules)" nb_loaded || return 1
+  fi
+  mkdir -p "$c"
+  for d in "$@"; do
+    rm -f "$c/collect-done"; printf '%s\n' "$d" > "$c/collect-request"
+    COLLECT_UNTIL=$(( $(date +%s) + limit ))
+    # a key cancels the wait: the rest is not collected
+    spin_until "$(t cli.collect_waiting) (${d##*/})" collect_ended || { info "$(t cli.cancelled)"; break; }
+    if [ -f "$c/collect-done" ]; then ok "$(t cli.collect_done)"; COLLECTED+=("$d"); else warn "$(t cli.collect_timeout "$limit")"; break; fi
+  done
+  if [ $opened = 1 ] && { [ "$ask" = 0 ] || ask_yn "  $(t cli.collect_ask_close)" N; }; then close_netbeans; fi
+  return 0
+}
+
 # without the compiled classes every bean would be unknown: errors that are not there
 not_compiled() { [ -f "$1/pom.xml" ] && [ ! -d "$1/target/classes" ]; }
 
@@ -150,9 +259,14 @@ jsf_analyze() {
   if [ ${#mods[@]} = 0 ]; then
     if not_compiled "$dir"; then die "$(t cli.analyze_no_classes "${dir/#$HOME/\~}")"; fi
     echo "  ${B}$(t cli.menu_analyze)${N}  ${dir/#$HOME/\~}"
+    netbeans_collections "$dir"
     analyze_one "$dir"; return $?
   fi
   echo "  ${B}$(t cli.menu_analyze)${N}  ${dir/#$HOME/\~}  ${D}$(t cli.analyze_modules "${#mods[@]}")${N}"
+  # the collection of what NetBeans marks: all the modules together (one question, NetBeans opened once)
+  local compiled=()
+  for m in "${mods[@]}"; do not_compiled "$m" || compiled+=("$m"); done
+  [ ${#compiled[@]} -gt 0 ] && netbeans_collections "${compiled[@]}"
   for m in "${mods[@]}"; do
     echo
     echo "  ${BL}${m#"$dir"/}${N}"

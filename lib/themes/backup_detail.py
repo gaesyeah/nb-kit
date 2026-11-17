@@ -30,7 +30,7 @@ def list_lines(items):
     shown, more = cap(items)
     lines = list(shown)
     if more:
-        lines.append(T('theme.bd_and_more', more))
+        lines.append(T('cli.and_more', more))
     return lines
 
 

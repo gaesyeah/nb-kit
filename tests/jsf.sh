@@ -202,6 +202,40 @@ contains "and which page is new" "$out" "new src/main/webapp/pages/brand-new.xht
 contains "and which classes were compiled after it" "$out" "classes app.CustomerVM"
 rm "$W/proj/src/main/webapp/pages/brand-new.xhtml"
 contains "with no collection, nothing to compare" "$("$JAVA" -Dnbkit.collection.check=1 -Dnbkit.collection.file="$W/none.tsv" -cp "$W/nbkit-jsf.jar" nbkit.jsf.Analyze "$W/proj" 2>&1)" "missing"
+# the analyze side: with arguments it only warns, about a missing collection or one that may be out of date
+out="$(NBKIT_COLLECTION="$W/none.tsv" analyze "$W/proj")"
+contains "with no collection it says how to get one" "$out" "No collection of what NetBeans marks on this project: no comparison."
+out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")"
+contains "with an old one it warns, and compares with it anyway" "$out" "The collection of what NetBeans marks (2026-11-16T19:00:00Z) may be out of date; comparing with it anyway."
+contains "saying what changed" "$out" "changed pages: src/main/webapp/pages/compare.xhtml"
+contains "and still compares" "$out" "Comparison with NetBeans (collection of"
+# in a terminal that answers (the interface, the menu) it asks first; no: the old one
+out="$(printf 'n\n' | NBKIT_TTY=1 NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
+contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks (2026-11-16T19:00:00Z) is out of date. Collect it again? It opens NetBeans if it is closed."
+contains "no: it compares with the old one, warning" "$out" "may be out of date; comparing with it anyway."
+# --netbeans: collects without asking, with a NetBeans that only answers the request (and closes it, since it opened it)
+FH="$W/fakehome"; FU="$FH/.netbeans/31"
+mkdir -p "$FU/modules" "$FU/config" "$FU/var/log" "$W/fakenb/bin"
+: > "$FU/modules/nbkit-jsf.jar"; printf 'nbkit/core/CloseOption' > "$FU/modules/nbkit-core.jar"; : > "$FU/var/log/messages.log"
+cat > "$W/fakenb/bin/netbeans" <<'X'
+#!/bin/bash
+# a NetBeans that only answers the collection request of nbkit (tests/jsf.sh)
+UD="$HOME/.netbeans/31"
+case " $* " in *" --nbkit-close "*) pkill -f "nbkit-fake-""netbeans" ; rm -f "$UD/lock"; exit 0 ;; esac
+: > "$UD/lock"
+echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
+nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then rm "$r"; cp "$FAKE_MARKS" "$NBKIT_COLLECTION"; echo "$NBKIT_COLLECTION" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.2; done' "nbkit-fake-""netbeans" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
+X
+chmod +x "$W/fakenb/bin/netbeans"
+"$JAVA" -Dnbkit.write="$W/fresh.tsv" -cp "$W/nbkit:$W/compare" RunComparison "$W/proj" "$W/app" "$W/api.jar" "$W/primefaces.jar" >/dev/null 2>&1
+out="$(HOME="$FH" NB_HOME="$W/fakenb" FAKE_MARKS="$W/fresh.tsv" NBKIT_COLLECTION="$W/collected.tsv" NBKIT_COLLECT_TIMEOUT=30 analyze "$W/proj" --netbeans)"; rc=$?
+check "--netbeans exits with 0" test "$rc" = 0
+contains "it opens NetBeans" "$out" "opening NetBeans"
+contains "waits for the collection" "$out" "NetBeans collected what it marks."
+contains "and compares with the new one" "$out" "Comparison with NetBeans (collection of"
+lacks "the new one is up to date" "$out" "may be out of date"
+check "and closes NetBeans, since it opened it" bash -c '! pgrep -f "nbkit-fake-""netbeans"'
+pkill -f "nbkit-fake-""netbeans" 2>/dev/null
 # a project with no compiled classes: its beans are unknown, so unknown names are not checked
 mkdir -p "$W/bare/src/main/webapp" "$W/bare/target/classes" && printf '<project/>' > "$W/bare/pom.xml"
 printf '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html"><h:body><h:outputText value="#{someBean.x}"/></h:body></html>\n' > "$W/bare/src/main/webapp/a.xhtml"

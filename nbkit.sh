@@ -90,7 +90,11 @@ source "$NBKIT_DIR/lib/tools.sh"      # every folder in modules/tools/
 # analyze jsf <project> and debug jsf on|off|log [userdir]: their own arguments (a folder here is not a userdir)
 case "${1:-}" in
   analyze)
-    # analyze jsf <project> | analyze jsf <project> --explain <file> | analyze jsf --explain <file> (project found from the file)
+    # analyze jsf <project> | analyze jsf <project> --explain <file> | analyze jsf --explain <file> (project found from the file);
+    # --netbeans anywhere: collect what NetBeans marks without asking (opens it if closed, see lib/analyze.sh)
+    args=()
+    for a in "$@"; do if [ "$a" = --netbeans ]; then export NBKIT_NETBEANS=1; else args+=("$a"); fi; done
+    set -- "${args[@]}"
     [ "${2:-}" = jsf ] || die "$(t cli.analyze_usage)"
     if [ "${3:-}" = --explain ] && [ $# = 4 ]; then header; jsf_analyze "" "$4"; exit $?; fi
     { [ $# -le 3 ] || { [ $# = 5 ] && [ "$4" = --explain ]; }; } || die "$(t cli.analyze_usage)"

@@ -158,8 +158,11 @@ menu() {
 spin_until() {
   local sp='|/-\' i=0 k cancel; cancel="$(t cli.enter_cancels)"
   printf '\e[?25l'; trap 'printf "\r\e[K\e[?25h"; exit 130' INT
+  # the keyboard is read only when someone can answer (a terminal, the interface); otherwise it only waits
+  local keys=0; { [ -t 0 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && keys=1
   while ! "$2"; do
     printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$1" "$D" "$cancel" "$N"; i=$((i + 1))
+    if [ $keys = 0 ]; then sleep 0.25; continue; fi
     if IFS= read -rsn1 -t 0.25 k </dev/tty; then
       IFS= read -rsn5 -t 0.05 k </dev/tty || true
       printf '\r\e[K\e[?25h'; trap 'exit 130' INT; return 1
