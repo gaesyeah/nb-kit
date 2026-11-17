@@ -17,7 +17,7 @@
     <h:panelGroup styleClass="real-clas">case 4b</h:panelGroup>
     <!-- case 5: a class with EL (skipped by nbkit, css.el: known only at runtime; NetBeans does not check it either) -->
     <h:panelGroup styleClass="#{greeter.name}">case 5</h:panelGroup>
-    <!-- case 6: a class with no CSS rule and no close name (skipped by nbkit, css.none: often a JavaScript hook; NetBeans Missing CSS Class marks it) -->
+    <!-- case 6: a class with no CSS rule, no close name and no use in the project's JavaScript (nbkit warning css.class; NetBeans Missing CSS Class marks it too: agree) -->
     <div class="zz-hook">case 6</div>
     <!-- case 7: a bean method called with the wrong number of arguments, count takes one (nbkit error el.member, saying it takes 1 argument; NetBeans Identifiers marks it too: agree) -->
     <h:outputText value="#{greeter.count('a', 'b')}"/>

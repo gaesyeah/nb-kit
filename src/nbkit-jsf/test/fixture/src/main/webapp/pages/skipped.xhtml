@@ -13,7 +13,7 @@
     <p:commandButton value="x" update="#{customerVM.title}"/><!--S:id.el-->
     <h:panelGroup id="#{customerVM.title}"/><!--S:idattr.el-->
     <h:panelGroup styleClass="#{customerVM.title}"/><!--S:css.el-->
-    <div class="zz-hook">hook</div><!--S:css.none-->
+    <div class="zz-hook">hook</div><!--W:css.class-->
     <h:outputStylesheet name="#{customerVM.title}"/><!--S:css.sheet.el S:res.el-->
     <h:commandButton value="x"><f:ajax event="#{customerVM.title}"/></h:commandButton><!--S:ajax.el-->
     <h:commandButton value="Next" action="#{customerVM.nextPage}"/><!--S:nav.el-->

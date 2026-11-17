@@ -112,10 +112,10 @@ public final class Rules {
 
     static {
         for (String r : new String[]{"el.dynamic", "el.index", "var.el", "id.el", "id.dynamic", "idattr.el", "widgetvar.dynamic",
-            "tpl.dynamic", "css.el", "css.sheet.el", "res.el", "ajax.el", "cc.dynamic"}) {
+            "tpl.dynamic", "css.el", "css.external", "css.sheet.el", "res.el", "ajax.el", "cc.dynamic"}) {
             SKIP_REASONS.put(r, SkipGroup.STATIC);
         }
-        for (String r : new String[]{"el.incomplete", "el.impl", "el.untyped", "el.stream", "el.bundle", "el.nobeans", "css.none",
+        for (String r : new String[]{"el.incomplete", "el.impl", "el.untyped", "el.stream", "el.bundle", "el.nobeans",
             "css.nosheet", "nav.el"}) {
             SKIP_REASONS.put(r, SkipGroup.GAP);
         }

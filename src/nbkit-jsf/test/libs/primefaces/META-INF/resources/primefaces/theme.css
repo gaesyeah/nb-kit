@@ -1,1 +1,3 @@
-/*x*/
+/* the theme of the component library: its classes are known (the components write them) */
+.ui-widget { font-size: 1em; }
+.ui-state-error { color: red; }

@@ -2413,10 +2413,15 @@ public final class Analyzer {
         for (File root : g.roots(file)) {
             view.addAll(g.composed(root));
         }
+        boolean external = false; // the view loads a stylesheet nbkit does not read (an external href)
         for (File x : view) {
             FileFacts xf = ws.facts(x);
             if (xf == null) {
                 continue;
+            }
+            for (Xml.Element e : xf.doc.all) {
+                String href = e.local.equals("link") ? e.value("href") : null;
+                external |= href != null && href.trim().matches("(?i)(https?:)?//.*");
             }
             for (Object[] sheet : stylesheets(x, xf.doc)) {
                 File css = (File) sheet[0];
@@ -2445,31 +2450,38 @@ public final class Analyzer {
                     skip("css.class", "css.el", a); // EL with a value known only at runtime
                     tokens = classTokens(blankEl(a.value)); // the words outside it are still checked
                 }
-                if (where.isEmpty()) {
-                    if (!tokens.isEmpty()) {
-                        skip("css.class", "css.nosheet", a);
-                    }
-                    continue;
-                }
+                boolean nosheet = false;
                 for (int[] t : tokens) {
                     String c = a.value.substring(t[0], t[1]);
                     if (own.contains(c)) {
                         continue; // a class of a stylesheet this file loads itself
                     }
                     int s0 = a.offset(t[0]), s1 = a.offset(t[1]);
+                    Rules.Target js = ws.jsClasses().get(c);
+                    String[] jar = ws.jarClasses().get(c);
+                    String hint = closest(c, where.keySet());
                     if (where.containsKey(c)) {
                         note("css.class", s0, s1, "origin.css", c, where.get(c));
+                    } else if (js != null) {
+                        // no rule, but a hook of the project's JavaScript
+                        File w = ws.webrootOf(js.file);
+                        report("css.class", Severity.INFO, s0, s1, Msg.t("css.js", c, w == null ? js.file.getName()
+                                : w.toPath().relativize(js.file.toPath()).toString().replace('\\', '/'), js.line), List.of(js));
+                    } else if (jar != null) {
+                        report("css.class", Severity.INFO, s0, s1, Msg.t("css.jar", c, jar[0], jar[1])); // a component library's theme
+                    } else if (hint != null) {
+                        report("css.class", Severity.INFO, s0, s1, Msg.t("css.none", c) + Msg.hint(hint, where.get(hint).get(0)),
+                                targets(where.get(hint).get(0)), swap(s0, s1, c, hint));
+                    } else if (external) {
+                        skip("css.class", "css.external", s0, s1);
+                    } else if (where.isEmpty()) {
+                        nosheet = true;
                     } else {
-                        // no rule: often on purpose (a hook for JavaScript, a CSS of a jar or CDN); said only when
-                        // a rule with a close name exists, as a possible typo
-                        String hint = closest(c, where.keySet());
-                        if (hint != null) {
-                            report("css.class", Severity.INFO, s0, s1, Msg.t("css.none", c) + Msg.hint(hint, where.get(hint).get(0)),
-                                    targets(where.get(hint).get(0)), swap(s0, s1, c, hint));
-                        } else {
-                            skip("css.class", "css.none", s0, s1);
-                        }
+                        report("css.class", Severity.WARNING, s0, s1, Msg.t("css.missing", c));
                     }
+                }
+                if (nosheet) {
+                    skip("css.class", "css.nosheet", a);
                 }
             }
         }

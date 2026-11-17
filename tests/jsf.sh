@@ -90,6 +90,11 @@ for fx in fixture fixture-resolver; do
       contains "and Trocar por" "$out" "«savee»  → ../resources/messages.properties:2  ⇒ save"
       contains "a key only in some files says which ones lack it" "$out" "The key 'onlyBase' of the bundle messages is not in messages_pt.properties."
       contains "a class picked by EL among fixed texts is checked, each in its place" "$out" "«panel-titl»  → resources/css/app.css:3  ⇒ panel-title"
+      contains "a class the project's JavaScript uses says where, and goes there" "$out" "«js-hook»  → resources/js/app.js:1"
+      contains "also from classList with more than one class" "$out" "«second-arg»  → resources/js/app.js:3"
+      contains "and from a script inside a page" "$out" "«inline-hook»  → pages/scripted.xhtml:7"
+      contains "a class of a jar's CSS says which jar" "$out" "'ui-widget' comes from primefaces/theme.css in primefaces.jar."
+      contains "a class in no CSS and no JavaScript is a warning" "$out" "The class 'nowhere-at-all' has no CSS rule and is not used by the project's JavaScript."
       contains "an outcome returned by an action method is checked, and goes to the method" "$out" \
         "The page 'nowhere.xhtml' does not exist (returned by toNowhere() of CustomerVM).  «#{customerVM.toNowhere}»  → ../java/app/CustomerVM.java:"
       contains "also after another call" "$out" "«toUpperCas»  ⇒ toUpperCase"
@@ -132,7 +137,7 @@ contains "the limits of any static check" "$out" "Limits of any static check"
 contains "and the gaps nbkit can close" "$out" "Gaps nbkit can close"
 contains "each reason with its rule and count" "$out" "Map or Object value (the rest of the expression is not checked)  [el.member]:"
 contains "and where, file:line:column" "$out" "src/main/webapp/pages/skipped.xhtml:4:"
-contains "the class of the stylesheets that has no rule and no close name" "$out" "class with no CSS rule and no close name (often a JavaScript or component hook)  [css.class]:"
+contains "a page with a stylesheet nbkit does not read leaves its unknown classes unchecked" "$out" "the page loads a stylesheet nbkit does not read (an external href): a class not found is not checked  [css.class]:"
 rm -rf "$W/proj/target"
 out="$(analyze "$W/proj")"; rc=$?
 check "analyze refuses a Maven project not compiled" test "$rc" = 1

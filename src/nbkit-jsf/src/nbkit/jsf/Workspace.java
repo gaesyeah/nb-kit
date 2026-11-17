@@ -247,6 +247,8 @@ public final class Workspace {
         facesVars.clear();
         facesBundles.clear();
         bundles.clear();
+        jsClasses = null;
+        jarClasses = null;
         navOutcomes.clear();
         tagTypes.clear();
         componentClasses.clear();
@@ -575,6 +577,108 @@ public final class Workspace {
         } catch (IOException | RuntimeException ex) {
             // ignore
         }
+    }
+
+    // ---------- classes of the project's JavaScript and of the jars' CSS (css.class), read once ----------
+
+    /** a selector given to jQuery or the DOM: its .classes */
+    static final Pattern JS_SELECTOR = Pattern.compile("(?:\\$|jQuery|querySelector(?:All)?|closest|find|matches)\\s*\\(\\s*(['\"])(.*?)\\1");
+    /** class names given one by one: getElementsByClassName, classList.add/remove/toggle/contains/replace, addClass... */
+    static final Pattern JS_NAMES = Pattern.compile("(?:getElementsByClassName|classList\\s*\\.\\s*(?:add|remove|toggle|contains|replace)|addClass|removeClass|toggleClass|hasClass)\\s*\\(([^)]*)\\)");
+    static final Pattern QUOTED = Pattern.compile("(['\"])(.*?)\\1");
+    static final Pattern DOT_CLASS = Pattern.compile("\\.(-?[_a-zA-Z][\\w-]*)");
+
+    private Map<String, Rules.Target> jsClasses;
+    private Map<String, String[]> jarClasses;
+
+    /** class -> where the project's JavaScript first uses it: the .js of the web folders and the script elements of the pages */
+    public synchronized Map<String, Rules.Target> jsClasses() {
+        if (jsClasses != null) {
+            return jsClasses;
+        }
+        Map<String, Rules.Target> r = new HashMap<>();
+        List<File> js = new ArrayList<>();
+        for (File w : webroots) {
+            try (var s = Files.walk(w.toPath())) {
+                s.filter(p -> p.toString().endsWith(".js") && !p.toString().contains("/node_modules/")).sorted().forEach(p -> js.add(p.toFile()));
+            } catch (IOException | RuntimeException ex) {
+                // ignore
+            }
+        }
+        for (File f : js) {
+            try {
+                jsUses(Files.readString(f.toPath(), StandardCharsets.UTF_8), 0, f, null, r);
+            } catch (IOException | RuntimeException ex) {
+                // unreadable: no classes
+            }
+        }
+        for (File x : xhtmlFiles()) {
+            FileFacts ff = facts(x);
+            for (Xml.Element e : ff == null ? List.<Xml.Element>of() : ff.doc.all) {
+                if (e.local.equals("script") || e.local.equals("outputScript")) {
+                    for (Xml.Node n : e.children) {
+                        if (n instanceof Xml.Text t) {
+                            jsUses(t.raw, n.start, x, ff.doc, r);
+                        }
+                    }
+                }
+            }
+        }
+        jsClasses = r;
+        return r;
+    }
+
+    private static void jsUses(String text, int base, File f, Xml.Doc doc, Map<String, Rules.Target> out) {
+        for (Matcher m = JS_SELECTOR.matcher(text); m.find();) {
+            for (Matcher c = DOT_CLASS.matcher(m.group(2)); c.find();) {
+                jsUse(c.group(1), text, m.start(), base, f, doc, out);
+            }
+        }
+        for (Matcher m = JS_NAMES.matcher(text); m.find();) {
+            for (Matcher q = QUOTED.matcher(m.group(1)); q.find();) {
+                for (String c : q.group(2).trim().split("\\s+")) {
+                    if (!c.isEmpty()) {
+                        jsUse(c, text, m.start(), base, f, doc, out);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void jsUse(String cls, String text, int at, int base, File f, Xml.Doc doc, Map<String, Rules.Target> out) {
+        if (!out.containsKey(cls)) {
+            int line = doc != null ? doc.line(base + at) : (int) text.substring(0, at).chars().filter(ch -> ch == '\n').count() + 1;
+            out.put(cls, new Rules.Target(f.getName() + ":" + line, f, line));
+        }
+    }
+
+    /** class -> { css path inside the jar (after META-INF/resources), jar name } for the CSS of the classpath jars */
+    public synchronized Map<String, String[]> jarClasses() {
+        if (jarClasses != null) {
+            return jarClasses;
+        }
+        Map<String, String[]> r = new HashMap<>();
+        for (File root : classRoots) {
+            if (!root.isFile()) {
+                continue;
+            }
+            try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(root)) {
+                for (var en = z.entries(); en.hasMoreElements();) {
+                    var e = en.nextElement();
+                    if (e.getName().startsWith("META-INF/resources/") && e.getName().endsWith(".css")) {
+                        try (var in = z.getInputStream(e)) {
+                            for (String c : Analyzer.cssClasses(new String(in.readAllBytes(), StandardCharsets.UTF_8)).keySet()) {
+                                r.putIfAbsent(c, new String[]{e.getName().substring("META-INF/resources/".length()), root.getName()});
+                            }
+                        }
+                    }
+                }
+            } catch (IOException | RuntimeException ex) {
+                // ignore
+            }
+        }
+        jarClasses = r;
+        return r;
     }
 
     // ---------- resource bundles ----------
