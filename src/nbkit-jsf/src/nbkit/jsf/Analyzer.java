@@ -2440,22 +2440,23 @@ public final class Analyzer {
                 if (!a.name.equals("class") && !a.name.equals("styleClass") || a.value.isBlank()) {
                     continue;
                 }
-                if (a.value.contains("{")) {
-                    skip("css.class", "css.el", a);
+                List<int[]> tokens = classTokens(a.value);
+                if (tokens == null) {
+                    skip("css.class", "css.el", a); // EL with a value known only at runtime
+                    tokens = classTokens(blankEl(a.value)); // the words outside it are still checked
                 }
                 if (where.isEmpty()) {
-                    if (!a.value.contains("{")) {
+                    if (!tokens.isEmpty()) {
                         skip("css.class", "css.nosheet", a);
                     }
                     continue;
                 }
-                Matcher m = Pattern.compile("[^\\s]+").matcher(a.value);
-                while (m.find()) {
-                    String c = m.group();
-                    if (c.contains("{") || c.contains("}") || own.contains(c)) {
-                        continue; // EL, or a class of a stylesheet this file loads itself
+                for (int[] t : tokens) {
+                    String c = a.value.substring(t[0], t[1]);
+                    if (own.contains(c)) {
+                        continue; // a class of a stylesheet this file loads itself
                     }
-                    int s0 = a.offset(m.start()), s1 = a.offset(m.end());
+                    int s0 = a.offset(t[0]), s1 = a.offset(t[1]);
                     if (where.containsKey(c)) {
                         note("css.class", s0, s1, "origin.css", c, where.get(c));
                     } else {
@@ -2472,6 +2473,121 @@ public final class Analyzer {
                 }
             }
         }
+    }
+
+    /**
+     * The classes of a class attribute, as [start, end) in its value: the words outside EL, and those of the fixed
+     * texts an EL can only pick (#{on ? 'a b' : 'c'}, nested too); null when an EL gives a value known only at runtime
+     */
+    static List<int[]> classTokens(String v) {
+        List<int[]> spans = new ArrayList<>();
+        int from = 0;
+        for (int i = 0; i < v.length(); i++) {
+            if ((v.charAt(i) == '#' || v.charAt(i) == '$') && i + 1 < v.length() && v.charAt(i + 1) == '{') {
+                int end = elEnd(v, i + 2);
+                spans.add(new int[]{from, i});
+                List<int[]> fixed = end < 0 ? null : fixedTexts(v, i + 2, end);
+                if (fixed == null) {
+                    return null;
+                }
+                spans.addAll(fixed);
+                i = end;
+                from = end + 1;
+            }
+        }
+        spans.add(new int[]{from, v.length()});
+        List<int[]> r = new ArrayList<>();
+        for (int[] sp : spans) {
+            Matcher m = Pattern.compile("[^\\s]+").matcher(v.substring(sp[0], sp[1]));
+            while (m.find()) {
+                r.add(new int[]{sp[0] + m.start(), sp[0] + m.end()});
+            }
+        }
+        return r;
+    }
+
+    /** the value with each EL turned into spaces (offsets kept) */
+    static String blankEl(String v) {
+        StringBuilder b = new StringBuilder(v);
+        for (int i = 0; i + 1 < v.length(); i++) {
+            if ((v.charAt(i) == '#' || v.charAt(i) == '$') && v.charAt(i + 1) == '{') {
+                int end = elEnd(v, i + 2);
+                end = end < 0 ? v.length() - 1 : end;
+                for (int k = i; k <= end; k++) {
+                    b.setCharAt(k, ' ');
+                }
+                i = end;
+            }
+        }
+        return b.toString();
+    }
+
+    /** the index of the } that closes an EL whose text starts at i (quotes and inner braces skipped); -1 if none */
+    static int elEnd(String v, int i) {
+        int depth = 0;
+        char q = 0;
+        for (; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (q != 0) {
+                q = c == q ? 0 : q;
+            } else if (c == '\'' || c == '"') {
+                q = c;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}' && depth-- == 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** the contents of the fixed texts [from, to) can only give: a literal, or cond ? x : y of those; null otherwise */
+    static List<int[]> fixedTexts(String v, int from, int to) {
+        while (from < to && Character.isWhitespace(v.charAt(from))) {
+            from++;
+        }
+        while (to > from && Character.isWhitespace(v.charAt(to - 1))) {
+            to--;
+        }
+        if (to - from >= 2 && (v.charAt(from) == '\'' || v.charAt(from) == '"') && v.charAt(to - 1) == v.charAt(from)
+                && v.substring(from + 1, to - 1).indexOf(v.charAt(from)) < 0 && v.substring(from + 1, to - 1).indexOf('\\') < 0) {
+            return new ArrayList<>(List.of(new int[]{from + 1, to - 1}));
+        }
+        int question = -1, colon = -1, depth = 0, open = 0;
+        char q = 0;
+        for (int i = from; i < to; i++) {
+            char c = v.charAt(i);
+            if (q != 0) {
+                q = c == q ? 0 : q;
+            } else if (c == '\'' || c == '"') {
+                q = c;
+            } else if (c == '(' || c == '[' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == ']' || c == '}') {
+                depth--;
+            } else if (depth == 0 && c == '?') {
+                if (question < 0) {
+                    question = i;
+                } else {
+                    open++;
+                }
+            } else if (depth == 0 && c == ':' && question >= 0) {
+                if (open == 0) {
+                    colon = i;
+                    break;
+                }
+                open--;
+            }
+        }
+        if (question < 0 || colon < 0) {
+            return null;
+        }
+        List<int[]> a = fixedTexts(v, question + 1, colon), b = fixedTexts(v, colon + 1, to);
+        if (a == null || b == null) {
+            return null;
+        }
+        a.addAll(b);
+        return a;
     }
 
     // ---------- per element rules ----------

@@ -89,6 +89,7 @@ for fx in fixture fixture-resolver; do
       contains "a key in no file of the bundle is an error, with the close one" "$out" "The key 'savee' is in no file of the bundle messages. Did you mean 'save'"
       contains "and Trocar por" "$out" "«savee»  → ../resources/messages.properties:2  ⇒ save"
       contains "a key only in some files says which ones lack it" "$out" "The key 'onlyBase' of the bundle messages is not in messages_pt.properties."
+      contains "a class picked by EL among fixed texts is checked, each in its place" "$out" "«panel-titl»  → resources/css/app.css:3  ⇒ panel-title"
       contains "an outcome returned by an action method is checked, and goes to the method" "$out" \
         "The page 'nowhere.xhtml' does not exist (returned by toNowhere() of CustomerVM).  «#{customerVM.toNowhere}»  → ../java/app/CustomerVM.java:"
       contains "also after another call" "$out" "«toUpperCas»  ⇒ toUpperCase"

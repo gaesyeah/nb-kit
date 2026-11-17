@@ -5,7 +5,7 @@
   <cc:implementation>
     <!-- what the page writes inside the tag runs here, once per item, with _item and _itemStatus -->
     <ui:repeat value="#{cc.attrs.items}" var="_item" varStatus="_itemStatus"><!--S:el.untyped-->
-      <div class="slide #{_itemStatus.index}"><cc:insertChildren/></div><!--S:css.el-->
+      <div class="slide #{_itemStatus.index}"><cc:insertChildren/></div><!--S:css.el S:css.nosheet-->
     </ui:repeat>
   </cc:implementation>
 </ui:component>
