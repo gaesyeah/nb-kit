@@ -10,7 +10,7 @@
     <h:outputText value="#{customerVM.map.anyKey} #{customerVM.items.size()} #{customerVM.format('a')}"/><!--S:el.dynamic-->
     <h:outputText value="#{customerVM.save}"/><!--E:el.kind-->
     <p:commandButton value="x" action="#{customerVM.title}"/><!--E:el.kind--><!--S:nav.el-->
-    <p:commandButton value="x" action="#{customerVM.delete(customerVM.customer)}" update="table msgs @form"/><!--I:origin--><!--S:nav.el-->
+    <p:commandButton value="x" action="#{customerVM.delete(customerVM.customer)}" update="table msgs @form"/><!--I:origin-->
     <p:commandButton value="x" update="@from"/><!--E:id.keyword-->
     <p:commandButton value="x" update="tablee"/><!--E:id.missing-->
     <p:commandButton value="x" update="panel"/><!--W:id.rendered-->

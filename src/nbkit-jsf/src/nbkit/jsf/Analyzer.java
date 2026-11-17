@@ -2506,7 +2506,7 @@ public final class Analyzer {
                 if (a != null && !a.value.contains("{") && !a.value.isBlank()) {
                     navigation(a);
                 } else if (a != null && a.value.contains("{")) {
-                    skip("nav.missing", "nav.el", a); // the outcome is what the method returns
+                    actionByMethod(a); // the outcome is what the method returns
                 }
             }
             if (Set.of("h:button", "h:link", "p:button", "p:linkButton", "p:menuitem").contains(t)) {
@@ -2676,7 +2676,91 @@ public final class Analyzer {
     }
 
     void navigation(Xml.Attr a) {
-        String o = a.value.trim();
+        navigation(a.value, a.offset(0), a.offset(a.value.length()), null, null, List.of());
+    }
+
+    static final Pattern ACTION_METHOD = Pattern.compile("#\\{\\s*([A-Za-z_]\\w*(?:\\.[A-Za-z_]\\w*)+)\\s*(\\((.*)\\))?\\s*}");
+
+    /**
+     * action="#{bean.method}": the outcome is what the method returns. Void, or a body that only returns null, has
+     * nothing to check; a body that only returns fixed texts gets each one checked as a literal action (read from the
+     * Java source, as constantGetter does); anything else is known only at runtime (skipped)
+     */
+    void actionByMethod(Xml.Attr a) {
+        Matcher m = ACTION_METHOD.matcher(a.value.trim());
+        if (m.matches()) {
+            String[] parts = m.group(1).split("\\.");
+            String type = beanType(parts[0]);
+            for (int i = 1; type != null && i < parts.length - 1; i++) {
+                type = ws.classes.complete(type) ? ClassModel.classOf(ws.classes.members(type).getters.get(parts[i])) : null;
+            }
+            String name = parts[parts.length - 1];
+            List<ClassModel.MethodInfo> ms = type == null || !ws.classes.complete(type) ? null : ws.classes.members(type).methods.get(name);
+            if (ms != null && ms.stream().allMatch(mi -> mi.returnType().equals("V"))) {
+                return;
+            }
+            boolean noArgs = m.group(3) == null || m.group(3).isBlank();
+            List<String> outs = ms == null || !noArgs ? null : fixedReturns(type, name);
+            if (outs != null) {
+                for (String o : outs) {
+                    navigation(o, a.offset(0), a.offset(a.value.length()), name, ClassModel.display(type), javaTarget(type, name));
+                }
+                return;
+            }
+        }
+        skip("nav.missing", "nav.el", a);
+    }
+
+    /** the texts a no-argument method returns, when every return of its Java body is a fixed text or null; else null */
+    List<String> fixedReturns(String type, String method) {
+        Pattern head = Pattern.compile("\\b" + Pattern.quote(method) + "\\s*\\(\\s*\\)\\s*(?:throws[\\w.,\\s]+)?\\{");
+        Deque<String> todo = new ArrayDeque<>(List.of(type));
+        Set<String> seen = new HashSet<>();
+        while (!todo.isEmpty()) {
+            String c = todo.poll();
+            if (c == null || !seen.add(c)) {
+                continue;
+            }
+            File src = javaSource(c);
+            String text = src == null ? "" : String.join("\n", javaLines.computeIfAbsent(src, f -> {
+                try {
+                    return java.nio.file.Files.readAllLines(f.toPath());
+                } catch (java.io.IOException | RuntimeException e) {
+                    return List.of();
+                }
+            }));
+            Matcher h = head.matcher(text);
+            if (h.find()) {
+                int depth = 1, i = h.end();
+                while (i < text.length() && depth > 0) {
+                    depth += text.charAt(i) == '{' ? 1 : text.charAt(i) == '}' ? -1 : 0;
+                    i++;
+                }
+                Matcher r = Pattern.compile("\\breturn\\b\\s*([^;]*);").matcher(text.substring(h.end(), i));
+                List<String> out = new ArrayList<>();
+                boolean any = false;
+                while (r.find()) {
+                    String v = r.group(1).trim();
+                    any = true;
+                    if (v.matches("\"[^\"\\\\]*\"")) {
+                        out.add(v.substring(1, v.length() - 1));
+                    } else if (!v.equals("null")) {
+                        return null; // computed: known only at runtime
+                    }
+                }
+                return any ? out : null;
+            }
+            ClassModel.ClassInfo ci = ws.classes.get(c);
+            if (ci != null && ci.superName != null) {
+                todo.add(ci.superName);
+            }
+        }
+        return null;
+    }
+
+    /** checks one outcome at [start, end); method and owner: the action method that returns it (null: a literal action) */
+    void navigation(String outcome, int start, int end, String method, String owner, List<Rules.Target> targets) {
+        String o = outcome.trim();
         int q = o.indexOf('?');
         String path = q >= 0 ? o.substring(0, q) : o;
         if (path.isEmpty() || ws.navOutcomes.contains(path) || path.startsWith("http") || path.startsWith("#")) {
@@ -2706,8 +2790,8 @@ public final class Analyzer {
                 return;
             }
         }
-        report("nav.missing", roots.isEmpty() ? Severity.WARNING : Severity.ERROR, a.offset(0), a.offset(a.value.length()),
-                Msg.t("nav.missing", path));
+        report("nav.missing", roots.isEmpty() ? Severity.WARNING : Severity.ERROR, start, end,
+                method == null ? Msg.t("nav.missing", path) : Msg.t("nav.missing.method", path, method, owner), targets);
     }
 
     // ---------- ids (8 to 13) ----------

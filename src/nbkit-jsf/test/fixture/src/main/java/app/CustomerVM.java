@@ -18,6 +18,15 @@ public class CustomerVM {
   public Customer[] getArray() { return null; }
   public outside.Thing getThing() { return null; }
   public String join(String... parts) { return ""; }
+  public String toList() { return "customers"; }
+  public String toNowhere() { return "nowhere"; }
+  public String branch() {
+    if (isCanEdit()) {
+      return "customers";
+    }
+    return "kinds?faces-redirect=true";
+  }
+  public String nextPage() { return getTitle(); }
   public void listen(jakarta.faces.event.ActionEvent e) { }
   public String pick(String a) { return a; }
   public String pick(String a, String b, String c) { return a; }

@@ -1,0 +1,11 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <!-- an action method whose body only returns fixed texts: each one is checked as a literal action -->
+    <h:commandButton value="a" action="#{customerVM.toList}"/>
+    <h:commandButton value="b" action="#{customerVM.toNowhere}"/><!--E:nav.missing-->
+    <h:commandButton value="c" action="#{customerVM.branch()}"/>
+    <!-- null (stay on the page) and void have nothing to check; what a method computes is known only at runtime -->
+    <h:commandButton value="d" action="#{customerVM.save}"/>
+    <h:commandButton value="e" action="#{customerVM.nextPage}"/><!--S:nav.el-->
+  </ui:define>
+</ui:composition>
