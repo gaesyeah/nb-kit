@@ -350,4 +350,30 @@ contains "a rule NetBeans did not run is not collected, saying why, instead of o
 contains "the pairs NetBeans rule -> nbkit rules, and the one nbkit turns off (NetBeansOverrides reads them)" "$out" \
   "MissingClassRule->[css.class] off org/netbeans/modules/csl/api/default/text_html_MissingClassRule"
 
+# tests/jsf-war crossed with a real collection of what NetBeans marks on it (tests/jsf-war/netbeans-marks.tsv, made in
+# NetBeans: nbkit.md, How to run): each case of its index.xhtml in the category of the table in the notes
+WAR="$NBKIT_DIR/tests/jsf-war"
+if [ -f "$WAR/netbeans-marks.tsv" ]; then
+  mkdir -p "$W/war" && cp -r "$WAR/src" "$WAR/pom.xml" "$W/war/" && mkdir -p "$W/war/target/classes"
+  mapfile -t src < <(java_files "$W/war/src/main/java")
+  compile -cp "$W/api.jar" -d "$W/war/target/classes" "${src[@]}"
+  # compiled long ago: the classes are not newer than the collection
+  find "$W/war/target/classes" -type f -exec touch -d '2000-01-01' {} +
+  # a home with no NetBeans: its version is not compared (the collection may come from another machine's NetBeans)
+  mkdir -p "$W/warhome"
+  out="$(HOME="$W/warhome" NBKIT_COLLECTION="$WAR/netbeans-marks.tsv" analyze "$W/war" --explain index.xhtml)"
+  lacks "jsf-war: the saved collection is up to date with the pages" "$out" "may be out of date"
+  contains "case 1 (#{greeter.nmae}): both mark it" "$out" "  9:36  agree"
+  contains "case 2 (concat in a method argument): a NetBeans false positive" "$out" "  11:46  NetBeans false positives"
+  contains "case 3 (generics): a NetBeans false positive" "$out" "  13:49  NetBeans false positives"
+  contains "case 4 (class typo): both mark it" "$out" "  15:17  agree"
+  contains "case 4b (styleClass typo): only nbkit" "$out" "  17:31  Only nbkit (to review)"
+  lacks "case 5 (class with EL): neither" "$out" "  19:31  "
+  contains "case 6 (class in no CSS nor JS): both mark it" "$out" "  21:17  agree"
+  contains "case 7 (wrong number of arguments): both mark it" "$out" "  23:36  agree"
+  contains "case 8 (only in an implementation): a NetBeans false positive" "$out" "  25:40  NetBeans false positives"
+else
+  echo "  skipped: jsf-war has no saved NetBeans collection yet (tests/jsf-war/netbeans-marks.tsv, see How to run)"
+fi
+
 finish
