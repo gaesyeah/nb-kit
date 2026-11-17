@@ -368,7 +368,9 @@ if [ -f "$WAR/netbeans-marks.tsv" ]; then
   contains "case 3 (generics): a NetBeans false positive" "$out" "  13:49  NetBeans false positives"
   contains "case 4 (class typo): both mark it" "$out" "  15:17  agree"
   contains "case 4b (styleClass typo): only nbkit" "$out" "  17:31  Only nbkit (to review)"
-  lacks "case 5 (class with EL): neither" "$out" "  19:31  "
+  contains "case 5 (class with EL): skipped by nbkit" "$out" "  19:31  [css.class]  class with EL, known only at runtime"
+  lacks "case 5 (class with EL): no comparison line" \
+    "$(grep -E '^  [0-9]+:[0-9]+  (agree|NetBeans false positives|NetBeans catches what nbkit skipped|Only nbkit \(to review\)|not collected)  ' <<<"$out")" "  19:31  "
   contains "case 6 (class in no CSS nor JS): both mark it" "$out" "  21:17  agree"
   contains "case 7 (wrong number of arguments): both mark it" "$out" "  23:36  agree"
   contains "case 8 (only in an implementation): a NetBeans false positive" "$out" "  25:40  NetBeans false positives"
