@@ -81,6 +81,9 @@ for fx in fixture fixture-resolver; do
       contains "a misspelled varStatus property is replaced" "$out" "«indx»  ⇒ index"
       contains "also the LoopTagStatus of c:forEach" "$out" "«cuont»  ⇒ count"
       contains "a method of a text literal is checked as String" "$out" "«concatt»  ⇒ concat"
+      contains "a method called with the wrong number of arguments says how many it takes, and goes to it" "$out" \
+        "The method 'format' of CustomerVM takes 1 argument, not 2.  «format»  → ../java/app/CustomerVM.java:14"
+      contains "with overloads, every number it takes" "$out" "The method 'pick' of CustomerVM takes 1 or 3 arguments, not 2."
       contains "also after another call" "$out" "«toUpperCas»  ⇒ toUpperCase"
       contains "facesContext has its type (as in NetBeans)" "$out" "«requestContextPat»  ⇒ requestContextPath"
       contains "a bean read through its scope is that bean" "$out" "«titel»  → ../java/app/CustomerVM.java:12  ⇒ title"

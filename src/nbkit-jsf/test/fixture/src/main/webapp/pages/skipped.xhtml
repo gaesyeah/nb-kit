@@ -8,7 +8,7 @@
     <ui:param name="loose" value="#{customerVM.title} x"/>
     <h:outputText value="#{loose.anything}"/><!--S:el.untyped-->
     <h:outputText value="#{customerVM.items.stream().findFirst().get().name}"/><!--S:el.stream-->
-    <h:outputText value="#{customerVM.format('a', 'b').length()}"/><!--S:el.overload-->
+    <h:outputText value="#{customerVM.format('a', 'b').length()}"/><!--E:el.member-->
     <ui:repeat value="#{customerVM.items}" var="#{customerVM.title}"/><!--S:var.el-->
     <p:commandButton value="x" update="#{customerVM.title}"/><!--S:id.el-->
     <h:panelGroup id="#{customerVM.title}"/><!--S:idattr.el-->

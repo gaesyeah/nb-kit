@@ -1,0 +1,11 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <!-- a method called with a number of arguments it does not take is an error (as NetBeans' Identifiers says) -->
+    <h:outputText value="#{customerVM.format('a', 'b')}"/><!--E:el.member-->
+    <h:outputText value="#{customerVM.pick('a', 'b')}"/><!--E:el.member-->
+    <h:outputText value="#{customerVM.pick('a')} #{customerVM.pick('a', 'b', 'c')}"/>
+    <!-- varargs take any number from the fixed ones on; a method of ActionEvent can be called with none -->
+    <h:outputText value="#{customerVM.join()} #{customerVM.join('a')} #{customerVM.join('a', 'b', 'c')}"/>
+    <h:commandButton value="x" actionListener="#{customerVM.listen()}"/>
+  </ui:define>
+</ui:composition>

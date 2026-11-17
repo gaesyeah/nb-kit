@@ -17,4 +17,8 @@ public class CustomerVM {
   public java.util.List<Contact> getContacts() { return null; }
   public Customer[] getArray() { return null; }
   public outside.Thing getThing() { return null; }
+  public String join(String... parts) { return ""; }
+  public void listen(jakarta.faces.event.ActionEvent e) { }
+  public String pick(String a) { return a; }
+  public String pick(String a, String b, String c) { return a; }
 }

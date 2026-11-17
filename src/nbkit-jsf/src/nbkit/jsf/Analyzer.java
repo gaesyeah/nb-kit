@@ -1101,7 +1101,14 @@ public final class Analyzer {
                     }
                 }
                 if (pick == null) {
-                    return stop("el.overload", m);
+                    if (accepts(ms, m.argCount)) {
+                        return null; // varargs, or a method of ActionEvent called with none: fine, not followed
+                    }
+                    if (reportMissing) {
+                        report("el.member", Severity.ERROR, s.x.off(m.a), s.x.off(m.b), Msg.t("el.member.args", m.name, ClassModel.display(cur),
+                                argCounts(ms), m.argCount), javaTarget(cur, m.name));
+                    }
+                    return null;
                 }
                 generic = ws.classes.resolve(generic, pick);
                 cur = typeOf(generic, pick.returnType());
@@ -1151,6 +1158,28 @@ public final class Analyzer {
         }
         lastGeneric = generic;
         return cur;
+    }
+
+    /**
+     * A call with n arguments that no method takes exactly, but that EL accepts all the same, as NetBeans' Identifiers
+     * does (ELTypeUtilities.isSameMethod): varargs from their fixed arguments on, and a method of one ActionEvent
+     * called with none (JSF passes the event)
+     */
+    static boolean accepts(List<ClassModel.MethodInfo> ms, int n) {
+        for (ClassModel.MethodInfo mi : ms) {
+            boolean varargs = (mi.access & 0x0080) != 0;
+            List<String> ps = mi.paramTypes();
+            if (varargs && n >= ps.size() - 1 || n == 0 && ps.size() == 1 && ps.get(0).matches("L(jakarta|javax)/faces/event/ActionEvent;")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** "1 argument", "1 or 3 arguments": how many arguments the methods of that name take */
+    static String argCounts(List<ClassModel.MethodInfo> ms) {
+        List<String> ns = ms.stream().map(ClassModel.MethodInfo::params).distinct().sorted().map(String::valueOf).toList();
+        return ns.equals(List.of("1")) ? Msg.t("el.member.arg1") : Msg.t("el.member.argn", String.join(Msg.t("el.member.or"), ns));
     }
 
     /** the methods of EL's Stream (EL 3.0, chapter 2.3) and of the Optional some of them give */
