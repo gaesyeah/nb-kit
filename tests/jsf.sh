@@ -235,6 +235,7 @@ contains "and the hashes" "$out" "read hashes: {src/main/webapp/a.xhtml=ba7816bf
 contains "and exactly the marks written (tabs, line breaks and backslashes too)" "$out" "read back the same marks: true"
 contains "it is written whole or not at all (no temporary file left)" "$out" "no temporary file left: true"
 contains "the done marker comes after, saying where the collection is" "$out" "done marker: true"
+
 contains "a request is taken: its project, and the request and the old done marker are gone" "$out" \
   "take: /work/next request left: false old done left: false"
 contains "a request is answered once" "$out" "take again: null"
@@ -252,4 +253,12 @@ contains "web module: yes when Identifiers applied to some EL of the project" "$
 contains "no when there was EL and it never applied" "$out" "web module, EL but Identifiers never applied: no"
 contains "unknown with no EL at all" "$out" "web module, no EL: unknown"
 contains "unknown is not taken as not run (no EL, no EL marks to miss)" "$out" "unknown web module: {}"
+# in NetBeans the Workspace lives on: a .js or a .properties that changes must not leave old classes or keys
+compile -cp "$W/nbkit" -d "$W/caches" "$J/test/RunWorkspaceCaches.java"
+out="$("$JAVA" -cp "$W/nbkit:$W/caches" RunWorkspaceCaches "$W/cacheproj" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"
+contains "the classes of the project's JavaScript are read" "$out" "js before: [first]"
+contains "and read again when a .js changes" "$out" "js after: [second]"
+contains "the keys of a bundle are read again when its .properties changes" "$out" "keys after: [one, two]"
+contains "and the signature NetBeans watches changes with them (the open pages are checked again)" "$out" "the files' signature changes: true"
+
 finish

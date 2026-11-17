@@ -122,24 +122,7 @@ final class Watcher implements DocumentListener {
     }
 
     private static String signature(File f) {
-        File project = Workspace.projectOf(f);
-        long sum = 0;
-        int n = 0;
-        for (File w : Workspace.webrootsOf(project, f)) {
-            try (var s = java.nio.file.Files.walk(w.toPath())) {
-                for (var p : (Iterable<java.nio.file.Path>) s::iterator) {
-                    String name = p.toString();
-                    if (name.endsWith(".xhtml") || name.endsWith(".xml")) {
-                        sum += p.toFile().lastModified();
-                        n++;
-                    }
-                }
-            } catch (Exception ex) {
-                // ignore
-            }
-        }
-        File classes = new File(project, "target/classes");
-        return n + ":" + sum + ":" + (classes.isDirectory() ? classes.lastModified() : 0);
+        return Workspace.filesSignature(Workspace.projectOf(f), f);
     }
 
     @Override

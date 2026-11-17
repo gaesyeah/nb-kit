@@ -210,6 +210,17 @@ public final class Workspace {
         return b.toString();
     }
 
+    /**
+     * What the open pages depend on besides their own text: the xhtml, xml and js of the web folders, the .properties
+     * of src/main/resources and target/classes. When it changes, the NetBeans side analyzes the open files again.
+     */
+    public static String filesSignature(File project, File file) {
+        List<File> dirs = new ArrayList<>(webrootsOf(project, file));
+        dirs.add(new File(project, "src/main/resources"));
+        File classes = new File(project, "target/classes");
+        return filesStamp(dirs, ".xhtml", ".xml", ".js", ".properties") + ":" + (classes.isDirectory() ? classes.lastModified() : 0);
+    }
+
     private static long newest(File dir) {
         long[] m = {dir.lastModified()};
         try (var s = Files.walk(dir.toPath())) {
@@ -220,7 +231,45 @@ public final class Workspace {
         return m[0];
     }
 
+    private String jsSignature, bundleSignature;
+
+    /** count and newest time of the files with these endings under the folders */
+    private static String filesStamp(List<File> dirs, String... endings) {
+        long sum = 0;
+        int n = 0;
+        for (File d : dirs) {
+            if (!d.isDirectory()) {
+                continue;
+            }
+            try (var s = Files.walk(d.toPath())) {
+                for (var p : (Iterable<java.nio.file.Path>) s::iterator) {
+                    for (String e : endings) {
+                        if (p.toString().endsWith(e)) {
+                            sum += p.toFile().lastModified();
+                            n++;
+                        }
+                    }
+                }
+            } catch (IOException | RuntimeException ex) {
+                // ignore
+            }
+        }
+        return n + ":" + sum;
+    }
+
     public synchronized void refresh() {
+        // the classes of the JavaScript (the .js and the script elements of the pages) and the keys of the bundles:
+        // read again only when their files change (checked every time: in NetBeans the Workspace lives on)
+        String js = filesStamp(webroots, ".js", ".xhtml");
+        if (!js.equals(jsSignature)) {
+            jsSignature = js;
+            jsClasses = null;
+        }
+        String props = filesStamp(List.of(new File(projectDir, "src/main/resources")), ".properties");
+        if (!props.equals(bundleSignature)) {
+            bundleSignature = props;
+            bundles.clear();
+        }
         long now = System.currentTimeMillis();
         if (scannedSignature != null && now - scannedAt < 5000) {
             return;
