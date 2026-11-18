@@ -203,15 +203,19 @@ contains "and which classes were compiled after it" "$out" "classes app.Customer
 rm "$W/proj/src/main/webapp/pages/brand-new.xhtml"
 contains "with no collection, nothing to compare" "$("$JAVA" -Dnbkit.collection.check=1 -Dnbkit.collection.file="$W/none.tsv" -cp "$W/nbkit-jsf.jar" nbkit.jsf.Analyze "$W/proj" 2>&1)" "missing"
 # the analyze side: with arguments it only warns, about a missing collection or one that may be out of date
+CD="$(date -d '2026-11-16T19:00:00Z' '+%Y-%m-%d %H:%M')"
 out="$(NBKIT_COLLECTION="$W/none.tsv" analyze "$W/proj")"
 contains "with no collection it says how to get one" "$out" "No collection of what NetBeans marks on this project: no comparison."
 out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")"
-contains "with an old one it warns, and compares with it anyway" "$out" "The collection of what NetBeans marks (2026-11-16T19:00:00Z) may be out of date; comparing with it anyway."
+contains "with an old one it warns, and compares with it anyway" "$out" "The collection of what NetBeans marks ($CD) may be out of date; comparing with it anyway."
 contains "saying what changed" "$out" "changed pages: src/main/webapp/pages/compare.xhtml"
 contains "and still compares" "$out" "Comparison with NetBeans (collection of"
 # in a terminal that answers (the interface, the menu) it asks first; no: the old one
-out="$(printf 'n\n' | NBKIT_TTY=1 NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
-contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks (2026-11-16T19:00:00Z) is out of date. Collect it again? It opens NetBeans if it is closed."
+# a home whose userdir has the JSF module and no lock: NetBeans is closed, so the question says it opens it
+QH="$W/qhome"; mkdir -p "$QH/.netbeans/31/config" "$QH/.netbeans/31/modules" "$QH/.netbeans/31/var/log"
+: > "$QH/.netbeans/31/modules/nbkit-jsf.jar"
+out="$(printf 'n\n' | HOME="$QH" NBKIT_TTY=1 NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
+contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) is out of date. Collect it again? It opens NetBeans."
 contains "no: it compares with the old one, warning" "$out" "may be out of date; comparing with it anyway."
 # --netbeans: collects without asking, with a NetBeans that only answers the request (and closes it, since it opened it)
 FH="$W/fakehome"; FU="$FH/.netbeans/31"

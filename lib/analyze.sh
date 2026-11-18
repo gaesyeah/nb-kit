@@ -134,9 +134,19 @@ collection_ud() {
 # the collection of a project: "missing", or "ok|stale <date>" and then one change per line (Analyze -Dnbkit.collection.check)
 collection_check() {
   local nbv=""
-  if collection_ud; then nbv="$(sed -n 's/^ *Product Version *= *//p' "$UD/var/log/messages.log" 2>/dev/null | tail -1 | sed 's/ *(.*//')"; fi
+  # a userdir without its log (copied, or never started) must not stop the check: no version, the rest still counts
+  if collection_ud; then nbv="$(sed -n 's/^ *Product Version *= *//p' "$UD/var/log/messages.log" 2>/dev/null | tail -1 | sed 's/ *(.*//' || true)"; fi
   "$JAVA" -Dnbkit.collection.check=1 ${NBKIT_COLLECTION:+"-Dnbkit.collection.file=$NBKIT_COLLECTION"} ${nbv:+"-Dnbkit.netbeans=$nbv"} \
     -cp "$JAR" nbkit.jsf.Analyze "$1" 2> >(grep -v '^Picked up JAVA_TOOL_OPTIONS' >&2)
+}
+# the date of the collection (ISO, UTC) in the reader's local time, in the language's format (cli.date_format)
+collect_date() {
+  local f="${L[cli.date_format]}" d y mo dy h mi
+  d="$(date -d "$1" '+%Y %m %d %H %M' 2>/dev/null)" || { echo "$1"; return; }
+  read -r y mo dy h mi <<<"$d"
+  f="${f//\{year\}/$y}"; f="${f//\{month\}/$mo}"; f="${f//\{day\}/$dy}"
+  f="${f//\{hour\}/$h}"; f="${f//\{minute\}/$mi}"
+  echo "$f"
 }
 # up to 5 names, then "... and N more"
 few() {
@@ -175,6 +185,7 @@ netbeans_collections() {
     mapfile -t lines < <(collection_check "$d")
     [ "${lines[0]%% *}" = ok ] && continue
     need+=("$d"); st[$d]="${lines[0]%% *}"; date[$d]="${lines[0]#* }"
+    if [ "${st[$d]}" = stale ]; then date[$d]="$(collect_date "${date[$d]}")"; fi
     changes[$d]="$(collection_changes "${lines[@]:1}")"
   done
   [ ${#need[@]} -gt 0 ] || return 0
@@ -194,6 +205,8 @@ netbeans_collections() {
       done
       label="$(t cli.collect_ask_modules "${#need[@]}")"
     fi
+    if nb_running; then label="$label $(t cli.collect_nb_open)"
+    else label="$label $(t cli.collect_nb_closed)"; fi
     ask_yn "  $label" N && go=1
   fi
   COLLECTED=()
