@@ -1,0 +1,21 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:f="jakarta.faces.core" xmlns:p="http://primefaces.org/ui" xmlns:ui="jakarta.faces.facelets" template="/WEB-INF/templates/main.xhtml">
+  <ui:define name="content">
+    <!-- a converter is looked up by its id (@FacesConverter or faces-config.xml): blue note with Go to its class -->
+    <p:inputMask mask="(99) 9999-9999" converter="app.convert.PhoneConverter"/><!--I:origin-->
+    <h:inputText value="x"><f:converter converterId="app.zip"/></h:inputText><!--I:origin-->
+    <!-- a standard JSF converter, and one known only at runtime: nothing -->
+    <h:outputText value="x" converter="jakarta.faces.Number"/>
+    <h:outputText value="x" converter="#{customerVM.title}"/>
+    <!-- no converter has that id: JSF fails building the page (a typo, a class that is not a converter, a package) -->
+    <p:inputMask mask="99" converter="app.convert.PhoneConvertr"/><!--E:conv.missing-->
+    <h:outputText value="x" converter="app.Gallery"/><!--E:conv.missing-->
+    <h:inputText value="x"><f:converter converterId="app.zipp"/></h:inputText><!--E:conv.missing-->
+    <!-- a validator is looked up by its id the same way -->
+    <h:inputText value="x"><f:validator validatorId="app.cpf"/></h:inputText><!--I:origin-->
+    <h:inputText value="x"><f:validator validatorId="jakarta.faces.Length"/></h:inputText>
+    <h:inputText value="x"><f:validator validatorId="app.cfp"/></h:inputText><!--E:valid.missing-->
+    <!-- the full name of a class of the project in another attribute: blue note with Go to its source -->
+    <h:outputText value="app.Gallery"/><!--I:origin-->
+    <h:outputText value="app.convert"/>
+  </ui:define>
+</ui:composition>

@@ -1924,6 +1924,8 @@ public final class Analyzer {
     }
 
     static final Pattern NAME = Pattern.compile("[A-Za-z_$][\\w$]*");
+    /** the full name of a class: com.x.PhoneConverter (lower-case package parts, then the class name) */
+    static final Pattern QUALIFIED = Pattern.compile("(?:[a-z_][\\w]*\\.)+[A-Z][\\w$]*");
     static final Pattern CHAIN = Pattern.compile("([A-Za-z_$][\\w$]*)((?:\\.[A-Za-z_$][\\w$]*)+)");
 
     /** an operand: true, false, null, a name the pages give (ui:param, c:set), a getter that returns a constant */
@@ -2717,6 +2719,40 @@ public final class Analyzer {
                     if (i >= 0) {
                         report("el.immediate", Severity.WARNING, a.offset(i), a.offset(i + 2),
                                 Msg.t("el.immediate"));
+                    }
+                }
+            }
+            // a converter or a validator is looked up by its id: a missing one makes JSF fail building the page
+            boolean validator = t.equals("f:validator");
+            Xml.Attr conv = validator ? e.attr("validatorId") : t.equals("f:converter") ? e.attr("converterId") : isJsfLib(e) ? e.attr("converter") : null;
+            if (conv != null && !conv.value.contains("{") && !conv.value.isBlank() && ws.beansKnown) {
+                String v = conv.value.strip();
+                int a = conv.offset(conv.value.indexOf(v)), b = a + v.length();
+                Map<String, String> ids = validator ? ws.validators : ws.converters;
+                if (ids.containsKey(v)) {
+                    String cls = ids.get(v);
+                    List<Rules.Target> to = cls == null ? List.of() : javaTarget(cls, null);
+                    if (!to.isEmpty()) {
+                        places.putIfAbsent(to.get(0).label, to.get(0));
+                        note(a, b, validator ? "origin.validator" : "origin.converter", v, List.of(to.get(0).label));
+                    }
+                } else {
+                    String hint = closest(v, ids.keySet());
+                    String cls = hint == null ? null : ids.get(hint);
+                    String rule = validator ? "valid.missing" : "conv.missing";
+                    report(rule, Severity.ERROR, a, b, Msg.t(rule, v) + Msg.hint(hint),
+                            cls == null ? List.of() : javaTarget(cls, null), swap(a, b, v, hint));
+                }
+            }
+            // the full name of a class of the project in another attribute: blue note, Go to its source
+            for (Xml.Attr a : e.attrs) {
+                String v = a.value.strip();
+                if (a != conv && QUALIFIED.matcher(v).matches()) {
+                    List<Rules.Target> to = javaTarget(v.replace('.', '/'), null);
+                    if (!to.isEmpty()) {
+                        int i = a.value.indexOf(v);
+                        places.putIfAbsent(to.get(0).label, to.get(0));
+                        note(a.offset(i), a.offset(i + v.length()), "origin.class", v, List.of(to.get(0).label));
                     }
                 }
             }

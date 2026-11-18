@@ -368,6 +368,7 @@ nbkit-bracket-unexpected = "#d41719"
 ["text/html".extra]
 nbkit-plain     = "#abb2bf"
 nbkit-doctype   = "#e06c75"
+nbkit-type      = "#e5c07b"
 nbkit-attribute = "#d19a66"
 nbkit-string    = "#98c379"
 

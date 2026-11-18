@@ -49,6 +49,9 @@ for fx in fixture fixture-resolver; do
     if [ "$fx$l" = fixtureen ]; then
       # where a note or a suggestion points to: "Go to" in NetBeans (Alt+Enter)
       contains "a blue note goes to where the name comes from" "$out" "«kindLabel»  → pages/kinds.xhtml:6"
+      contains "a converter goes to its class" "$out" "«app.convert.PhoneConverter»  → ../java/app/convert/PhoneConverter.java:7"
+      contains "a missing converter id suggests the closest and goes to its class" "$out" "«app.convert.PhoneConvertr»  → ../java/app/convert/PhoneConverter.java:7  ⇒ app.convert.PhoneConverter"
+      contains "a missing validator id suggests the closest and goes to its class" "$out" "«app.cfp»  → ../java/app/convert/CpfValidator.java:7  ⇒ app.cpf"
       contains "a CSS class goes to its rule" "$out" "«panel-title»  → resources/css/app.css:3"
       contains "a suggested name goes to where it is" "$out" "«tablee»  → pages/customers.xhtml:27"
       contains "a variable used outside its loop goes to the loop" "$out" "«row»  → pages/customers.xhtml:27"

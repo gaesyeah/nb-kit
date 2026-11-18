@@ -675,8 +675,17 @@ public final class PatternsFactory implements HighlightsLayerFactory {
 
     private static final Pattern DOCTYPE_PART = Pattern.compile("(?i)(<!)|(DOCTYPE)|(\"[^\"]*\"?)|([^\\s>\"]+)|(>)");
 
+    // an attribute value that is the full name of a class (converter="com.x.PhoneConverter"): colored as in Java
+    private static final Pattern CLASS_VALUE = Pattern.compile("([\"']?)((?:[a-z_]\\w*\\.)+)([A-Z][\\w$]*)\\1");
+
     private static void html(List<Tok> t, OffsetsBag out, Map<String, AttributeSet> colors) {
         for (Tok k : t) {
+            Matcher v = k.id.equals("VALUE") ? CLASS_VALUE.matcher(k.text) : null;
+            if (v != null && v.matches()) {
+                paint(out, colors, "nbkit-plain", k.start + v.start(2), k.start + v.end(2));
+                paint(out, colors, "nbkit-type", k.start + v.start(3), k.start + v.end(3));
+                continue;
+            }
             if (k.id.equals("XML_PI")) {
                 xmlPi(k, out, colors);                  // <?xml ...?> (meta.tag.metadata.processing.xml.html)
                 continue;

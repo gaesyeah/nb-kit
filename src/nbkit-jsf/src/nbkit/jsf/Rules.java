@@ -89,6 +89,8 @@ public final class Rules {
         ALL.put("tpl.define", Msg.t("rule.tpl.define"));
         ALL.put("tpl.path", Msg.t("rule.tpl.path"));
         ALL.put("res.missing", Msg.t("rule.res.missing"));
+        ALL.put("conv.missing", Msg.t("rule.conv.missing"));
+        ALL.put("valid.missing", Msg.t("rule.valid.missing"));
         ALL.put("nav.missing", Msg.t("rule.nav.missing"));
         ALL.put("comment.el", Msg.t("rule.comment.el"));
         ALL.put("xml.entity", Msg.t("rule.xml.entity"));

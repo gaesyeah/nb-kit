@@ -42,6 +42,10 @@ public final class Workspace {
     /** var -> base-name of each resource-bundle of faces-config.xml */
     public final Map<String, String> facesBundles = new HashMap<>();
     public final Set<String> navOutcomes = new HashSet<>();
+    /** converter id -> its class (internal name; null when not known): @FacesConverter, faces-config.xml, the standard ones */
+    public final Map<String, String> converters = new HashMap<>();
+    /** the same for validators: @FacesValidator, validator-id of faces-config.xml, the standard ones */
+    public final Map<String, String> validators = new HashMap<>();
     /** class of an EL resolver of the project itself (names it provides cannot be seen), or null */
     public String customElResolver;
     public boolean skipComments;
@@ -290,6 +294,12 @@ public final class Workspace {
     private static final Set<String> NAMED = Set.of("Ljavax/inject/Named;", "Ljakarta/inject/Named;");
     private static final String MANAGED = "Ljavax/faces/bean/ManagedBean;";
     private static final String BEAN = "Lorg/springframework/context/annotation/Bean;";
+    private static final Set<String> CONVERTER = Set.of("Ljakarta/faces/convert/FacesConverter;", "Ljavax/faces/convert/FacesConverter;");
+    private static final Set<String> VALIDATOR = Set.of("Ljakarta/faces/validator/FacesValidator;", "Ljavax/faces/validator/FacesValidator;");
+    private static final String[] STANDARD_VALIDATORS = {"Bean", "DoubleRange", "Length", "LongRange", "Regex", "Required"};
+    /** the converters every JSF implementation registers (jakarta.faces.X and javax.faces.X) */
+    private static final String[] STANDARD_CONVERTERS = {"BigDecimal", "BigInteger", "Boolean", "Byte", "Character", "DateTime",
+        "Double", "Enum", "Float", "Integer", "Long", "Number", "Short", "UUID"};
 
     private void scanAll() {
         beans.clear();
@@ -299,6 +309,16 @@ public final class Workspace {
         jsClasses = null;
         jarClasses = null;
         navOutcomes.clear();
+        converters.clear();
+        validators.clear();
+        for (String n : STANDARD_CONVERTERS) {
+            converters.put("jakarta.faces." + n, null);
+            converters.put("javax.faces." + n, null);
+        }
+        for (String n : STANDARD_VALIDATORS) {
+            validators.put("jakarta.faces." + n, null);
+            validators.put("javax.faces." + n, null);
+        }
         tagTypes.clear();
         componentClasses.clear();
         subtypes.clear();
@@ -358,6 +378,12 @@ public final class Workspace {
                     name = a.string("value");
                 } else if (NAMED.contains(a.type)) {
                     name = a.string("value");
+                } else if (CONVERTER.contains(a.type) || VALIDATOR.contains(a.type)) {
+                    String id = a.string("value");
+                    if (id != null && !id.isBlank()) {
+                        (CONVERTER.contains(a.type) ? converters : validators).put(id, c.name);
+                    }
+                    continue;
                 } else if (MANAGED.equals(a.type)) {
                     name = a.string("name");
                 } else {
@@ -444,6 +470,16 @@ public final class Workspace {
             }
             for (String v : texts(d, "managed-bean-name")) {
                 addBean(v, null, "faces-config");
+            }
+            for (String kind : new String[]{"converter", "validator"}) {
+                NodeList l = d.getElementsByTagNameNS("*", kind);
+                for (int i = 0; i < l.getLength(); i++) {
+                    org.w3c.dom.Element c = (org.w3c.dom.Element) l.item(i);
+                    String id = child(c, kind + "-id"), cls = child(c, kind + "-class");
+                    if (id != null) {
+                        (kind.equals("converter") ? converters : validators).put(id.trim(), cls == null ? null : cls.trim().replace('.', '/'));
+                    }
+                }
             }
             for (String v : texts(d, "from-outcome")) {
                 navOutcomes.add(v);
@@ -596,6 +632,8 @@ public final class Workspace {
         }
     }
 
+    /** @FacesConverter("id") / @FacesValidator("id") in a source file (a class not compiled yet still registers its id) */
+    private static final Pattern CONVERTER_SRC = Pattern.compile("@(?:[\\w.]+\\.)?Faces(Converter|Validator)\\s*\\(\\s*(?:value\\s*=\\s*)?\"([^\"]+)\"");
     private static final Pattern PKG = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
 
     private void scanSources(File dir, Set<String> stereo) {
@@ -606,6 +644,10 @@ public final class Workspace {
             s.filter(f -> f.toString().endsWith(".java")).forEach(f -> {
                 try {
                     String src = Files.readString(f, StandardCharsets.UTF_8);
+                    Matcher cv = CONVERTER_SRC.matcher(src);
+                    while (cv.find()) {
+                        (cv.group(1).equals("Converter") ? converters : validators).putIfAbsent(cv.group(2), null);
+                    }
                     Matcher m = p.matcher(src);
                     while (m.find()) {
                         String name = m.group(3);
