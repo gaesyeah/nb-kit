@@ -227,7 +227,7 @@ collect_all() {
     spin_until "$(t cli.collect_waiting) (${d##*/})" collect_ended || { info "$(t cli.cancelled)"; break; }
     if [ -f "$c/collect-done" ]; then ok "$(t cli.collect_done)"; COLLECTED+=("$d"); else warn "$(t cli.collect_timeout "$limit")"; break; fi
   done
-  if [ $opened = 1 ] && { [ "$ask" = 0 ] || ask_yn "  $(t cli.collect_ask_close)" N; }; then close_netbeans; fi
+  if [ $opened = 1 ] && { [ "$ask" = 0 ] || ask_yn "  $(t cli.collect_ask_close)" N "$(t cli.collect_ask_close_detail)"; }; then close_netbeans; fi
   return 0
 }
 

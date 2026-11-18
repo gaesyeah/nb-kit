@@ -221,6 +221,10 @@ rc=0; NBKIT_UI_EVENTS="$E" NBKIT_DIR="$NBKIT_DIR" setsid -w bash -c 'source "$NB
 check "a question without a terminal takes the default" test "$rc" = 0
 check "a question is an ask event, then answered" test "$(cat "$E")" = '{"ev":"ask","text":"Go on?","default":"Y"}
 {"ev":"answered"}'
+rm -f "$E"
+rc=0; NBKIT_UI_EVENTS="$E" NBKIT_DIR="$NBKIT_DIR" setsid -w bash -c 'source "$NBKIT_DIR/lib/terminal.sh"; ask_yn "Go on?" Y "because it was closed"' </dev/null >/dev/null 2>&1 || rc=$?
+check "a question with a detail sends it" test "$(cat "$E")" = '{"ev":"ask","text":"Go on?","detail":"because it was closed","default":"Y"}
+{"ev":"answered"}'
 
 echo "Restore and delete a backup from the arguments"
 B="$(ls "$U"/nbkit-theme-backup-*.tar.gz)"

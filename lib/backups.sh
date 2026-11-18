@@ -40,14 +40,14 @@ confirm_restore() {
   if mod_installed "$1"; then t cli.restore_uninstalls_first "$(mod_label "$1")"; echo
   else t cli.restore_makes_backup; echo; fi
   echo
-  ask_yn "$(t cli.ask_restore)" N
+  ask_yn "$(t cli.ask_restore "$(bk_date "$2")")" N
 }
 confirm_delete_backup() {
   if [ "$(mod_call "$1" backups | wc -l)" = 1 ] && mod_installed "$1"; then
     t cli.only_backup "$(mod_label "$1")"; echo
     echo
   fi
-  ask_yn "$(t cli.ask_delete_backup "$(bk_date "$2")")" N
+  ask_yn "$(t cli.ask_delete_backup "$(bk_date "$2")")" N "$(t cli.ask_delete_backup_detail)"
 }
 # browses the backups: Enter restores, Del deletes, Esc goes back. A confirmed restore goes to RESTORE_ID/RESTORE_BK
 browse_backups() {

@@ -139,7 +139,7 @@ ensure_closed() {
     die "$(t cli.nb_open_die)"
   fi
   if can_close; then
-    if [ "${NBKIT_CLOSE:-}" != 1 ] && ! ask_yn "$(t cli.ask_close)" Y; then
+    if [ "${NBKIT_CLOSE:-}" != 1 ] && ! ask_yn "$(t cli.ask_close)" Y "$(t cli.ask_close_detail)"; then
       t cli.nothing_changed; echo; exit 0
     fi
     close_netbeans || { t cli.cancelled; echo; exit 0; }

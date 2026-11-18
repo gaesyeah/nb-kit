@@ -275,7 +275,7 @@ do_uninstall() {
       [ ${#BKS[@]} -gt 0 ] || continue
       echo
       if [ ${#BKS[@]} = 1 ]; then q="$(t cli.one_file)"; else q="$(t cli.n_files "${#BKS[@]}")"; fi
-      if ask_yn "$(t cli.ask_delete_backups "$(mod_label "$id")" "$q")" N; then
+      if ask_yn "$(t cli.ask_delete_backups "$(mod_label "$id")" "$q")" N "$(t cli.ask_delete_backups_detail)"; then
         rm -f "${BKS[@]}"; ok "$(t cli.backups_deleted)"
       fi
     done
@@ -295,7 +295,7 @@ after_change() {
   # waits for NetBeans to check by itself, unless you said not to open it now
   local wait=1
   if find_launcher; then
-    if ask_yn "$(t cli.ask_open)" Y; then open_netbeans; else wait=0; fi
+    if ask_yn "$(t cli.ask_open)" Y "$(t cli.ask_open_detail)"; then open_netbeans; else wait=0; fi
   fi
   if [ "$1" = install ] && [ $wait = 0 ]; then t cli.check_later_menu "$(t cli.menu_check)"; echo; exit 0; fi
   if [ "$1" = install ]; then
@@ -342,7 +342,7 @@ do_check() {
   echo "${R}$(t cli.problems_above)${N}"
   if [ ${#fix[@]} -gt 0 ] && [ $INTERACTIVE = 1 ]; then
     echo
-    if ask_yn "$(t cli.ask_reinstall)" Y; then echo; exec env NBKIT_TTY=1 NBKIT_CLOSE=1 bash "$SELF" install "${fix[@]}" "$UD"; fi
+    if ask_yn "$(t cli.ask_reinstall)" Y "$(t cli.ask_reinstall_detail)"; then echo; exec env NBKIT_TTY=1 NBKIT_CLOSE=1 bash "$SELF" install "${fix[@]}" "$UD"; fi
   else
     t cli.send_output; echo
   fi
@@ -533,7 +533,7 @@ if [ $MENU = 1 ]; then
         fi
         # with or without the explanation of one file (how each name of its EL was resolved)
         file=""
-        if ask_yn "  $(t cli.analyze_explain_ask)" N; then
+        if ask_yn "  $(t cli.analyze_explain_ask)" N "$(t cli.analyze_explain_ask_detail)"; then
           read -r -e -p "  $(t cli.analyze_explain_file): " -i "${dir%/}/" file || { echo; exit 0; }
           file="${file/#\~/$HOME}"
         fi

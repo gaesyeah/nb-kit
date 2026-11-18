@@ -72,12 +72,13 @@ info() { printf '      %s%s%s\n' "$D" "$*" "$N"; }
 warn() { printf '      %s!%s %s\n' "$Y" "$N" "$*"; }
 
 # ---------- yes/no ----------
-# yes/no question; the uppercase letter is the Enter default (Y or N in $2).
-# With the interface it also becomes a dialog there, which answers by typing here (see lib/gui/model.py).
+# yes/no question; the uppercase letter is the Enter default (Y or N in $2). An optional third argument is a
+# detail (why, what happened), shown above the question and sent to the interface dialog (see lib/gui/model.py).
 ask_yn() {
-  local a hint; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
+  local a hint d=""; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
+  if [ -n "${3:-}" ]; then info "$3"; d=",\"detail\":$(json_str "$3")"; fi
   printf '%s %s ' "$1" "$hint"
-  ui_event "{\"ev\":\"ask\",\"text\":$(json_str "$1"),\"default\":\"$2\"}"
+  ui_event "{\"ev\":\"ask\",\"text\":$(json_str "$1")${d},\"default\":\"$2\"}"
   IFS= read -r a </dev/tty || a=""
   ui_event '{"ev":"answered"}'
   a="${a,,}"

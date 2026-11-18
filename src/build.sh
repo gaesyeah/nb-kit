@@ -48,7 +48,7 @@ if [ $FORCE = 0 ]; then
     ask=0
     if [ -n "${NBKIT_INTERACTIVE:-}" ]; then ask=$NBKIT_INTERACTIVE; elif [ -t 0 ] && [ -t 1 ]; then ask=1; fi
     if [ "$ask" = 1 ]; then
-      ask_yn "$(t build.ask_force)" N || { echo; t build.skipped; echo; exit 0; }
+      ask_yn "$(t build.ask_force)" N "$(t build.ask_force_detail)" || { echo; t build.skipped; echo; exit 0; }
       echo
     else
       t build.force_hint; echo
