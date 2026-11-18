@@ -214,8 +214,10 @@ contains "and still compares" "$out" "Comparison with NetBeans (collection of"
 # a home whose userdir has the JSF module and no lock: NetBeans is closed, so the question says it opens it
 QH="$W/qhome"; mkdir -p "$QH/.netbeans/31/config" "$QH/.netbeans/31/modules" "$QH/.netbeans/31/var/log"
 : > "$QH/.netbeans/31/modules/nbkit-jsf.jar"
-out="$(printf 'n\n' | HOME="$QH" NBKIT_TTY=1 NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
-contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) is out of date. Collect it again? It opens NetBeans."
+rm -f "$W/collect-ev"
+out="$(printf 'n\n' | HOME="$QH" NBKIT_TTY=1 NBKIT_UI_EVENTS="$W/collect-ev" NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
+contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) may be out of date. Collect it again? It opens NetBeans."
+check "the dialog gets what changed, from the same list" grep -q 'changed pages: src/main/webapp/pages/compare.xhtml' "$W/collect-ev"
 contains "no: it compares with the old one, warning" "$out" "may be out of date; comparing with it anyway."
 # --netbeans: collects without asking, with a NetBeans that only answers the request (and closes it, since it opened it)
 FH="$W/fakehome"; FU="$FH/.netbeans/31"

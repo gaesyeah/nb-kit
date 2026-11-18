@@ -179,7 +179,7 @@ collection_changes() {
 # otherwise (arguments) only warns. A project not collected again is compared with its old collection all the same,
 # saying it may be out of date
 netbeans_collections() {
-  local d lines=() ask=0 need=() label
+  local d lines=() ask=0 need=() label det=""
   declare -A st=() date=() changes=()
   for d in "$@"; do
     mapfile -t lines < <(collection_check "$d")
@@ -196,18 +196,25 @@ netbeans_collections() {
   elif [ $ask = 1 ] && collection_ud; then
     echo
     if [ $# = 1 ]; then
-      [ -n "${changes[${need[0]}]}" ] && echo "${changes[${need[0]}]}"
+      det="${changes[${need[0]}]}"
+      if [ -n "$det" ]; then echo "$det"; fi
       if [ "${st[${need[0]}]}" = missing ]; then label="$(t cli.collect_ask_missing)"; else label="$(t cli.collect_ask_stale "${date[${need[0]}]}")"; fi
     else
+      det=""
       for d in "${need[@]}"; do
-        if [ "${st[$d]}" = missing ]; then echo "    $(t cli.collect_module_missing "${d##*/}")"
-        else echo "    $(t cli.collect_module_stale "${d##*/}" "${date[$d]}")"; [ -n "${changes[$d]}" ] && echo "${changes[$d]}"; fi
+        if [ "${st[$d]}" = missing ]; then
+          det+="    $(t cli.collect_module_missing "${d##*/}")"$'\n'
+        else
+          det+="    $(t cli.collect_module_stale "${d##*/}" "${date[$d]}")"$'\n'
+          if [ -n "${changes[$d]}" ]; then det+="${changes[$d]}"$'\n'; fi
+        fi
       done
+      printf '%s' "$det"
       label="$(t cli.collect_ask_modules "${#need[@]}")"
     fi
     if nb_running; then label="$label $(t cli.collect_nb_open)"
     else label="$label $(t cli.collect_nb_closed)"; fi
-    ask_yn "  $label" N && go=1
+    ask_yn "  $label" N "${det%$'\n'}" && go=1
   fi
   COLLECTED=()
   if [ $go = 1 ]; then collect_all $ask "${need[@]}"; fi
@@ -225,7 +232,7 @@ collect_ended() { [ -f "$HOME/.cache/nbkit/collect-done" ] || [ "$(date +%s)" -g
 # (NBKIT_COLLECT_TIMEOUT seconds, 600), and closes NetBeans once at the end if it opened it (asking, when someone can
 # answer). COLLECTED: the projects collected
 collect_all() {
-  local ask="$1" opened=0 c="$HOME/.cache/nbkit" limit="${NBKIT_COLLECT_TIMEOUT:-600}" d; shift
+  local ask="$1" opened=0 c="$HOME/.cache/nbkit" limit="${NBKIT_COLLECT_TIMEOUT:-600}" d det; shift
   collection_ud || { warn "$(t cli.collect_no_module)"; return 1; }
   if ! nb_running; then
     find_launcher || { warn "$(t cli.collect_no_launcher)"; return 1; }
@@ -240,7 +247,14 @@ collect_all() {
     spin_until "$(t cli.collect_waiting) (${d##*/})" collect_ended || { info "$(t cli.cancelled)"; break; }
     if [ -f "$c/collect-done" ]; then ok "$(t cli.collect_done)"; COLLECTED+=("$d"); else warn "$(t cli.collect_timeout "$limit")"; break; fi
   done
-  if [ $opened = 1 ] && { [ "$ask" = 0 ] || ask_yn "  $(t cli.collect_ask_close)" N "$(t cli.collect_ask_close_detail)"; }; then close_netbeans; fi
+  if [ $opened = 1 ]; then
+    if [ "$ask" = 0 ]; then close_netbeans
+    else
+      det="$(t cli.collect_ask_close_detail)"
+      info "$det"
+      if ask_yn "  $(t cli.collect_ask_close)" N "$det"; then close_netbeans; fi
+    fi
+  fi
   return 0
 }
 

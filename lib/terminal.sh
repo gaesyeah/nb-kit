@@ -73,10 +73,11 @@ warn() { printf '      %s!%s %s\n' "$Y" "$N" "$*"; }
 
 # ---------- yes/no ----------
 # yes/no question; the uppercase letter is the Enter default (Y or N in $2). An optional third argument is a
-# detail (why, what happened), shown above the question and sent to the interface dialog (see lib/gui/model.py).
+# detail (why, what happened) sent to the interface dialog (see lib/gui/model.py): the terminal output is the
+# caller's, so the caller decides what to show above the question.
 ask_yn() {
   local a hint d=""; hint="$(t cli.yn_no)"; [ "$2" = Y ] && hint="$(t cli.yn_yes)"
-  if [ -n "${3:-}" ]; then info "$3"; d=",\"detail\":$(json_str "$3")"; fi
+  if [ -n "${3:-}" ]; then d=",\"detail\":$(json_str "$3")"; fi
   printf '%s %s ' "$1" "$hint"
   ui_event "{\"ev\":\"ask\",\"text\":$(json_str "$1")${d},\"default\":\"$2\"}"
   IFS= read -r a </dev/tty || a=""
