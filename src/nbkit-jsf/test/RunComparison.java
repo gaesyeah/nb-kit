@@ -32,6 +32,7 @@ public class RunComparison {
             java.util.Map<String, String> info = new java.util.LinkedHashMap<>();
             info.put("netbeans", "Apache NetBeans IDE 31 31-test");
             info.put("date", "2026-11-16T19:00:00Z");
+            info.put("html-error-checking", "off text/facelets");
             info.put(NetBeansMarks.INFO_CLASSES, "" + (System.currentTimeMillis() + 60000));
             java.util.Map<String, String> hashes = new java.util.LinkedHashMap<>();
             for (File p : Workspace.pages(proj)) {

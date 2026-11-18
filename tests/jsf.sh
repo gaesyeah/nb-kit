@@ -186,20 +186,27 @@ contains "the why of a false positive comes from how nbkit resolved it" "$out" "
 contains "what NetBeans catches and nbkit skipped, by the reason" "$out" "Map or Object value (the rest of the expression is not checked): 1"
 contains "and what only nbkit marks" "$out" "Only nbkit (to review)"
 out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj" --explain pages/compare.xhtml)"
-contains "--explain lists the crossings of the file" "$out" "Comparison with NetBeans in this file:"
+contains "--explain shows cmp.header with date and NetBeans version" "$out" "Comparison with NetBeans (collection of 2026-11-16T19:00:00Z, Apache NetBeans IDE 31 31-test):"
+contains "--explain shows cmp.counts with the numbers of this file" "$out" "agree 2   NetBeans false positives 3   NetBeans catches what nbkit skipped 1   only nbkit 1"
+contains "--explain shows Not collected with the reason" "$out" "Not collected: the HTML rules (Missing CSS Class) (html-error-checking off text/facelets)"
 contains "line by line, with the category" "$out" "  4:"
+# --explain on a file without any crossings still shows cmp.header, zero counts and Not collected
+out_no="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj" --explain pages/standalone.xhtml)"
+contains "--explain without crossings shows cmp.header" "$out_no" "Comparison with NetBeans (collection of 2026-11-16T19:00:00Z, Apache NetBeans IDE 31 31-test):"
+contains "--explain without crossings shows zero counts" "$out_no" "agree 0   NetBeans false positives 0   NetBeans catches what nbkit skipped 0   only nbkit 0"
+contains "--explain without crossings shows Not collected with the reason" "$out_no" "Not collected: the HTML rules (Missing CSS Class) (html-error-checking off text/facelets)"
 # whole-project analyze with a collection having marks in more than one file (step 5 regression check)
 cp "$W/marks.tsv" "$W/multi-marks.tsv"
 printf 'mark\tsrc/main/webapp/pages/orders.xhtml\t5\t36\t419\t424\ttext_x-el_Identifiers\tWARNING\ton\tUnknown property numbr\n' >> "$W/multi-marks.tsv"
 out="$(NBKIT_COLLECTION="$W/multi-marks.tsv" analyze "$W/proj")"
 lacks "whole-project analyze has no explain.header" "$out" "How each expression of"
-lacks "whole-project analyze has no per-file comparison block" "$out" "Comparison with NetBeans in this file:"
 lacks "whole-project analyze has no per-file skip block" "$out" "Not checked in this file:"
+check "whole-project analyze has cmp.header once" test "$(grep -c 'Comparison with NetBeans (collection of' <<<"$out")" = 1
+check "whole-project analyze has cmp.counts once" test "$(grep -cE 'agree [0-9]+   NetBeans false positives [0-9]+' <<<"$out")" = 1
 check "each line of the comparison summary appears once" test "$(grep -c 'Unknown method concat' <<<"$out")" = 1
 check "the mark of the second file is crossed (one more agree)" test "$(grep -oE "agree [0-9]+" <<<"$out")" = "agree $(( $(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj" | grep -oE "agree [0-9]+" | grep -oE "[0-9]+") + 1 ))"
 out="$(NBKIT_COLLECTION="$W/multi-marks.tsv" analyze "$W/proj" --explain pages/compare.xhtml)"
 contains "--explain has explain.header" "$out" "How each expression of src/main/webapp/pages/compare.xhtml was resolved:"
-contains "--explain has per-file comparison block" "$out" "Comparison with NetBeans in this file:"
 contains "--explain has per-file skip block" "$out" "Not checked in this file:"
 lacks "--explain has no marks from other files" "$out" "numbr"
 # is the collection up to date? (lib/analyze.sh asks this before comparing)

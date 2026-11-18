@@ -114,24 +114,22 @@ public final class Analyze {
                     int[] lc = lineCol(text, x.offset);
                     System.out.println("  " + lc[0] + ":" + lc[1] + "  #{" + x.expr + "}\n      " + x.steps);
                 }
-                System.out.println();
-                if (!comparison.isEmpty()) {
-                    System.out.println((color ? "\u001b[1m" : "") + Msg.t("cmp.file") + (color ? "\u001b[0m" : ""));
+                if (collected != null) {
+                    printComparisonHeader(comparison, collected, color);
                     for (Object[] e : comparison) {
                         NetBeansComparison.Match x = (NetBeansComparison.Match) e[0];
                         String place = ((String) e[1]).substring(((String) e[1]).indexOf(':') + 1);
                         System.out.println("  " + place + "  " + Msg.t("cmp.cat." + x.category().name()) + "  " + describe(x));
                     }
-                    System.out.println();
                 }
                 if (!res.skipped.isEmpty()) {
+                    System.out.println();
                     System.out.println((color ? "\u001b[1m" : "") + Msg.t("skip.file") + (color ? "\u001b[0m" : ""));
                     for (Rules.Skipped k : res.skipped) {
                         int[] lc = lineCol(text, k.start);
                         System.out.println("  " + lc[0] + ":" + lc[1] + "  [" + k.rule + "]  " + k.message + "  «"
                                 + text.substring(k.start, Math.min(k.end, text.length())).replace('\n', ' ') + "»");
                     }
-                    System.out.println();
                 }
             }
         }
@@ -193,8 +191,8 @@ public final class Analyze {
         return (nb + (nb.isEmpty() || nbkit.isEmpty() ? "" : "  /  ") + nbkit) + (x.why() == null ? "" : "  \u2190 " + x.why());
     }
 
-    /** the comparison with NetBeans: counts per category, what was not collected, then the lists (up to 20 places each) */
-    static void printComparison(List<Object[]> comparison, NetBeansMarks.Collected c, File project, boolean color) {
+    /** the header of the comparison: collection date, NetBeans version, counts per category, what was not collected */
+    static Map<NetBeansComparison.Category, List<Object[]>> printComparisonHeader(List<Object[]> comparison, NetBeansMarks.Collected c, boolean color) {
         Map<NetBeansComparison.Category, List<Object[]>> by = new java.util.EnumMap<>(NetBeansComparison.Category.class);
         for (NetBeansComparison.Category k : NetBeansComparison.Category.values()) {
             by.put(k, new ArrayList<>());
@@ -209,6 +207,12 @@ public final class Analyze {
         for (Map.Entry<String, String> e : NetBeansMarks.notRun(c).entrySet()) {
             System.out.println("  " + Msg.t("cmp.notrun", e.getKey().endsWith("_") ? Msg.t("cmp.rules.html") : e.getKey().substring(e.getKey().lastIndexOf('_') + 1), e.getValue()));
         }
+        return by;
+    }
+
+    /** the comparison with NetBeans: counts per category, what was not collected, then the lists (up to 20 places each) */
+    static void printComparison(List<Object[]> comparison, NetBeansMarks.Collected c, File project, boolean color) {
+        Map<NetBeansComparison.Category, List<Object[]>> by = printComparisonHeader(comparison, c, color);
         boolean cut = false;
         cut |= list(Msg.t("cmp.cat.NETBEANS_FALSE_POSITIVE"), by.get(NetBeansComparison.Category.NETBEANS_FALSE_POSITIVE));
         // what NetBeans catches and nbkit skipped, by the reason it skipped: the list of what to evolve in nbkit
