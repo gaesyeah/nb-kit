@@ -107,7 +107,7 @@ public final class Analyze {
                     System.out.println(s);
                 }
             }
-            if (how != null) {
+            if (explain != null) {
                 System.out.println();
                 System.out.println((color ? "\u001b[1m" : "") + Msg.t("explain.header", project.toPath().relativize(f.toPath())) + (color ? "\u001b[0m" : ""));
                 for (Analyzer.Explained x : how) {

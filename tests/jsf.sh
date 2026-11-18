@@ -188,6 +188,20 @@ contains "and what only nbkit marks" "$out" "Only nbkit (to review)"
 out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj" --explain pages/compare.xhtml)"
 contains "--explain lists the crossings of the file" "$out" "Comparison with NetBeans in this file:"
 contains "line by line, with the category" "$out" "  4:"
+# whole-project analyze with a collection having marks in more than one file (step 5 regression check)
+cp "$W/marks.tsv" "$W/multi-marks.tsv"
+printf 'mark\tsrc/main/webapp/pages/orders.xhtml\t5\t36\t419\t424\ttext_x-el_Identifiers\tWARNING\ton\tUnknown property numbr\n' >> "$W/multi-marks.tsv"
+out="$(NBKIT_COLLECTION="$W/multi-marks.tsv" analyze "$W/proj")"
+lacks "whole-project analyze has no explain.header" "$out" "How each expression of"
+lacks "whole-project analyze has no per-file comparison block" "$out" "Comparison with NetBeans in this file:"
+lacks "whole-project analyze has no per-file skip block" "$out" "Not checked in this file:"
+check "each line of the comparison summary appears once" test "$(grep -c 'Unknown method concat' <<<"$out")" = 1
+check "the mark of the second file is crossed (one more agree)" test "$(grep -oE "agree [0-9]+" <<<"$out")" = "agree $(( $(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj" | grep -oE "agree [0-9]+" | grep -oE "[0-9]+") + 1 ))"
+out="$(NBKIT_COLLECTION="$W/multi-marks.tsv" analyze "$W/proj" --explain pages/compare.xhtml)"
+contains "--explain has explain.header" "$out" "How each expression of src/main/webapp/pages/compare.xhtml was resolved:"
+contains "--explain has per-file comparison block" "$out" "Comparison with NetBeans in this file:"
+contains "--explain has per-file skip block" "$out" "Not checked in this file:"
+lacks "--explain has no marks from other files" "$out" "numbr"
 # is the collection up to date? (lib/analyze.sh asks this before comparing)
 check_col() { "$JAVA" -Dnbkit.collection.check=1 -Dnbkit.collection.file="$W/marks.tsv" "$@" -cp "$W/nbkit-jsf.jar" nbkit.jsf.Analyze "$W/proj" 2>&1 | grep -v '^Picked up'; }
 contains "the collection is up to date" "$(check_col)" "ok 2026-11-16T19:00:00Z"
