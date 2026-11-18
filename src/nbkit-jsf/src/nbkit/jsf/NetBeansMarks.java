@@ -68,6 +68,14 @@ public final class NetBeansMarks {
         return new File(cache, "collect-done");
     }
 
+    /**
+     * How far a collection got, for whoever waits on it (nbkit's terminal): one line "pages done TAB pages TAB marks so
+     * far TAB the page being collected", rewritten before each page, gone when the collection ends
+     */
+    public static File progressFile(File cache) {
+        return new File(cache, "collect-progress");
+    }
+
     /** the project of the request (its first line that is not blank, ~ is the home folder), or null when there is none */
     public static File readRequest(File request) {
         List<String> lines;
@@ -274,15 +282,23 @@ public final class NetBeansMarks {
         info.put(INFO_CLASSES, "" + classesTime(dir));
         Map<String, String> hashes = new LinkedHashMap<>();
         List<Mark> marks = new ArrayList<>();
-        if (steps.open()) {
-            for (File page : Workspace.pages(dir)) {
-                String rel = dir.toPath().relativize(page.toPath()).toString().replace('\\', '/');
-                hashes.put(rel, sha256(Files.readAllBytes(page.toPath())));
-                marks.addAll(steps.marks(page, rel));
+        File progress = progressFile(cache);
+        try {
+            if (steps.open()) {
+                List<File> pages = Workspace.pages(dir);
+                for (File page : pages) {
+                    String rel = dir.toPath().relativize(page.toPath()).toString().replace('\\', '/');
+                    Files.writeString(progress.toPath(), hashes.size() + "\t" + pages.size() + "\t" + marks.size() + "\t" + rel + "\n",
+                            StandardCharsets.UTF_8);
+                    hashes.put(rel, sha256(Files.readAllBytes(page.toPath())));
+                    marks.addAll(steps.marks(page, rel));
+                }
+                info.putAll(steps.info());
+            } else {
+                info.put("error", "not a NetBeans project: " + dir);
             }
-            info.putAll(steps.info());
-        } else {
-            info.put("error", "not a NetBeans project: " + dir);
+        } finally {
+            Files.deleteIfExists(progress.toPath());
         }
         File out = outputFile(cache, dir);
         write(out, info, hashes, marks);

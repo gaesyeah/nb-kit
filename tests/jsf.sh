@@ -349,10 +349,11 @@ steps="$(grep '^collect step: ' <<<"$out" | paste -sd'|')"
 contains "the collection notifies first, saying the project and that NetBeans can still be used" "$out" \
   "collect step: notice nbkit | nbkit: collecting what NetBeans marks on collectproj to compare with analyze. You can keep working."
 check "the first notification comes before opening the project" grep -q "^collect step: notice nbkit | nbkit: collecting" <<<"$(grep '^collect step: ' <<<"$out" | head -1)"
-contains "then each page in turn" "$out" "collect step: marks of src/main/webapp/b.xhtml"
+contains "then each page in turn, telling how far it got (pages done, of how many, marks so far, the page)" "$out" \
+  "collect step: marks of src/main/webapp/b.xhtml, progress 1 2 1 src/main/webapp/b.xhtml"
 contains "at the end the first one goes away and the last one says how many marks" "$steps" \
   "collect step: clear nbkit: collecting what NetBeans marks on collectproj to compare with analyze. You can keep working.|collect step: notice nbkit | Collection ready: 2 marks."
-contains "after the collection and its done marker are written" "$steps" "Collection ready: 2 marks.|collect step: collection: 2 marks, done marker: true"
+contains "after the collection and its done marker are written" "$steps" "Collection ready: 2 marks.|collect step: collection: 2 marks, done marker: true, progress left: false"
 # in NetBeans the Workspace lives on: a .js or a .properties that changes must not leave old classes or keys
 compile -cp "$W/nbkit" -d "$W/caches" "$J/test/RunWorkspaceCaches.java"
 out="$("$JAVA" -cp "$W/nbkit:$W/caches" RunWorkspaceCaches "$W/cacheproj" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"

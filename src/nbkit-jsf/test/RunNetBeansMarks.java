@@ -104,7 +104,12 @@ public class RunNetBeansMarks {
         int n = NetBeansMarks.collect(proj, cache, new NetBeansMarks.CollectSteps() {
             public boolean open() { events.add("open the project, wait for the scan"); return true; }
             public List<NetBeansMarks.Mark> marks(File page, String rel) {
-                events.add("marks of " + rel);
+                File pr = NetBeansMarks.progressFile(cache);
+                try {
+                    events.add("marks of " + rel + ", progress " + Files.readString(pr.toPath()).replace('\t', ' ').strip());
+                } catch (java.io.IOException e) {
+                    events.add("marks of " + rel + ", no progress");
+                }
                 return List.of(new NetBeansMarks.Mark(rel, 1, 1, 0, 1, "text_x-el_Identifiers", "WARNING", true, "m"));
             }
             public Map<String, String> info() { return Map.of("netbeans", "Apache NetBeans IDE 31 x"); }
@@ -112,7 +117,7 @@ public class RunNetBeansMarks {
             public void clear(Object notice) { events.add("clear " + notice); }
         });
         events.add("collection: " + NetBeansMarks.read(NetBeansMarks.outputFile(cache, proj)).marks().size() + " marks, done marker: "
-                + NetBeansMarks.doneFile(cache).exists());
+                + NetBeansMarks.doneFile(cache).exists() + ", progress left: " + NetBeansMarks.progressFile(cache).exists());
         for (String e : events) {
             System.out.println("collect step: " + e);
         }

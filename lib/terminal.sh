@@ -158,12 +158,17 @@ menu() {
 
 # spinner until the condition is true; any key cancels (returns 1)
 spin_until() {
-  local sp='|/-\' i=0 k cancel; cancel="$(t cli.enter_cancels)"
+  local sp='|/-\' i=0 k cancel line cols=0; cancel="$(t cli.enter_cancels)"
+  [ -t 1 ] && cols="$(tput cols 2>/dev/null || echo 80)"
   printf '\e[?25l'; trap 'printf "\r\e[K\e[?25h"; exit 130' INT
   # the keyboard is read only when someone can answer (a terminal, the interface); otherwise it only waits
   local keys=0; { [ -t 0 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && keys=1
   while ! "$2"; do
-    printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$1" "$D" "$cancel" "$N"; i=$((i + 1))
+    # $3: a function telling how far it got, shown instead of the text once it says something; cut to the width of a
+    # terminal (a wrapped line cannot be redrawn in place)
+    line=""; [ -n "${3:-}" ] && line="$("$3")"; line="${line:-$1}"
+    [ "$cols" -gt 0 ] && [ ${#line} -gt $((cols - ${#cancel} - 8)) ] && line="${line:0:$((cols - ${#cancel} - 9))}…"
+    printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$line" "$D" "$cancel" "$N"; i=$((i + 1))
     if [ $keys = 0 ]; then sleep 0.25; continue; fi
     if IFS= read -rsn1 -t 0.25 k </dev/tty; then
       IFS= read -rsn5 -t 0.05 k </dev/tty || true

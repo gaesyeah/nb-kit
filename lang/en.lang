@@ -127,6 +127,7 @@ cli.collect_change_classes=Java classes compiled after it: %s
 cli.collect_no_module=The JSF module is in no NetBeans userdir: install it (nbkit install jsf) to compare with NetBeans.
 cli.collect_no_launcher=NetBeans was not found to open: open it and analyze again.
 cli.collect_waiting=Waiting for NetBeans to collect what it marks
+cli.collect_progress=Collecting %s/%s pages, %s marks (%s): %s
 cli.collect_done=NetBeans collected what it marks.
 cli.collect_timeout=NetBeans did not finish collecting in %s s: no new collection.
 cli.collect_ask_close=Close NetBeans?

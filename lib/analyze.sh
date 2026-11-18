@@ -237,6 +237,13 @@ netbeans_collections() {
   done
   return 0
 }
+# how far the collection of COLLECTING got, from the line the JSF module rewrites before each page:
+# "Collecting 120/631 pages, 85 marks (project): page"
+collect_progress() {
+  local pages_done total marks page
+  IFS=$'\t' read -r pages_done total marks page < "$HOME/.cache/nbkit/collect-progress" 2>/dev/null || return 0
+  [ -n "$total" ] && t cli.collect_progress "$pages_done" "$total" "$marks" "${COLLECTING##*/}" "$page"
+}
 collect_ended() { [ -f "$HOME/.cache/nbkit/collect-done" ] || [ "$(date +%s)" -ge "$COLLECT_UNTIL" ]; }
 # opens NetBeans once if it is closed, asks the JSF module to collect each project in turn, waiting for each
 # (NBKIT_COLLECT_TIMEOUT seconds, 600), and closes NetBeans once at the end if it opened it (asking, when someone can
@@ -251,10 +258,10 @@ collect_all() {
   fi
   mkdir -p "$c"
   for d in "$@"; do
-    rm -f "$c/collect-done"; printf '%s\n' "$d" > "$c/collect-request"
-    COLLECT_UNTIL=$(( $(date +%s) + limit ))
+    rm -f "$c/collect-done" "$c/collect-progress"; printf '%s\n' "$d" > "$c/collect-request"
+    COLLECT_UNTIL=$(( $(date +%s) + limit )); COLLECTING="$d"
     # a key cancels the wait: the rest is not collected
-    spin_until "$(t cli.collect_waiting) (${d##*/})" collect_ended || { info "$(t cli.cancelled)"; break; }
+    spin_until "$(t cli.collect_waiting) (${d##*/})" collect_ended collect_progress || { info "$(t cli.cancelled)"; break; }
     if [ -f "$c/collect-done" ]; then ok "$(t cli.collect_done)"; COLLECTED+=("$d"); else warn "$(t cli.collect_timeout "$limit")"; break; fi
   done
   if [ $opened = 1 ]; then
