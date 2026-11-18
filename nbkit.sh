@@ -533,6 +533,7 @@ if [ $MENU = 1 ]; then
         fi
         # with or without the explanation of one file (how each name of its EL was resolved)
         file=""
+        printf '  %s\n' "$(t cli.analyze_explain_ask_detail)"
         if ask_yn "  $(t cli.analyze_explain_ask)" N "$(t cli.analyze_explain_ask_detail)"; then
           read -r -e -p "  $(t cli.analyze_explain_file): " -i "${dir%/}/" file || { echo; exit 0; }
           file="${file/#\~/$HOME}"

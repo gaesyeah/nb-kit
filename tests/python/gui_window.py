@@ -167,6 +167,12 @@ def actions(w):
     w.ask_explain('/p')
     d = w.explain_dialog
     check('choosing a project asks: with or without the explanation of a file', d.get_visible())
+    labels = [x for x in children(d.get_child()) if isinstance(x, Gtk.Label)]
+    check('the question explains itself below it (the detail of the question)',
+          [x.get_label() for x in labels] == [app.T('cli.analyze_explain_ask'), app.T('cli.analyze_explain_ask_detail')],
+          [x.get_label() for x in labels])
+    check('the question and its detail are centered, like the title of the window',
+          all(x.get_halign() == Gtk.Align.CENTER and x.get_justify() == Gtk.Justification.CENTER for x in labels))
     d.get_default_widget().emit('clicked')
     check('without (the default) analyzes the project', started == [('analyze', '/p')], started)
     w.start = real_start

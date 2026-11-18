@@ -444,23 +444,35 @@ class Window(Gtk.ApplicationWindow):
 
     def ask_explain(self, project):
         """with or without the explanation of one file (how each name of its EL was resolved): then which file"""
+        d, no, yes = self.question_dialog(T('cli.analyze_explain_ask'), T('cli.analyze_explain_ask_detail'), False)
+        no.connect('clicked', lambda _b: (d.destroy(), self.start('analyze', project)))
+        yes.connect('clicked', lambda _b: (d.destroy(), self.pick_explain(project)))
+        self.explain_dialog = d
+        d.present()
+
+    def question_dialog(self, text, detail, default_yes, listing=False):
+        """a yes/no dialog: the question and, below it, its detail, both centered under the title of the window; a
+        listing (the lines of a list, in monospace) keeps its lines aligned to the left inside the centered block"""
         d = Gtk.Window(title=T('gui.question'), transient_for=self, modal=True, resizable=False)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin_top=16, margin_bottom=16,
                       margin_start=18, margin_end=18)
-        box.append(label(T('cli.analyze_explain_ask'), 'heading', wrap=True))
+        for t, cls in ((text, 'heading'), (detail, 'monospace' if listing else 'dim-label')):
+            if t:
+                w = label(t, cls, wrap=True, xalign=0.0 if cls == 'monospace' else 0.5)
+                w.set_halign(Gtk.Align.CENTER)
+                w.set_max_width_chars(60)
+                w.set_justify(Gtk.Justification.LEFT if cls == 'monospace' else Gtk.Justification.CENTER)
+                box.append(w)
         buttons = Gtk.Box(spacing=8, halign=Gtk.Align.END)
         no, yes = Gtk.Button(label=T('gui.no')), Gtk.Button(label=T('gui.yes'))
         for b in (no, yes):
             b.set_cursor_from_name('pointer')
             buttons.append(b)
-        no.add_css_class('suggested-action')
-        no.connect('clicked', lambda _b: (d.destroy(), self.start('analyze', project)))
-        yes.connect('clicked', lambda _b: (d.destroy(), self.pick_explain(project)))
+        (yes if default_yes else no).add_css_class('suggested-action')
         box.append(buttons)
         d.set_child(box)
-        d.set_default_widget(no)
-        self.explain_dialog = d
-        d.present()
+        d.set_default_widget(yes if default_yes else no)
+        return d, no, yes
 
     def pick_explain(self, project):
         xhtml = Gtk.FileFilter(name='xhtml')
@@ -679,25 +691,9 @@ class Window(Gtk.ApplicationWindow):
     # ---------- questions: a dialog that answers by typing in the terminal ----------
     def ask(self, q):
         self.close_question()
-        d = Gtk.Window(title=T('gui.question'), transient_for=self, modal=True, resizable=False)
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin_top=16, margin_bottom=16,
-                      margin_start=18, margin_end=18)
-        if q['detail']:
-            detail = label(q['detail'], 'monospace', wrap=True)
-            box.append(detail)
-        box.append(label(q['text'], 'heading', wrap=True))
-        buttons = Gtk.Box(spacing=8, halign=Gtk.Align.END)
-        no, yes = Gtk.Button(label=T('gui.no')), Gtk.Button(label=T('gui.yes'))
-        for b in (no, yes):
-            b.set_cursor_from_name('pointer')
+        d, no, yes = self.question_dialog(q['text'], q['detail'], q['default_yes'], listing=True)
         no.connect('clicked', lambda _b: self.reply(False))
         yes.connect('clicked', lambda _b: self.reply(True))
-        (yes if q['default_yes'] else no).add_css_class('suggested-action')
-        buttons.append(no)
-        buttons.append(yes)
-        box.append(buttons)
-        d.set_child(box)
-        d.set_default_widget(yes if q['default_yes'] else no)
         # closing the dialog leaves the question in the terminal, to answer there
         d.connect('close-request', lambda _w: self.forget_question() or False)
         self.question = d

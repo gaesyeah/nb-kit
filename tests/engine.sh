@@ -672,7 +672,8 @@ contains "a long path is cut at the start, so the line fits" "$out" "… with a 
 check "no line of the list is wider than the terminal" python3 -c 'import sys; sys.exit(any(len(l) > 60 for l in sys.argv[1].splitlines() if l.lstrip(" >").startswith("web ")))' "$out"
 # Enter for each question: the project, the explanation of a file, collecting what NetBeans marks (no)
 keys '\033[B\033[B\r\r\r\r' "bash '$NBKIT_DIR/nbkit.sh' --lang en"; asked="$KEYS_OUT"
-contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain how each name of the EL of one file was resolved? [y/N]"
+contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain one .xhtml file in detail? [y/N]"
+contains "and says what the explanation shows before asking" "$asked" "you pick one .xhtml file and nbkit shows"
 
 out="$(nbkit --lang en debug jsf maybe)"; rc=$?
 check "an unknown debug option fails" test "$rc" = 1
