@@ -45,6 +45,14 @@ jsf_modules() {
     | while IFS= read -r m; do if has_xhtml "$m"; then echo "$m"; fi; done
   return 0
 }
+# a monorepo parent: a build file of its own, or a modules/ folder, with JSF modules under it. A folder that only
+# has a project somewhere deep inside (a repo inside it) is not a parent
+jsf_parent() {
+  if [ -f "$1/pom.xml" ] || [ -f "$1/build.gradle" ] || [ -f "$1/build.gradle.kts" ]; then
+    [ -n "$(jsf_modules "$1")" ] && return 0
+  fi
+  [ -d "$1/modules" ] && [ -n "$(jsf_modules "$1/modules")" ]
+}
 # path<TAB>name for each path read: the name NetBeans shows (the <name> of the pom, else its artifactId), else the folder
 project_names() {
   "$NBKIT_PY" -c '
@@ -70,12 +78,14 @@ jsf_projects() {
   done < <(sed -n 's/^openProjectsURLs\.\([0-9]*\)=file:/\1\t/p' "$f" | sort -n | cut -f2-)
   [ ${#open[@]} -gt 0 ] || return 0
   {
-    printf '%s\n' "${open[@]}"
+    printf 'open\t%s\n' "${open[@]}"
     printf '%s\n' "${open[@]}" | sed 's#/[^/]*$##' | sort -u | while IFS= read -r p; do
-      find "$p" -mindepth 1 -maxdepth 1 -type d -not -name '.*' | sort
+      find "$p" -mindepth 1 -maxdepth 1 -type d -not -name '.*' | sort | sed 's/^/sibling\t/'
     done
-  } | awk '!seen[$0]++' | while IFS= read -r p; do
-    if has_xhtml "$p" || [ -n "$(jsf_modules "$p")" ]; then echo "$p"; fi
+  } | awk -F'\t' '!seen[$2]++' | while IFS=$'\t' read -r kind p; do
+    if [ "$kind" = open ]; then
+      if has_xhtml "$p" || [ -n "$(jsf_modules "$p")" ]; then echo "$p"; fi
+    elif has_xhtml "$p" || jsf_parent "$p"; then echo "$p"; fi
   done | project_names
   return 0
 }

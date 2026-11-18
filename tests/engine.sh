@@ -642,13 +642,23 @@ printf '<project><parent><artifactId>p</artifactId></parent><artifactId>web-app<
 printf '<project><artifactId>mono</artifactId></project>' > "$P/mono/pom.xml"
 printf '<project><artifactId>site-ui</artifactId></project>' > "$P/mono/site-ui/pom.xml"
 printf '<project><artifactId>lib</artifactId></project>' > "$P/mono/lib/pom.xml"
+# a folder that is only the parent of a repo with a project deep inside: not a project (it listed ~/Documents/personal
+# because of nb-kit/tests/jsf-war)
+mkdir -p "$P/not a project/nb-kit/tests/deep/src/main/webapp"
+: > "$P/not a project/nb-kit/tests/deep/src/main/webapp/x.xhtml"
+printf '<project/>' > "$P/not a project/nb-kit/tests/deep/pom.xml"
+# a monorepo parent with the projects under modules/, without a build file of its own: still a project
+mkdir -p "$P/modules parent/modules/site/src/main/webapp"
+: > "$P/modules parent/modules/site/src/main/webapp/x.xhtml"
+printf '<project/>' > "$P/modules parent/modules/site/pom.xml"
 # not open in NetBeans, but in the same folder as the open ones
 mkdir -p "$P/closed one/src/main/webapp" && : > "$P/closed one/src/main/webapp/a.xhtml"
 mkdir -p "$U/config/Preferences/org/netbeans/modules"
 printf 'openProjectsURLs.1=file:%s/\nopenProjectsURLs.0=file:%s/\nopenProjectsURLs.2=file:%s/gone/\nopenProjectsURLs.3=file:%s/\n' \
   "$P/parent" "$P/web%20app" "$P" "$P/mono" > "$U/config/Preferences/org/netbeans/modules/projectui.properties"
 contains "status --json lists the JSF projects (pages in them or in modules): the open ones first, then the others beside them, with the name NetBeans shows" \
-  "$(nbkit status --json)" "\"jsf_projects\":[{\"path\":\"$P/web app\",\"name\":\"Web App\"},{\"path\":\"$P/mono\",\"name\":\"mono\"},{\"path\":\"$P/closed one\",\"name\":\"closed one\"}]"
+  "$(nbkit status --json)" "\"jsf_projects\":[{\"path\":\"$P/web app\",\"name\":\"Web App\"},{\"path\":\"$P/mono\",\"name\":\"mono\"},{\"path\":\"$P/closed one\",\"name\":\"closed one\"},{\"path\":\"$P/modules parent\",\"name\":\"modules parent\"}]"
+lacks "a folder with a repo and a project deep inside is not a JSF project" "$(nbkit status --json)" "$P/not a project"
 
 # the list in the menu of the terminal: each project on one line, even in a narrow terminal
 L="$P/a folder with a very long name/that goes on and on/web"
