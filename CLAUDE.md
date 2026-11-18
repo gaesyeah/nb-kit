@@ -11,7 +11,7 @@ Read the other notes when the task needs them (not imported, to save context):
 
 Essentials:
 - Never commit or push. When work is ready, give the ready command `git commit -m "..."` (single quotes inside, no AI attribution).
-- Tests fail first, then pass. While implementing, run only the affected test files (`bash tests/run.sh <file>`); the whole suite (`bash tests/run.sh`) runs once at the end, before giving the commit command.
+- Tests fail first, then pass. While implementing, run only the affected test files (`bash tests/run.sh <file>`). A simple change (lang/text, one rule, one screen, one file) needs only that file before the commit command; the whole suite (`bash tests/run.sh`) is for shared code (`lib/terminal.sh`, `lib/analyze.sh`, `nbkit.sh`, `lib/gui`) or before a merge/release.
 - Every feature: backend logic, CLI tip, GUI tooltip, lang keys in en and pt-BR, tests.
 - Use the ponytail skill when writing code (smallest complete change). Not for tests.
 - Respect the architecture in `nbkit.md` ("Architecture"): logic in the backend (`lib/`), exposed through `nbkit.sh` and `status --json`; the GUI (`model.py` decides, `app.py` only draws) and the CLI menu only call it.
