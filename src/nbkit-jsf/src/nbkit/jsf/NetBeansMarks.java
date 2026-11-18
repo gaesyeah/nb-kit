@@ -270,7 +270,6 @@ public final class NetBeansMarks {
     public static int collect(File dir, File cache, CollectSteps steps) throws Exception {
         Object started = steps.notice(Msg.t("collect.title"), Msg.t("collect.started", dir.getName()));
         Map<String, String> info = new LinkedHashMap<>();
-        info.put("project", dir.getPath());
         info.put("date", java.time.Instant.now().toString());
         info.put(INFO_CLASSES, "" + classesTime(dir));
         Map<String, String> hashes = new LinkedHashMap<>();

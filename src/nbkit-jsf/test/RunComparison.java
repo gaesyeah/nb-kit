@@ -30,7 +30,6 @@ public class RunComparison {
         String out = System.getProperty("nbkit.write");
         if (out != null) {
             java.util.Map<String, String> info = new java.util.LinkedHashMap<>();
-            info.put("project", proj.getPath());
             info.put("netbeans", "Apache NetBeans IDE 31 31-test");
             info.put("date", "2026-11-16T19:00:00Z");
             info.put(NetBeansMarks.INFO_CLASSES, "" + (System.currentTimeMillis() + 60000));

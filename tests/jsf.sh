@@ -360,6 +360,7 @@ contains "the pairs NetBeans rule -> nbkit rules, and the one nbkit turns off (N
 # NetBeans: nbkit.md, How to run): each case of its index.xhtml in the category of the table in the notes
 WAR="$NBKIT_DIR/tests/jsf-war"
 if [ -f "$WAR/netbeans-marks.tsv" ]; then
+  check "the saved collection does not carry the machine path" test -z "$(grep -F $'info\tproject\t/' "$WAR/netbeans-marks.tsv")"
   mkdir -p "$W/war" && cp -r "$WAR/src" "$WAR/pom.xml" "$W/war/" && mkdir -p "$W/war/target/classes"
   mapfile -t src < <(java_files "$W/war/src/main/java")
   compile -cp "$W/api.jar" -d "$W/war/target/classes" "${src[@]}"
