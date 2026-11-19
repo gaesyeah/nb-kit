@@ -691,7 +691,7 @@ UD="$HOME/.netbeans/31"
 case " $* " in *" --nbkit-close "*) echo close >> "$COL_EVENTS"; pkill -f "nbkit-fake-""collector"; rm -f "$UD/lock"; exit 0 ;; esac
 echo open >> "$COL_EVENTS"
 : > "$UD/lock"; echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
-nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then p="$(cat "$r")"; rm "$r"; echo "collect ${p##*/}" >> "$COL_EVENTS"; printf "1\t2\t3\tsrc/main/webapp/p.xhtml\n" > "$HOME/.cache/nbkit/collect-progress"; sleep 0.6; rm -f "$HOME/.cache/nbkit/collect-progress"; mkdir -p "$HOME/.cache/nbkit/collect"; printf "# nbkit NetBeans marks 1\n" > "$HOME/.cache/nbkit/collect/x.tsv"; echo "$HOME/.cache/nbkit/collect/x.tsv" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.2; done' "nbkit-fake-""collector" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
+nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then p="$(cat "$r")"; rm "$r"; echo "collect ${p##*/}" >> "$COL_EVENTS"; sleep 1; printf "1\t2\t3\tsrc/main/webapp/p.xhtml\n" > "$HOME/.cache/nbkit/collect-progress"; sleep 0.6; rm -f "$HOME/.cache/nbkit/collect-progress"; mkdir -p "$HOME/.cache/nbkit/collect"; printf "# nbkit NetBeans marks 1\n" > "$HOME/.cache/nbkit/collect/x.tsv"; echo "$HOME/.cache/nbkit/collect/x.tsv" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.2; done' "nbkit-fake-""collector" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
 X
   chmod +x "$WORK/colnb/bin/netbeans"
   M2="$WORK/mono2"
@@ -703,6 +703,7 @@ X
   out="$(HOME="$FH" NB_HOME="$WORK/colnb" COL_EVENTS="$EV" NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false bash "$NBKIT_DIR/nbkit.sh" --lang en analyze jsf "$M2" --netbeans </dev/null 2>&1)"
   check "--netbeans on a project of 2 modules: opens NetBeans once, collects each module in turn, closes it once" \
     test "$(paste -sd' ' "$EV")" = "open collect a collect b close"
+  lacks "while the collector has not created progress yet, there is no missing-file error" "$out" "$FH/.cache/nbkit/collect-progress"
   contains "while NetBeans collects, the wait shows how far it got" "$out" "Collecting 1/2 pages, 3 marks (a): src/main/webapp/p.xhtml"
   : > "$EV"
   # yes to collecting; the yes to closing only after the collections (a key typed while it waits cancels the wait)

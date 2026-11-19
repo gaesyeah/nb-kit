@@ -240,8 +240,9 @@ netbeans_collections() {
 # how far the collection of COLLECTING got, from the line the JSF module rewrites before each page:
 # "Collecting 120/631 pages, 85 marks (project): page"
 collect_progress() {
-  local pages_done total marks page
-  IFS=$'\t' read -r pages_done total marks page < "$HOME/.cache/nbkit/collect-progress" 2>/dev/null || return 0
+  local progress="$HOME/.cache/nbkit/collect-progress" pages_done total marks page
+  [ -r "$progress" ] || return 0
+  IFS=$'\t' read -r pages_done total marks page 2>/dev/null < "$progress" || return 0
   [ -n "$total" ] && t cli.collect_progress "$pages_done" "$total" "$marks" "${COLLECTING##*/}" "$page"
 }
 collect_ended() { [ -f "$HOME/.cache/nbkit/collect-done" ] || [ "$(date +%s)" -ge "$COLLECT_UNTIL" ]; }
