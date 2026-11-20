@@ -105,17 +105,23 @@ analyze_java() {
 # the libraries of a Maven project, one per line (Maven itself prints nothing; offline first, it is faster)
 # shortcut: one pom only (a multi-module parent gives the classpath of its last module), enough for one web project
 analyze_classpath() {
-  local dir="$1" mvn="${NBKIT_MVN:-mvn}" out
+  local dir="$1" mvn="${NBKIT_MVN:-mvn}" out maven_pid
   [ -f "$dir/pom.xml" ] || return 0
   if ! command -v "$mvn" >/dev/null 2>&1; then warn "$(t cli.analyze_no_maven "$(t cli.analyze_maven_missing)")" >&2; return 0; fi
-  info "$(t cli.analyze_maven)" >&2
   out="$(mktemp)"
-  if "$mvn" -o -q -f "$dir/pom.xml" dependency:build-classpath -Dmdep.outputFile="$out" >/dev/null 2>&1 \
-    || "$mvn" -q -f "$dir/pom.xml" dependency:build-classpath -Dmdep.outputFile="$out" >/dev/null 2>&1; then
+  (
+    "$mvn" -o -q -f "$dir/pom.xml" dependency:build-classpath -Dmdep.outputFile="$out" >/dev/null 2>&1 \
+      || "$mvn" -q -f "$dir/pom.xml" dependency:build-classpath -Dmdep.outputFile="$out" >/dev/null 2>&1
+  ) &
+  maven_pid=$!
+  analyze_maven_finished() { ! kill -0 "$maven_pid" 2>/dev/null; }
+  spin_until "$(t cli.analyze_maven)" analyze_maven_finished "" no yes >&2
+  if wait "$maven_pid"; then
     tr ':' '\n' < "$out"
   else
     warn "$(t cli.analyze_no_maven "$(t cli.analyze_maven_failed)")" >&2
   fi
+  unset -f analyze_maven_finished
   rm -f "$out"
 }
 
@@ -255,7 +261,8 @@ collect_all() {
   if ! nb_running; then
     find_launcher || { warn "$(t cli.collect_no_launcher)"; return 1; }
     open_netbeans; opened=1
-    spin_until "$(t cli.waiting_open)" nb_running && spin_until "$(t cli.waiting_modules)" nb_loaded || return 1
+    spin_until "$(t cli.waiting_open)" nb_running "" yes yes \
+      && spin_until "$(t cli.waiting_modules)" nb_loaded "" yes yes || return 1
   fi
   mkdir -p "$c"
   for d in "$@"; do

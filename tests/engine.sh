@@ -690,7 +690,7 @@ if command -v java >/dev/null 2>&1 || ls /usr/lib/jvm/*/bin/java >/dev/null 2>&1
 UD="$HOME/.netbeans/31"
 case " $* " in *" --nbkit-close "*) echo close >> "$COL_EVENTS"; pkill -f "nbkit-fake-""collector"; rm -f "$UD/lock"; exit 0 ;; esac
 echo open >> "$COL_EVENTS"
-: > "$UD/lock"; echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
+: > "$UD/lock"; sleep 1; echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
 nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then p="$(cat "$r")"; rm "$r"; echo "collect ${p##*/}" >> "$COL_EVENTS"; sleep 1; printf "1\t2\t3\tsrc/main/webapp/p.xhtml\n" > "$HOME/.cache/nbkit/collect-progress"; sleep 0.6; rm -f "$HOME/.cache/nbkit/collect-progress"; mkdir -p "$HOME/.cache/nbkit/collect"; printf "# nbkit NetBeans marks 1\n" > "$HOME/.cache/nbkit/collect/x.tsv"; echo "$HOME/.cache/nbkit/collect/x.tsv" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.2; done' "nbkit-fake-""collector" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
 X
   chmod +x "$WORK/colnb/bin/netbeans"
@@ -703,6 +703,7 @@ X
   out="$(HOME="$FH" NB_HOME="$WORK/colnb" COL_EVENTS="$EV" NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false bash "$NBKIT_DIR/nbkit.sh" --lang en analyze jsf "$M2" --netbeans </dev/null 2>&1)"
   check "--netbeans on a project of 2 modules: opens NetBeans once, collects each module in turn, closes it once" \
     test "$(paste -sd' ' "$EV")" = "open collect a collect b close"
+  contains "loading NetBeans modules shows elapsed time" "$out" "00:00"
   lacks "while the collector has not created progress yet, there is no missing-file error" "$out" "$FH/.cache/nbkit/collect-progress"
   contains "while NetBeans collects, the wait shows how far it got" "$out" "Collecting 1/2 pages, 3 marks (a): src/main/webapp/p.xhtml"
   : > "$EV"
@@ -715,6 +716,26 @@ X
   contains "the other one too" "$KEYS_OUT" "b: no collection"
   check "and then opens once, collects both and closes once (asked at the end)" test "$(paste -sd' ' "$EV")" = "open collect a collect b close"
   pkill -f "nbkit-fake-""collector" 2>/dev/null
+else
+  echo "  skipped: no Java here"
+fi
+
+echo "Analyze: Maven classpath loading"
+if command -v java >/dev/null 2>&1; then
+  MP="$WORK/analyze-spinner"; MVN="$WORK/fake-mvn"; AH="$WORK/analyze-home"
+  mkdir -p "$MP/src/main/webapp" "$MP/target/classes" "$AH"
+  printf '<project/>\n' > "$MP/pom.xml"
+  printf '<html/>\n' > "$MP/src/main/webapp/index.xhtml"
+  cat > "$MVN" <<'X'
+#!/bin/bash
+for arg in "$@"; do case "$arg" in -Dmdep.outputFile=*) out="${arg#*=}";; esac; done
+sleep 1.3
+: > "$out"
+X
+  chmod +x "$MVN"
+  out="$({ sleep 0.3; printf x; } | HOME="$AH" NBKIT_TTY=1 NBKIT_MVN="$MVN" NBKIT_JSF_JAR="$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar" timeout 20 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$MP'" /dev/null 2>&1 | tr -d '\r')"
+  contains "Maven classpath loading shows elapsed mm:ss" "$out" "00:01"
+  contains "a key does not cancel Maven classpath loading" "$out" "xhtml files,"
 else
   echo "  skipped: no Java here"
 fi

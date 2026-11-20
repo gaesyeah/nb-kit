@@ -156,18 +156,32 @@ menu() {
   MENU_IDX=$i
 }
 
-# spinner until the condition is true; any key cancels (returns 1)
+# spinner until the condition is true; any key cancels (returns 1) unless disabled
+# optional: progress function, cancelable (yes), elapsed time (no)
 spin_until() {
-  local sp='|/-\' i=0 k cancel line cols=0; cancel="$(t cli.enter_cancels)"
-  [ -t 1 ] && cols="$(tput cols 2>/dev/null || echo 80)"
+  local sp='|/-\' i=0 k cancel='' line label timer cols=0 keys=0 elapsed=0 started=$SECONDS
+  [ "${4:-yes}" = yes ] && cancel="$(t cli.enter_cancels)"
+  { [ -t 1 ] || [ -t 2 ]; } && cols="$(tput cols 2>/dev/null || echo 80)"
+  [ "${4:-yes}" = yes ] && { [ -t 0 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && keys=1
   printf '\e[?25l'; trap 'printf "\r\e[K\e[?25h"; exit 130' INT
-  # the keyboard is read only when someone can answer (a terminal, the interface); otherwise it only waits
-  local keys=0; { [ -t 0 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && keys=1
   while ! "$2"; do
     # $3: a function telling how far it got, shown instead of the text once it says something; cut to the width of a
     # terminal (a wrapped line cannot be redrawn in place)
     line=""; [ -n "${3:-}" ] && line="$("$3")"; line="${line:-$1}"
-    [ "$cols" -gt 0 ] && [ ${#line} -gt $((cols - ${#cancel} - 8)) ] && line="${line:0:$((cols - ${#cancel} - 9))}…"
+    timer=""
+    if [ "${5:-no}" = yes ]; then
+      elapsed=$((SECONDS - started))
+      timer="$(printf '%02d:%02d' "$((elapsed / 60))" "$((elapsed % 60))")"
+      line+=" $timer"
+    fi
+    if [ "$cols" -gt 0 ] && [ ${#line} -gt $((cols - ${#cancel} - 8)) ]; then
+      if [ -n "$timer" ]; then
+        label="${line% $timer}"
+        line="${label:0:$((cols - ${#cancel} - ${#timer} - 10))}… $timer"
+      else
+        line="${line:0:$((cols - ${#cancel} - 9))}…"
+      fi
+    fi
     printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$line" "$D" "$cancel" "$N"; i=$((i + 1))
     if [ $keys = 0 ]; then sleep 0.25; continue; fi
     if IFS= read -rsn1 -t 0.25 k </dev/tty; then
@@ -175,7 +189,7 @@ spin_until() {
       printf '\r\e[K\e[?25h'; trap 'exit 130' INT; return 1
     fi
   done
-  printf '\r\e[K\e[?25h'; trap 'exit 130' INT
+  printf '\r\e[K\e[?25h'; trap 'printf "\r\e[K\e[?25h"; exit 130' INT
 }
 
 HEADER=0

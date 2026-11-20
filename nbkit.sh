@@ -299,8 +299,8 @@ after_change() {
   fi
   if [ "$1" = install ] && [ $wait = 0 ]; then t cli.check_later_menu "$(t cli.menu_check)"; echo; exit 0; fi
   if [ "$1" = install ]; then
-    if spin_until "$(t cli.waiting_open)" nb_running \
-       && spin_until "$(t cli.waiting_modules)" nb_loaded; then
+    if spin_until "$(t cli.waiting_open)" nb_running "" yes yes \
+       && spin_until "$(t cli.waiting_modules)" nb_loaded "" yes yes; then
       sleep 2
       echo
       exec env NBKIT_TTY=1 bash "$SELF" check "$UD"
