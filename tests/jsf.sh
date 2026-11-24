@@ -10,6 +10,8 @@ for c in "$JAVAC" "$JAR" "$JAVA"; do
   command -v "$c" >/dev/null 2>&1 || { echo "  skipped: JDK 17 or newer not found (javac, jar, java)"; exit 3; }
 done
 W="$(mktemp -d)"
+# the analyze reports in a cache of the test, not in the real home
+export XDG_CACHE_HOME="$W/cache"
 trap 'rm -rf "$W"' EXIT
 quiet() { "$@" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS' || true; }
 compile() { quiet "$JAVAC" --release 17 -encoding UTF-8 -nowarn "$@"; }
@@ -176,6 +178,21 @@ for i in $(seq 1 25); do printf '<h:panelGroup xmlns:h="jakarta.faces.html" styl
 out="$(analyze "$W/proj")"
 check "a long list stops at 20 places and says how many more" grep -qE '^      and [0-9]+ more$' <<<"$out"
 contains "and says how to see everything of one file" "$out" "nbkit analyze jsf $W/proj --explain <file>"
+# the whole report goes to a file, said in a green line at the end: every place, no cut, no colors
+contains "the report is saved, said at the end" "$(tail -1 <<<"$out")" "Report saved: $W/cache/nbkit/analyze/proj-"
+rep="$(sed -n 's/.*Report saved: \(.*\.txt\).*/\1/p' <<<"$out")"
+check "the report file exists" test -f "$rep"
+check "the terminal cuts the long list" test "$(grep -c 'pages/many.xhtml:' <<<"$out")" -lt 25
+check "the report has all 25" test "$(grep -c 'pages/many.xhtml:' "$rep")" = 25
+lacks "the report is not cut" "$(cat "$rep")" "Some lists were cut"
+check "nor says how many more" bash -c "! grep -qE '^ +and [0-9]+ more$' '$rep'"
+check "the report has no colors" bash -c "! grep -q $'\x1b' '$rep'"
+contains "the report has the summary" "$(cat "$rep")" "$(grep -m1 -E 'xhtml files, [0-9]+ with something' <<<"$out")"
+# --explain too: its report is named after the page
+out="$(analyze "$W/proj" --explain pages/many.xhtml)"
+contains "--explain saves its report too, named after the page" "$(tail -1 <<<"$out")" "Report saved: $W/cache/nbkit/analyze/proj-many-"
+rep="$(sed -n 's/.*Report saved: \(.*\.txt\).*/\1/p' <<<"$out")"
+contains "with how each name was resolved" "$(cat "$rep")" "How each expression of src/main/webapp/pages/many.xhtml was resolved:"
 rm "$W/proj/src/main/webapp/pages/many.xhtml"
 # with a collection of what NetBeans marks (here a fake one, pages/compare.xhtml): the comparison after the summary
 compile -cp "$W/nbkit" -d "$W/compare" "$J/test/RunComparison.java"
@@ -262,10 +279,15 @@ rm "$WA"/pages/extra-*.xhtml
 QH="$W/qhome"; mkdir -p "$QH/.netbeans/31/config" "$QH/.netbeans/31/modules" "$QH/.netbeans/31/var/log"
 : > "$QH/.netbeans/31/modules/nbkit-jsf.jar"
 rm -f "$W/collect-ev"
-out="$(printf 'n\n' | HOME="$QH" NBKIT_TTY=1 NBKIT_UI_EVENTS="$W/collect-ev" NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
+# a fake xdg-open, to see the report opened
+mkdir -p "$W/fakebin"; printf '#!/bin/bash\necho "$1" > "%s/opened"\n' "$W" > "$W/fakebin/xdg-open"; chmod +x "$W/fakebin/xdg-open"
+out="$(printf 'n\n\n' | PATH="$W/fakebin:$PATH" HOME="$QH" NBKIT_TTY=1 NBKIT_UI_EVENTS="$W/collect-ev" NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
 contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) may be out of date. Collect it again? It opens NetBeans."
 check "the dialog gets what changed, from the same list" grep -q 'changed pages (1): src/main/webapp/pages/compare.xhtml' "$W/collect-ev"
 contains "no: it compares with the old one, warning" "$out" "may be out of date; comparing with it anyway."
+contains "the interface or the menu asks whether to open the report, Enter opens" "$out" "Report saved: $W/cache/nbkit/analyze/proj-"
+for _ in $(seq 50); do [ -f "$W/opened" ] && break; sleep 0.1; done
+check "Enter opens it" grep -q "$W/cache/nbkit/analyze/proj-.*\.txt" "$W/opened"
 # --netbeans: collects without asking, with a NetBeans that only answers the request (and closes it, since it opened it)
 FH="$W/fakehome"; FU="$FH/.netbeans/31"
 mkdir -p "$FU/modules" "$FU/config" "$FU/var/log" "$W/fakenb/bin"

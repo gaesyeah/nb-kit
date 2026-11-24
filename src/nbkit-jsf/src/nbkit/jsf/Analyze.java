@@ -1,7 +1,11 @@
 package nbkit.jsf;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -16,9 +20,14 @@ import java.util.Map;
  * (target/classes...) are found by Workspace. Prints each problem as file:line:column with what the lightbulb would
  * offer, then a summary. -Dnbkit.explain=<file> analyzes only the files whose path ends with it and also says how
  * each name of the EL was resolved (its type at each step, and where and why the checking stopped). Exit code: 0 when it ran (what it found is in the summary), 2 nothing to analyze.
- * -Dnbkit.color=1 colors the output.
+ * -Dnbkit.color=1 colors the output. -Dnbkit.report=<file> also appends the whole output to that file, with the lists
+ * the terminal cuts at 20 in full.
  */
 public final class Analyze {
+
+    /** the terminal only (the cut lists' "and N more") and the report only (the rest of those lists; null: none) */
+    private static PrintStream term = System.out;
+    private static PrintStream report;
 
     private Analyze() {
     }
@@ -50,6 +59,31 @@ public final class Analyze {
             System.exit(0);
         }
         boolean color = "1".equals(System.getProperty("nbkit.color"));
+        String rf = System.getProperty("nbkit.report");
+        if (rf != null && !rf.isBlank()) {
+            // everything printed goes to both; lib/analyze.sh takes the colors out of the file
+            report = new PrintStream(new FileOutputStream(rf, true), true, StandardCharsets.UTF_8);
+            OutputStream both = new OutputStream() {
+                @Override
+                public void write(int b) {
+                    term.write(b);
+                    report.write(b);
+                }
+
+                @Override
+                public void write(byte[] b, int off, int len) {
+                    term.write(b, off, len);
+                    report.write(b, off, len);
+                }
+
+                @Override
+                public void flush() {
+                    term.flush();
+                    report.flush();
+                }
+            };
+            System.setOut(new PrintStream(both, true, StandardCharsets.UTF_8));
+        }
         String explain = System.getProperty("nbkit.explain");
         if (explain != null) {
             String want = explain.replace('\\', '/');
@@ -174,13 +208,14 @@ public final class Analyze {
                     System.out.println("      " + w);
                 }
                 if (where.size() > 20) {
-                    System.out.println("      " + Msg.t("skip.more", where.size() - 20));
+                    onlyReport(where.subList(20, where.size()).stream().map(w -> "      " + w).toList());
+                    term.println("      " + Msg.t("skip.more", where.size() - 20));
                     cut = true;
                 }
             }
         }
         if (cut) {
-            System.out.println("  " + Msg.t("skip.howto", project));
+            term.println("  " + Msg.t("skip.howto", project));
         }
     }
 
@@ -228,7 +263,7 @@ public final class Analyze {
         }
         cut |= list(Msg.t("cmp.cat.NBKIT_ONLY"), by.get(NetBeansComparison.Category.NBKIT_ONLY));
         if (cut) {
-            System.out.println("  " + Msg.t("cmp.howto", project));
+            term.println("  " + Msg.t("cmp.howto", project));
         }
     }
 
@@ -245,10 +280,19 @@ public final class Analyze {
             System.out.println(indent + e[1] + "  " + describe((NetBeansComparison.Match) e[0]));
         }
         if (l.size() > 20) {
-            System.out.println(indent + Msg.t("skip.more", l.size() - 20));
+            onlyReport(l.subList(20, l.size()).stream().map(e -> indent + e[1] + "  " + describe((NetBeansComparison.Match) e[0])).toList());
+            term.println(indent + Msg.t("skip.more", l.size() - 20));
             return true;
         }
         return false;
+    }
+
+    /** the rest of a list the terminal cuts at 20: only in the report */
+    private static void onlyReport(List<String> lines) {
+        System.out.flush();
+        if (report != null) {
+            lines.forEach(report::println);
+        }
     }
 
     static int[] lineCol(String text, int offset) {

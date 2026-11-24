@@ -133,7 +133,7 @@ analyze_one() {
   case "$NBKIT_LANG" in pt*) lang=pt ;; esac
   [ -n "$G" ] && color=1
   "$JAVA" -Duser.language=$lang -Dstdout.encoding=UTF-8 -Dnbkit.color=$color ${EXPLAIN:+"-Dnbkit.explain=$EXPLAIN"} \
-    ${NBKIT_COLLECTION:+"-Dnbkit.collection.file=$NBKIT_COLLECTION"} \
+    ${NBKIT_COLLECTION:+"-Dnbkit.collection.file=$NBKIT_COLLECTION"} ${REPORT:+"-Dnbkit.report=$REPORT"} \
     -cp "$JAR" nbkit.jsf.Analyze "$1" ${cp[@]+"${cp[@]}"} \
     2> >(grep -v '^Picked up JAVA_TOOL_OPTIONS' >&2) || rc=$?
   return "$rc"
@@ -301,7 +301,7 @@ not_compiled() { [ -f "$1/pom.xml" ] && [ ! -d "$1/target/classes" ]; }
 # is analyzed module by module. With a file, only that file (in its own project, found from it), also saying how each
 # name of its EL was resolved
 jsf_analyze() {
-  local dir="${1:-}" mods=() m rc=0
+  local dir="${1:-}" mods=() m rc=0 REPORT=""
   EXPLAIN="${2:-}"
   # with a file, its own project (the nearest folder above it with a pom.xml or a build.gradle): the module, in a monorepo
   # (with a project given, the file may also be the end of its path: pages/x.xhtml)
@@ -323,18 +323,46 @@ jsf_analyze() {
     if not_compiled "$dir"; then die "$(t cli.analyze_no_classes "${dir/#$HOME/\~}")"; fi
     echo "  ${B}$(t cli.menu_analyze)${N}  ${dir/#$HOME/\~}"
     netbeans_collections "$dir"
-    analyze_one "$dir"; return $?
+    report_start "$dir"
+    analyze_one "$dir" || rc=$?
+    # nothing analyzed (no such file for --explain): no report
+    if [ $rc = 2 ]; then rm -f "$REPORT"; else report_end; fi
+    return $rc
   fi
   echo "  ${B}$(t cli.menu_analyze)${N}  ${dir/#$HOME/\~}  ${D}$(t cli.analyze_modules "${#mods[@]}")${N}"
   # the collection of what NetBeans marks: all the modules together (one question, NetBeans opened once)
   local compiled=()
   for m in "${mods[@]}"; do not_compiled "$m" || compiled+=("$m"); done
   [ ${#compiled[@]} -gt 0 ] && netbeans_collections "${compiled[@]}"
+  report_start "$dir"
   for m in "${mods[@]}"; do
     echo
     echo "  ${BL}${m#"$dir"/}${N}"
+    printf '\n%s\n' "${m#"$dir"/}" >> "$REPORT"
     if not_compiled "$m"; then warn "$(t cli.analyze_skip "${m#"$dir"/}")"; rc=1; continue; fi
     analyze_one "$m" || { [ $? = 2 ] || rc=1; }
   done
+  report_end
   return $rc
+}
+
+# the report: the whole output of the analysis (Analyze -Dnbkit.report, the lists the terminal cuts in full), in
+# REPORT under the cache, named after the project (and the page, with --explain) and the time
+report_start() {
+  local d="${XDG_CACHE_HOME:-$HOME/.cache}/nbkit/analyze" page=""
+  [ -n "$EXPLAIN" ] && page="-$(basename "$EXPLAIN" .xhtml)"
+  mkdir -p "$d"
+  REPORT="$d/${1##*/}$page-$(date +%Y-%m-%d-%H%M%S).txt"
+  echo "nbkit analyze jsf $1${EXPLAIN:+ --explain $EXPLAIN}  ($(date '+%Y-%m-%d %H:%M'))" > "$REPORT"
+}
+# at the end, a green line with where the report is; the menu and the interface ask whether to open it (Enter opens)
+report_end() {
+  local shown="${REPORT/#$HOME/\~}"
+  sed -i 's/\x1b\[[0-9;]*m//g' "$REPORT"
+  echo
+  if { [ "${MENU:-0}" = 1 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && command -v xdg-open >/dev/null 2>&1; then
+    if ask_yn "  ${G}$(t cli.analyze_report_open "$shown")${N}" Y; then setsid -f xdg-open "$REPORT" >/dev/null 2>&1; fi
+  else
+    echo "  ${G}$(t cli.analyze_report "$shown")${N}"
+  fi
 }

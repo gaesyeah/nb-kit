@@ -1,0 +1,3 @@
+#!/bin/sh
+# opens nothing: a test that answers yes to opening a report must not open a window
+exit 0

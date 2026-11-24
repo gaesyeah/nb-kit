@@ -670,8 +670,12 @@ contains "the menu lists the JSF projects to analyze" "$out" "Other folder..."
 
 contains "a long path is cut at the start, so the line fits" "$out" "… with a very long name/that goes on and on/web"
 check "no line of the list is wider than the terminal" python3 -c 'import sys; sys.exit(any(len(l) > 60 for l in sys.argv[1].splitlines() if l.lstrip(" >").startswith("web ")))' "$out"
-# Enter for each question: the project, the explanation of a file, collecting what NetBeans marks (no)
-keys '\033[B\033[B\r\r\r\r' "bash '$NBKIT_DIR/nbkit.sh' --lang en"; asked="$KEYS_OUT"
+# Enter for each question: the project, the explanation of a file, collecting what NetBeans marks (no); then, after the
+# analysis (keys typed ahead are lost when the menu ends), the end of input for opening the report (Enter: the fake
+# xdg-open of tests/bin)
+asked="$({ printf '\033[B\033[B\r\r\r\r'; sleep 3; printf '\r'; sleep 8; } | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
+check "it ends by itself, not at the time limit" test "$?" != 124
+contains "at the end it says where the report is and offers to open it" "$asked" "Report saved: ~/.cache/nbkit/analyze/web-"
 contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain one .xhtml file in detail? [y/N]"
 contains "and says what the explanation shows before asking" "$asked" "you pick one .xhtml file and nbkit shows"
 
