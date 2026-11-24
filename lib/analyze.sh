@@ -209,7 +209,7 @@ netbeans_collections() {
   local d lines=() ask=0 need=() label det=""
   declare -A st=() date=() changes=()
   # an analyze stopped in the middle of a no-window collection left NetBeans' project list pending
-  if collection_ud; then projects_restore; fi
+  if collection_ud; then projects_pending; fi
   for d in "$@"; do
     mapfile -t lines < <(collection_check "$d")
     [ "${lines[0]%% *}" = ok ] && continue
@@ -272,8 +272,32 @@ PROJECTUI=config/Preferences/org/netbeans/modules/projectui.properties
 projects_keep() {
   local c="$HOME/.cache/nbkit"
   mkdir -p "$c"
+  rm -f "$c/collect-projectui.pid"
   if [ -f "$UD/$PROJECTUI" ]; then cp -p "$UD/$PROJECTUI" "$c/collect-projectui.properties"; else : > "$c/collect-projectui.none"; fi
 }
+# the pids of the no-window NetBeans, with the copy: a next analyze tells whether it still runs
+projects_pid() { nb_pids > "$HOME/.cache/nbkit/collect-projectui.pid"; }
+projects_forget() { rm -f "$HOME/.cache/nbkit/collect-projectui".{properties,none,pid}; }
+# a copy left by an analyze stopped with no chance to clean up (kill -9). Its no-window NetBeans still running: close
+# it and put the list back. Gone: NetBeans may have been used since, so never in silence: the menu and the interface
+# ask (no: the copy is forgotten); with arguments it stays pending and one line says so
+projects_pending() {
+  local c="$HOME/.cache/nbkit/collect-projectui" p
+  [ -e "$c.properties" ] || [ -e "$c.none" ] || return 0
+  for p in $(cat "$c.pid" 2>/dev/null); do
+    if tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -q 'org.netbeans.Main'; then
+      info "$(t cli.collect_left_running)"
+      close_nowindow; projects_restore; return 0
+    fi
+  done
+  if [ "${MENU:-0}" = 1 ] || [ "${NBKIT_TTY:-}" = 1 ]; then
+    if ask_yn "  $(t cli.collect_restore_ask)" N "$(t cli.collect_restore_detail)"; then projects_restore; else projects_forget; fi
+  else
+    warn "$(t cli.collect_restore_skipped)"
+  fi
+}
+# the analyze ends in the middle of a no-window collection (Ctrl+C, kill, the terminal closed): through on_exit
+nowindow_abort() { close_nowindow; projects_restore; }
 # only once NetBeans is gone and its lock with it: it writes the list while it exits
 projects_free() { nb_closed && [ ! -e "$UD/lock" ]; }
 projects_restore() {
@@ -282,9 +306,9 @@ projects_restore() {
   for ((i = 0; i < 60; i++)); do projects_free && break; sleep 0.5; done
   projects_free || return 0
   if [ -e "$c/collect-projectui.properties" ]; then
-    mkdir -p "$(dirname "$UD/$PROJECTUI")" && cp -p "$c/collect-projectui.properties" "$UD/$PROJECTUI" && rm -f "$c/collect-projectui.properties"
+    mkdir -p "$(dirname "$UD/$PROJECTUI")" && cp -p "$c/collect-projectui.properties" "$UD/$PROJECTUI" && projects_forget
   else
-    rm -f "$UD/$PROJECTUI" "$c/collect-projectui.none"
+    rm -f "$UD/$PROJECTUI"; projects_forget
   fi
 }
 # opens NetBeans once if it is closed, asks the JSF module to collect each project in turn, waiting for each
@@ -300,12 +324,13 @@ collect_all() {
     find_launcher || { warn "$(t cli.collect_no_launcher)"; return 1; }
     # closed: with no window (it closes by itself at the end), unless --netbeans=window
     if [ "${NBKIT_NB_MODE:-auto}" = window ]; then open_netbeans
-    else projects_keep; open_netbeans --nosplash --nogui -J-Djava.awt.headless=true; nowindow=1; fi
+    else projects_keep; EXIT_HOOK=nowindow_abort; open_netbeans --nosplash --nogui -J-Djava.awt.headless=true; nowindow=1; fi
     opened=1
     if ! { spin_until "$(t cli.waiting_open)" nb_running "" yes yes && spin_until "$(t cli.waiting_modules)" nb_loaded "" yes yes; }; then
-      if [ $nowindow = 1 ]; then close_nowindow; projects_restore; fi
+      if [ $nowindow = 1 ]; then close_nowindow; projects_restore; EXIT_HOOK=""; fi
       return 1
     fi
+    if [ $nowindow = 1 ]; then projects_pid; fi
     if [ $nowindow = 1 ]; then info "$(t cli.collect_nowindow)"; fi
   fi
   mkdir -p "$c"
@@ -316,7 +341,7 @@ collect_all() {
     spin_until "$(t cli.collect_waiting) (${d##*/})" collect_ended collect_progress || { info "$(t cli.cancelled)"; break; }
     if [ -f "$c/collect-done" ]; then ok "$(t cli.collect_done)"; COLLECTED+=("$d"); else warn "$(t cli.collect_timeout "$limit")"; break; fi
   done
-  if [ $nowindow = 1 ]; then close_nowindow; projects_restore
+  if [ $nowindow = 1 ]; then close_nowindow; projects_restore; EXIT_HOOK=""
   elif [ $opened = 1 ]; then
     if [ "$ask" = 0 ]; then close_netbeans
     else

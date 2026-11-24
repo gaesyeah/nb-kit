@@ -17,6 +17,8 @@ on_exit() {
     t cli.nothing_changed_nb; echo
   fi
   [ ${#CLEAN[@]} -gt 0 ] && rm -rf "${CLEAN[@]}"
+  # what an engine must undo however nbkit ends (Ctrl+C, kill, the terminal closed): e.g. analyze's no-window NetBeans
+  if [ -n "${EXIT_HOOK:-}" ]; then "$EXIT_HOOK" || true; fi
   return 0
 }
 trap on_exit EXIT
