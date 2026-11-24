@@ -173,7 +173,7 @@ few() {
 }
 # what changed since the collection, a line per kind (the lines of collection_check after the first)
 collection_changes() {
-  local l nb="" changed=() new=() removed=() classes=()
+  local l nb="" changed=() new=() removed=() classes=() moved=() a b c n f folder=""
   for l in "$@"; do
     case "$l" in
       netbeans\ *) nb="${l#netbeans }" ;;
@@ -181,13 +181,24 @@ collection_changes() {
       new\ *) new+=("${l#new }") ;;
       removed\ *) removed+=("${l#removed }") ;;
       classes\ *) classes+=("${l#classes }") ;;
+      moved\ *)
+        l="${l#moved }"; a="${l%%$'\t'*}"; b="${l#*$'\t'}"; moved+=("$a -> $b")
+        # the folders that differ: both paths without the names they end with in common, keeping the topmost of
+        # those folders (resources/ -> META-INF/resources/ reads better than webapp/ -> webapp/META-INF/)
+        f="$a -> $b"; c=""; n=0
+        while [ "${a##*/}" = "${b##*/}" ] && [[ $a == */* && $b == */* ]]; do c="${a##*/}"; a="${a%/*}"; b="${b%/*}"; n=$((n + 1)); done
+        if [ $n = 1 ]; then f="$a/ -> $b/"; elif [ $n -gt 1 ]; then f="$a/$c/ -> $b/$c/"; fi
+        if [ -z "$folder" ] && [ "$f" != "${moved[-1]}" ]; then folder="$f"; elif [ "$folder" != "$f" ]; then folder="-"; fi ;;
     esac
   done
   if [ -n "$nb" ]; then echo "      $(t cli.collect_change_netbeans "${nb% *}" "${nb#* }")"; fi
-  if [ ${#changed[@]} -gt 0 ]; then echo "      $(t cli.collect_change_changed "$(few "${changed[@]}")")"; fi
-  if [ ${#new[@]} -gt 0 ]; then echo "      $(t cli.collect_change_new "$(few "${new[@]}")")"; fi
-  if [ ${#removed[@]} -gt 0 ]; then echo "      $(t cli.collect_change_removed "$(few "${removed[@]}")")"; fi
-  if [ ${#classes[@]} -gt 0 ]; then echo "      $(t cli.collect_change_classes "$(few "${classes[@]}")")"; fi
+  if [ ${#changed[@]} -gt 0 ]; then echo "      $(t cli.collect_change_changed ${#changed[@]} "$(few "${changed[@]}")")"; fi
+  if [ ${#new[@]} -gt 0 ]; then echo "      $(t cli.collect_change_new ${#new[@]} "$(few "${new[@]}")")"; fi
+  if [ ${#removed[@]} -gt 0 ]; then echo "      $(t cli.collect_change_removed ${#removed[@]} "$(few "${removed[@]}")")"; fi
+  # all moved from one folder to another: that folder once; otherwise each page, from -> to
+  if [ ${#moved[@]} -gt 0 ] && [ "$folder" != "-" ]; then echo "      $(t cli.collect_change_folder ${#moved[@]} "${folder% -> *}" "${folder#* -> }")"
+  elif [ ${#moved[@]} -gt 0 ]; then echo "      $(t cli.collect_change_moved ${#moved[@]} "$(few "${moved[@]}")")"; fi
+  if [ ${#classes[@]} -gt 0 ]; then echo "      $(t cli.collect_change_classes ${#classes[@]} "$(few "${classes[@]}")")"; fi
   return 0
 }
 # before analyzing: the projects (one, or the modules of a parent) whose collection is missing or out of date. Menu

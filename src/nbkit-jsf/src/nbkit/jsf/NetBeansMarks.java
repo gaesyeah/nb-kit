@@ -8,10 +8,12 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * What NetBeans marks on the xhtml of a project, as collected by the module (nb/Collector) and read by the comparison
@@ -159,7 +161,7 @@ public final class NetBeansMarks {
 
     /**
      * What changed since a collection, one "kind name" per line: "netbeans 31 32" (the version of NetBeans now differs),
-     * "changed|new|removed <page>" (by the hashes), "classes <class>" (compiled after the collection). Empty: up to date.
+     * "changed|new|removed <page>" (by the hashes), "moved <old>\t<new>" (same content, another path), "classes <class>" (compiled after the collection). Empty: up to date.
      * netbeansNow: the product version NetBeans runs now (null: not known, not compared).
      */
     public static List<String> changes(Collected c, File project, List<File> pages, String netbeansNow) throws IOException {
@@ -172,19 +174,35 @@ public final class NetBeansMarks {
         for (File p : pages) {
             now.put(project.toPath().relativize(p.toPath()).toString().replace('\\', '/'), sha256(Files.readAllBytes(p.toPath())));
         }
+        // a new page with the same content as a removed one was moved: "moved <old>\t<new>"
+        Map<String, List<String>> added = new LinkedHashMap<>();
         for (Map.Entry<String, String> e : now.entrySet()) {
             String old = c.hashes().get(e.getKey());
             if (old == null) {
-                r.add("new " + e.getKey());
+                added.computeIfAbsent(e.getValue(), h -> new ArrayList<>()).add(e.getKey());
             } else if (!old.equals(e.getValue())) {
                 r.add("changed " + e.getKey());
             }
         }
-        for (String old : c.hashes().keySet()) {
-            if (!now.containsKey(old)) {
-                r.add("removed " + old);
+        List<String> moved = new ArrayList<>();
+        Set<String> movedTo = new HashSet<>();
+        for (Map.Entry<String, String> e : c.hashes().entrySet()) {
+            if (!now.containsKey(e.getKey())) {
+                List<String> same = added.get(e.getValue());
+                if (same != null && !same.isEmpty()) {
+                    movedTo.add(same.get(0));
+                    moved.add("moved " + e.getKey() + "\t" + same.remove(0));
+                } else {
+                    r.add("removed " + e.getKey());
+                }
             }
         }
+        for (String p : now.keySet()) {
+            if (!c.hashes().containsKey(p) && !movedTo.contains(p)) {
+                r.add("new " + p);
+            }
+        }
+        r.addAll(moved);
         String classes = c.info().get(INFO_CLASSES);
         if (classes != null && classesTime(project) > Long.parseLong(classes)) {
             for (String p : new String[]{"target/classes", "build/classes/java/main", "build/classes", "build/web/WEB-INF/classes"}) {

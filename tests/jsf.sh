@@ -232,8 +232,31 @@ out="$(NBKIT_COLLECTION="$W/none.tsv" analyze "$W/proj")"
 contains "with no collection it says how to get one" "$out" "No collection of what NetBeans marks on this project: no comparison."
 out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")"
 contains "with an old one it warns, and compares with it anyway" "$out" "The collection of what NetBeans marks ($CD) may be out of date; comparing with it anyway."
-contains "saying what changed" "$out" "changed pages: src/main/webapp/pages/compare.xhtml"
+contains "saying what changed, with how many" "$out" "changed pages (1): src/main/webapp/pages/compare.xhtml"
 contains "and still compares" "$out" "Comparison with NetBeans (collection of"
+# a folder moved since the collection (same content, another path): one line with the folder, not each page twice
+WA="$W/proj/src/main/webapp"
+nres="$(find "$WA/resources" -name '*.xhtml' | wc -l)"
+mkdir "$WA/META-INF" && mv "$WA/resources" "$WA/META-INF/resources"
+out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")"
+contains "a moved folder is one line, with how many pages" "$out" "$nres pages moved to another folder: src/main/webapp/resources/ -> src/main/webapp/META-INF/resources/"
+lacks "its pages are not new" "$out" "new pages"
+lacks "nor removed" "$out" "removed pages"
+mv "$WA/META-INF/resources" "$WA/resources" && rmdir "$WA/META-INF"
+# a page renamed (same content): moved, each with where it went
+mv "$WA/pages/standalone.xhtml" "$WA/pages/alone.xhtml"
+out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")"
+contains "a renamed page is moved, old -> new" "$out" "moved pages (1): src/main/webapp/pages/standalone.xhtml -> src/main/webapp/pages/alone.xhtml"
+# a page gone (no page now with its content): removed
+rm "$WA/pages/alone.xhtml"
+out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")"
+contains "a page gone is removed" "$out" "removed pages (1): src/main/webapp/pages/standalone.xhtml"
+cp "$J/test/fixture/src/main/webapp/pages/standalone.xhtml" "$WA/pages/"
+# more than 5 pages of a kind: the first 5, then how many more
+for i in 1 2 3 4 5 6 7; do echo "<!-- $i -->" > "$WA/pages/extra-$i.xhtml"; done
+out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")"
+contains "over 5 pages: 5 names and how many more" "$out" "new pages (7): src/main/webapp/pages/extra-1.xhtml, src/main/webapp/pages/extra-2.xhtml, src/main/webapp/pages/extra-3.xhtml, src/main/webapp/pages/extra-4.xhtml, src/main/webapp/pages/extra-5.xhtml … and 2 more"
+rm "$WA"/pages/extra-*.xhtml
 # in a terminal that answers (the interface, the menu) it asks first; no: the old one
 # a home whose userdir has the JSF module and no lock: NetBeans is closed, so the question says it opens it
 QH="$W/qhome"; mkdir -p "$QH/.netbeans/31/config" "$QH/.netbeans/31/modules" "$QH/.netbeans/31/var/log"
@@ -241,7 +264,7 @@ QH="$W/qhome"; mkdir -p "$QH/.netbeans/31/config" "$QH/.netbeans/31/modules" "$Q
 rm -f "$W/collect-ev"
 out="$(printf 'n\n' | HOME="$QH" NBKIT_TTY=1 NBKIT_UI_EVENTS="$W/collect-ev" NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
 contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) may be out of date. Collect it again? It opens NetBeans."
-check "the dialog gets what changed, from the same list" grep -q 'changed pages: src/main/webapp/pages/compare.xhtml' "$W/collect-ev"
+check "the dialog gets what changed, from the same list" grep -q 'changed pages (1): src/main/webapp/pages/compare.xhtml' "$W/collect-ev"
 contains "no: it compares with the old one, warning" "$out" "may be out of date; comparing with it anyway."
 # --netbeans: collects without asking, with a NetBeans that only answers the request (and closes it, since it opened it)
 FH="$W/fakehome"; FU="$FH/.netbeans/31"
