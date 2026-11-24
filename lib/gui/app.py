@@ -190,7 +190,9 @@ class Window(Gtk.ApplicationWindow):
         self.status_row.append(self.progress_box)
 
         # bottom: the terminal where nbkit.sh runs
-        self.terminal = Vte.Terminal(scrollback_lines=10000, vexpand=True)
+        self.terminal = Vte.Terminal(vexpand=True)
+        # unlimited scrollback (VTE keeps it compressed on disk): a big analyze passes any fixed limit
+        self.terminal.set_scrollback_lines(-1)
         self.terminal.set_size(80, 14)
         # the lines sit at the bottom: when the height is not a whole number of lines, the leftover goes on top
         # (blank) instead of cutting the last line; a little padding keeps it off the edge
@@ -262,10 +264,11 @@ class Window(Gtk.ApplicationWindow):
         self.terminal.copy_clipboard_format(Vte.Format.TEXT)
 
     def copy_all(self):
-        # the button: always the whole output, scrollback included, without selecting it
-        adj = self.terminal.get_vadjustment()
-        text = self.terminal.get_text_range_format(Vte.Format.TEXT, int(adj.get_lower()), 0, int(adj.get_upper()) - 1, -1)[0]
-        self.terminal.get_clipboard().set(text.rstrip('\n') + '\n')
+        # the button: always the whole output, scrollback included, leaving nothing selected (select_all, not
+        # the vadjustment's rows: those restart at 0 while get_text_range_format counts rows ever written)
+        self.terminal.unselect_all()
+        self.copy_terminal()
+        self.terminal.unselect_all()
 
     # when it opens: the whole top visible and the terminal with room for about 16 lines; the window grows up to
     # 90% of the screen for that, and on a smaller screen the top scrolls

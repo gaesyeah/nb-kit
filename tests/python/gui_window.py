@@ -273,15 +273,16 @@ def actions(w):
     check('copy without a selection takes the whole output', wait(lambda: got, 5) and 'Installed: JSF checks' in (got[0] or ''), got)
     check('the right-click menu has copy and select all', [w.terminal.get_context_menu_model().get_item_attribute_value(i, 'action').unpack()
                                                           for i in range(2)] == ['term.copy', 'term.select-all'])
-    w.terminal.feed(''.join('line %d\r\n' % i for i in range(300)).encode())   # more than the screen: scrollback
-    wait(lambda: 'line 299' in terminal_text(w), 5)
+    # more than the screen and more than VTE's default scrollback (a big analyze): nothing is dropped
+    w.terminal.feed(''.join('line %d\r\n' % i for i in range(12000)).encode())
+    wait(lambda: 'line 11999' in terminal_text(w), 10)
     w.terminal.unselect_all()
     w.terminal.get_clipboard().set('')
     got.clear()
     w.copy_button.emit('clicked')
     w.terminal.get_clipboard().read_text_async(None, lambda cb, res: got.append(cb.read_text_finish(res)))
     check('the copy button copies the whole output, scrollback included',
-          wait(lambda: got, 5) and 'Installed: JSF checks' in (got[0] or '') and 'line 0\n' in got[0] and 'line 299\n' in got[0],
+          wait(lambda: got, 5) and 'Installed: JSF checks' in (got[0] or '') and 'line 0\n' in got[0] and 'line 11999\n' in got[0],
           (got[0] or '')[-80:] if got else got)
     check('and selects nothing', not w.terminal.get_has_selection())
     w.clear_button.emit('clicked')
