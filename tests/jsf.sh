@@ -200,6 +200,16 @@ out="$(analyze "$W/proj" --explain pages/many.xhtml)"
 contains "--explain saves its report too, named after the page" "$(tail -1 <<<"$out")" "Report saved: $W/cache/nbkit/analyze/proj-many-"
 rep="$(sed -n 's/.*Report saved: \(.*\.txt\).*/\1/p' <<<"$out")"
 contains "with how each name was resolved" "$(cat "$rep")" "How each expression of src/main/webapp/pages/many.xhtml was resolved:"
+# only the 10 newest reports of a project are kept (--explain ones included); another project's are not touched,
+# even one whose name starts the same (the first line of a report names its project)
+RD="$W/cache/nbkit/analyze"
+for i in $(seq -w 1 12); do echo "nbkit analyze jsf $W/proj  (old)" > "$RD/proj-2000-01-01-0000$i.txt"; touch -d "2000-01-01 00:00:$i" "$RD/proj-2000-01-01-0000$i.txt"; done
+for i in 1 2; do echo "nbkit analyze jsf $W/proj-other  (old)" > "$RD/proj-other-2000-01-01-00000$i.txt"; touch -d "2000-01-01" "$RD/proj-other-2000-01-01-00000$i.txt"; done
+out="$(analyze "$W/proj")"
+check "a new report keeps the 10 newest of its project" test "$(for f in "$RD"/*.txt; do head -1 "$f"; done | grep -cE "^nbkit analyze jsf $W/proj(  \(| --explain )")" = 10
+check "the oldest go" test ! -e "$RD/proj-2000-01-01-000001.txt"
+check "the newest old ones stay" test -e "$RD/proj-2000-01-01-000012.txt"
+check "another project's reports are not touched" test "$(ls "$RD"/proj-other-*.txt | wc -l)" = 2
 rm "$W/proj/src/main/webapp/pages/many.xhtml"
 # with a collection of what NetBeans marks (here a fake one, pages/compare.xhtml): the comparison after the summary
 compile -cp "$W/nbkit" -d "$W/compare" "$J/test/RunComparison.java"
@@ -264,6 +274,22 @@ printf 'info\tunsaved\tsrc/main/webapp/pages/compare.xhtml\ninfo\tunsaved\tsrc/m
 out="$(NBKIT_COLLECTION="$W/unsaved.tsv" analyze "$W/proj")"
 contains "a page unsaved in NetBeans makes the comparison partial, naming each" "$out" "Partial comparison: not saved in NetBeans when it collected: src/main/webapp/pages/compare.xhtml, src/main/webapp/pages/orders.xhtml."
 lacks "a collection with every page saved says nothing" "$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")" "Partial comparison"
+# a repeated info line: the last one counts (only unsaved gathers its lines)
+printf 'info\tdate\t2026-01-02T00:00:00Z\n' >> "$W/unsaved.tsv"
+contains "a repeated info line: the last one counts" "$(NBKIT_COLLECTION="$W/unsaved.tsv" analyze "$W/proj")" "Comparison with NetBeans (collection of 2026-01-02T00:00:00Z,"
+# pages with the same content: moved only when one page went and one came with it; with several, new and removed
+WA="$W/proj/src/main/webapp"
+x="$(printf '<!-- same -->' | sha256sum | cut -d' ' -f1)"; y="$(printf '<!-- alone -->' | sha256sum | cut -d' ' -f1)"
+cp "$W/marks.tsv" "$W/dups.tsv"
+printf 'file\tsrc/main/webapp/pages/gone1.xhtml\t%s\nfile\tsrc/main/webapp/pages/gone2.xhtml\t%s\nfile\tsrc/main/webapp/pages/gone3.xhtml\t%s\n' "$x" "$x" "$y" >> "$W/dups.tsv"
+printf '<!-- same -->' > "$WA/pages/dup1.xhtml"; printf '<!-- same -->' > "$WA/pages/dup2.xhtml"; printf '<!-- alone -->' > "$WA/pages/came3.xhtml"
+out="$("$JAVA" -Dnbkit.collection.check=1 -Dnbkit.collection.file="$W/dups.tsv" -cp "$W/nbkit-jsf.jar" nbkit.jsf.Analyze "$W/proj" 2>&1)"
+contains "one page gone and one come with its content: moved" "$out" "moved src/main/webapp/pages/gone3.xhtml"$'\t'"src/main/webapp/pages/came3.xhtml"
+contains "several with the same content: new" "$out" "new src/main/webapp/pages/dup1.xhtml"
+contains "and new" "$out" "new src/main/webapp/pages/dup2.xhtml"
+contains "and removed" "$out" "removed src/main/webapp/pages/gone1.xhtml"
+check "not moved" bash -c '! grep -q "^moved src/main/webapp/pages/gone1.xhtml" <<<"$1"' _ "$out"
+rm -f "$WA/pages/dup1.xhtml" "$WA/pages/dup2.xhtml" "$WA/pages/came3.xhtml"
 # a folder moved since the collection (same content, another path): one line with the folder, not each page twice
 WA="$W/proj/src/main/webapp"
 nres="$(find "$WA/resources" -name '*.xhtml' | wc -l)"

@@ -8,6 +8,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -206,14 +207,22 @@ public final class NetBeansMarks {
                 r.add("changed " + e.getKey());
             }
         }
+        // moved only when the content is unique on both sides (one page gone, one page come with it): with several
+        // pages of the same content there is no telling which went where
+        Map<String, Integer> gone = new HashMap<>();
+        for (Map.Entry<String, String> e : c.hashes().entrySet()) {
+            if (!now.containsKey(e.getKey())) {
+                gone.merge(e.getValue(), 1, Integer::sum);
+            }
+        }
         List<String> moved = new ArrayList<>();
         Set<String> movedTo = new HashSet<>();
         for (Map.Entry<String, String> e : c.hashes().entrySet()) {
             if (!now.containsKey(e.getKey())) {
                 List<String> same = added.get(e.getValue());
-                if (same != null && !same.isEmpty()) {
+                if (same != null && same.size() == 1 && gone.get(e.getValue()) == 1) {
                     movedTo.add(same.get(0));
-                    moved.add("moved " + e.getKey() + "\t" + same.remove(0));
+                    moved.add("moved " + e.getKey() + "\t" + same.get(0));
                 } else {
                     r.add("removed " + e.getKey());
                 }
@@ -414,7 +423,9 @@ public final class NetBeansMarks {
                 f[i] = unescape(f[i]);
             }
             switch (f[0]) {
-                case "info" -> info.merge(f[1], String.join("\t", List.of(f).subList(2, f.length)), (a, b) -> a + "\t" + b);
+                // unsaved: one line per page, gathered; any other repeated info line: the last one counts
+                case "info" -> info.merge(f[1], String.join("\t", List.of(f).subList(2, f.length)),
+                        (a, b) -> f[1].equals(INFO_UNSAVED) ? a + "\t" + b : b);
                 case "file" -> hashes.put(f[1], f[2]);
                 case "mark" -> marks.add(new Mark(f[1], Integer.parseInt(f[2]), Integer.parseInt(f[3]), Integer.parseInt(f[4]),
                         Integer.parseInt(f[5]), f[6], f[7], f[8].equals("on"), f[9]));

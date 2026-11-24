@@ -413,6 +413,14 @@ report_start() {
   mkdir -p "$d"
   REPORT="$d/${1##*/}$page-$(date +%Y-%m-%d-%H%M%S).txt"
   echo "nbkit analyze jsf $1${EXPLAIN:+ --explain $EXPLAIN}  ($(date '+%Y-%m-%d %H:%M'))" > "$REPORT"
+  # only the 10 newest of this project (--explain ones too), told by their first line, not by the name: another
+  # project's name may start the same
+  local f n=0
+  while IFS= read -r f; do
+    case "$(head -1 "$f" 2>/dev/null)" in
+      "nbkit analyze jsf $1  ("*|"nbkit analyze jsf $1 --explain "*) n=$((n + 1)); [ $n -le 10 ] || rm -f "$f" ;;
+    esac
+  done < <(ls -t "$d"/*.txt 2>/dev/null)
 }
 # at the end, a green line with where the report is; the menu and the interface ask whether to open it (Enter opens)
 report_end() {
