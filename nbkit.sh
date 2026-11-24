@@ -91,9 +91,17 @@ source "$NBKIT_DIR/lib/tools.sh"      # every folder in modules/tools/
 case "${1:-}" in
   analyze)
     # analyze jsf <project> | analyze jsf <project> --explain <file> | analyze jsf --explain <file> (project found from the file);
-    # --netbeans anywhere: collect what NetBeans marks without asking (opens it if closed, see lib/analyze.sh)
+    # --netbeans anywhere: collect what NetBeans marks without asking (the open one, or one opened with no window;
+    # =window / =nowindow choose by hand, see lib/analyze.sh)
     args=()
-    for a in "$@"; do if [ "$a" = --netbeans ]; then export NBKIT_NETBEANS=1; else args+=("$a"); fi; done
+    for a in "$@"; do
+      case "$a" in
+        --netbeans) export NBKIT_NETBEANS=1 NBKIT_NB_MODE=auto ;;
+        --netbeans=window|--netbeans=nowindow) export NBKIT_NETBEANS=1 NBKIT_NB_MODE="${a#--netbeans=}" ;;
+        --netbeans=*) die "$(t cli.analyze_usage)" ;;
+        *) args+=("$a") ;;
+      esac
+    done
     set -- "${args[@]}"
     [ "${2:-}" = jsf ] || die "$(t cli.analyze_usage)"
     if [ "${3:-}" = --explain ] && [ $# = 4 ]; then header; jsf_analyze "" "$4"; exit $?; fi

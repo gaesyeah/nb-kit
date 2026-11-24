@@ -295,7 +295,7 @@ rm -f "$W/collect-ev"
 # a fake xdg-open, to see the report opened
 mkdir -p "$W/fakebin"; printf '#!/bin/bash\necho "$1" > "%s/opened"\n' "$W" > "$W/fakebin/xdg-open"; chmod +x "$W/fakebin/xdg-open"
 out="$(printf 'n\n\n' | PATH="$W/fakebin:$PATH" HOME="$QH" NBKIT_TTY=1 NBKIT_UI_EVENTS="$W/collect-ev" NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
-contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) may be out of date. Collect it again? It opens NetBeans."
+contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) may be out of date. Collect it again? It opens NetBeans with no window; it closes by itself when done."
 check "the dialog gets what changed, from the same list" grep -q 'changed pages (1): src/main/webapp/pages/compare.xhtml' "$W/collect-ev"
 contains "no: it compares with the old one, warning" "$out" "may be out of date; comparing with it anyway."
 # NetBeans open with that userdir: the question says the running one is used, and that unsaved files go as on disk
@@ -314,21 +314,74 @@ cat > "$W/fakenb/bin/netbeans" <<'X'
 #!/bin/bash
 # a NetBeans that only answers the collection request of nbkit (tests/jsf.sh)
 UD="$HOME/.netbeans/31"
-case " $* " in *" --nbkit-close "*) pkill -f "nbkit-fake-""netbeans" ; rm -f "$UD/lock"; exit 0 ;; esac
+echo "$*" >> "$NB_ARGS"
+# closing: like NetBeans, it writes its open and recent projects while it exits, a moment after being asked
+PUI="$UD/config/Preferences/org/netbeans/modules/projectui.properties"
+case " $* " in *" --nbkit-close "*) (sleep 1; mkdir -p "${PUI%/*}"; echo "recentProjectsURLs.0=file:/collected/" >> "$PUI"; pkill -f "nbkit-fake-""netbeans"; rm -f "$UD/lock") >/dev/null 2>&1 & exit 0 ;; esac
 : > "$UD/lock"
 echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
 nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then rm "$r"; cp "$FAKE_MARKS" "$NBKIT_COLLECTION"; echo "$NBKIT_COLLECTION" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.2; done' "nbkit-fake-""netbeans" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
 X
 chmod +x "$W/fakenb/bin/netbeans"
 "$JAVA" -Dnbkit.write="$W/fresh.tsv" -cp "$W/nbkit:$W/compare" RunComparison "$W/proj" "$W/app" "$W/api.jar" "$W/primefaces.jar" >/dev/null 2>&1
-out="$(HOME="$FH" NB_HOME="$W/fakenb" FAKE_MARKS="$W/fresh.tsv" NBKIT_COLLECTION="$W/collected.tsv" NBKIT_COLLECT_TIMEOUT=30 analyze "$W/proj" --netbeans)"; rc=$?
+export NB_ARGS="$W/nb-args"
+collect() { HOME="$FH" NB_HOME="$W/fakenb" FAKE_MARKS="$W/fresh.tsv" NBKIT_COLLECTION="$W/collected.tsv" NBKIT_COLLECT_TIMEOUT=30 analyze "$W/proj" "$@"; }
+NOWINDOW="NetBeans is running with no window and closes by itself when done; to open it, wait for the collection to end."
+: > "$NB_ARGS"; out="$(collect --netbeans)"; rc=$?
 check "--netbeans exits with 0" test "$rc" = 0
-contains "it opens NetBeans" "$out" "opening NetBeans"
+contains "NetBeans closed: it opens it with no window" "$(head -1 "$NB_ARGS")" "--nosplash --nogui -J-Djava.awt.headless=true"
+contains "and says so while it waits, and how to open it" "$out" "$NOWINDOW"
 contains "waits for the collection" "$out" "NetBeans collected what it marks."
 contains "and compares with the new one" "$out" "Comparison with NetBeans (collection of"
 lacks "the new one is up to date" "$out" "may be out of date"
 check "and closes NetBeans, since it opened it" bash -c '! pgrep -f "nbkit-fake-""netbeans"'
+contains "through its close option" "$(tail -1 "$NB_ARGS")" "--nbkit-close"
 pkill -f "nbkit-fake-""netbeans" 2>/dev/null
+# with no window, NetBeans' list of open and recent projects is put back as it was, once NetBeans is gone (it
+# writes the list while it exits), byte for byte; with no list before, none after
+PUI="$FU/config/Preferences/org/netbeans/modules/projectui.properties"; mkdir -p "${PUI%/*}"
+printf 'openProjectsURLs.0=file:/home/mine/\nrecentProjectsURLs.0=file:/home/old/' > "$PUI"; cp "$PUI" "$W/pui-before"
+out="$(collect --netbeans)"
+check "the open and recent projects are as before, byte for byte" cmp -s "$PUI" "$W/pui-before"
+check "and nothing is left pending" test ! -e "$FH/.cache/nbkit/collect-projectui.properties"
+rm -f "$PUI"; out="$(collect --netbeans)"
+check "no list before: none after" test ! -e "$PUI"
+check "and nothing pending" test ! -e "$FH/.cache/nbkit/collect-projectui.none"
+# analyze killed in the middle: the copy stays pending and the next analyze puts it back before anything else
+printf 'openProjectsURLs.0=file:/home/mine/\n' > "$FH/.cache/nbkit/collect-projectui.properties"; printf 'openProjectsURLs.0=file:/collected/\n' > "$PUI"
+HOME="$FH" "$W/fakenb/bin/netbeans" >/dev/null 2>&1; out="$(collect)"
+check "a pending list is not put back while NetBeans runs" grep -q collected "$PUI"
+pkill -f "nbkit-fake-""netbeans" 2>/dev/null; rm -f "$FU/lock"
+out="$(collect)"
+check "with NetBeans closed, the next analyze puts the pending list back" test "$(cat "$PUI")" = "openProjectsURLs.0=file:/home/mine/"
+check "and it is no longer pending" test ! -e "$FH/.cache/nbkit/collect-projectui.properties"
+: > "$FH/.cache/nbkit/collect-projectui.none"; out="$(collect)"
+check "pending with no list before: the list is removed" test ! -e "$PUI"
+check "and nothing pending" test ! -e "$FH/.cache/nbkit/collect-projectui.none"
+# --netbeans=window: the visible NetBeans, as before
+: > "$NB_ARGS"; out="$(collect --netbeans=window)"
+lacks "--netbeans=window: opened with its window" "$(head -1 "$NB_ARGS")" "--nogui"
+lacks "and no word about running with no window" "$out" "$NOWINDOW"
+check "closed at the end all the same (arguments: nothing asked)" bash -c '! pgrep -f "nbkit-fake-""netbeans"'
+pkill -f "nbkit-fake-""netbeans" 2>/dev/null
+# NetBeans already open: the running one collects, nothing is opened or closed
+HOME="$FH" "$W/fakenb/bin/netbeans"; : > "$NB_ARGS"
+out="$(collect --netbeans)"
+check "NetBeans open: --netbeans opens nothing and closes nothing" test ! -s "$NB_ARGS"
+contains "and the open one collects" "$out" "NetBeans collected what it marks."
+out="$(collect --netbeans=nowindow)"
+contains "--netbeans=nowindow with NetBeans open: says it uses the open one" "$out" "NetBeans is already open: the collection uses it."
+check "and opens nothing" test ! -s "$NB_ARGS"
+pkill -f "nbkit-fake-""netbeans" 2>/dev/null; rm -f "$FU/lock"
+# an old base module without the close option: no window to close by hand, so SIGTERM (NetBeans saves and lets go)
+printf 'old' > "$FU/modules/nbkit-core.jar"
+out="$(collect --netbeans)"
+check "no close option: the no-window NetBeans is ended all the same (SIGTERM)" bash -c '! pgrep -f "nbkit-fake-""netbeans"'
+printf 'nbkit/core/CloseOption' > "$FU/modules/nbkit-core.jar"
+pkill -f "nbkit-fake-""netbeans" 2>/dev/null; rm -f "$FU/lock"
+out="$(collect --netbeans=maybe)"; rc=$?
+check "--netbeans=<anything else> fails" test "$rc" != 0
+contains "and shows how to use it" "$out" "[--netbeans[=window|nowindow]]"
 # a project with no compiled classes: its beans are unknown, so unknown names are not checked
 mkdir -p "$W/bare/src/main/webapp" "$W/bare/target/classes" && printf '<project/>' > "$W/bare/pom.xml"
 printf '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html"><h:body><h:outputText value="#{someBean.x}"/></h:body></html>\n' > "$W/bare/src/main/webapp/a.xhtml"

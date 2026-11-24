@@ -208,6 +208,8 @@ collection_changes() {
 netbeans_collections() {
   local d lines=() ask=0 need=() label det=""
   declare -A st=() date=() changes=()
+  # an analyze stopped in the middle of a no-window collection left NetBeans' project list pending
+  if collection_ud; then projects_restore; fi
   for d in "$@"; do
     mapfile -t lines < <(collection_check "$d")
     [ "${lines[0]%% *}" = ok ] && continue
@@ -263,17 +265,48 @@ collect_progress() {
   [ -n "$total" ] && t cli.collect_progress "$pages_done" "$total" "$marks" "${COLLECTING##*/}" "$page"
 }
 collect_ended() { [ -f "$HOME/.cache/nbkit/collect-done" ] || [ "$(date +%s)" -ge "$COLLECT_UNTIL" ]; }
+# NetBeans' open and recent projects (the no-window NetBeans would add the project it opens to them): kept before it
+# starts, put back byte for byte once it is gone. The copy (or .none: there was no list) stays pending until then,
+# so an analyze stopped in the middle puts it back the next time
+PROJECTUI=config/Preferences/org/netbeans/modules/projectui.properties
+projects_keep() {
+  local c="$HOME/.cache/nbkit"
+  mkdir -p "$c"
+  if [ -f "$UD/$PROJECTUI" ]; then cp -p "$UD/$PROJECTUI" "$c/collect-projectui.properties"; else : > "$c/collect-projectui.none"; fi
+}
+# only once NetBeans is gone and its lock with it: it writes the list while it exits
+projects_free() { nb_closed && [ ! -e "$UD/lock" ]; }
+projects_restore() {
+  local c="$HOME/.cache/nbkit" i
+  [ -e "$c/collect-projectui.properties" ] || [ -e "$c/collect-projectui.none" ] || return 0
+  for ((i = 0; i < 60; i++)); do projects_free && break; sleep 0.5; done
+  projects_free || return 0
+  if [ -e "$c/collect-projectui.properties" ]; then
+    mkdir -p "$(dirname "$UD/$PROJECTUI")" && cp -p "$c/collect-projectui.properties" "$UD/$PROJECTUI" && rm -f "$c/collect-projectui.properties"
+  else
+    rm -f "$UD/$PROJECTUI" "$c/collect-projectui.none"
+  fi
+}
 # opens NetBeans once if it is closed, asks the JSF module to collect each project in turn, waiting for each
 # (NBKIT_COLLECT_TIMEOUT seconds, 600), and closes NetBeans once at the end if it opened it (asking, when someone can
 # answer). COLLECTED: the projects collected
 collect_all() {
-  local ask="$1" opened=0 c="$HOME/.cache/nbkit" limit="${NBKIT_COLLECT_TIMEOUT:-600}" d det; shift
+  local ask="$1" opened=0 nowindow=0 c="$HOME/.cache/nbkit" limit="${NBKIT_COLLECT_TIMEOUT:-600}" d det; shift
   collection_ud || { warn "$(t cli.collect_no_module)"; return 1; }
-  if ! nb_running; then
+  if nb_running; then
+    # with the same userdir a second NetBeans cannot start: the open one collects
+    if [ "${NBKIT_NB_MODE:-auto}" = nowindow ]; then info "$(t cli.collect_nb_open_used)"; fi
+  else
     find_launcher || { warn "$(t cli.collect_no_launcher)"; return 1; }
-    open_netbeans; opened=1
-    spin_until "$(t cli.waiting_open)" nb_running "" yes yes \
-      && spin_until "$(t cli.waiting_modules)" nb_loaded "" yes yes || return 1
+    # closed: with no window (it closes by itself at the end), unless --netbeans=window
+    if [ "${NBKIT_NB_MODE:-auto}" = window ]; then open_netbeans
+    else projects_keep; open_netbeans --nosplash --nogui -J-Djava.awt.headless=true; nowindow=1; fi
+    opened=1
+    if ! { spin_until "$(t cli.waiting_open)" nb_running "" yes yes && spin_until "$(t cli.waiting_modules)" nb_loaded "" yes yes; }; then
+      if [ $nowindow = 1 ]; then close_nowindow; projects_restore; fi
+      return 1
+    fi
+    if [ $nowindow = 1 ]; then info "$(t cli.collect_nowindow)"; fi
   fi
   mkdir -p "$c"
   for d in "$@"; do
@@ -283,7 +316,8 @@ collect_all() {
     spin_until "$(t cli.collect_waiting) (${d##*/})" collect_ended collect_progress || { info "$(t cli.cancelled)"; break; }
     if [ -f "$c/collect-done" ]; then ok "$(t cli.collect_done)"; COLLECTED+=("$d"); else warn "$(t cli.collect_timeout "$limit")"; break; fi
   done
-  if [ $opened = 1 ]; then
+  if [ $nowindow = 1 ]; then close_nowindow; projects_restore
+  elif [ $opened = 1 ]; then
     if [ "$ask" = 0 ]; then close_netbeans
     else
       det="$(t cli.collect_ask_close_detail)"

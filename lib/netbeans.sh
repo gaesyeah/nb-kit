@@ -88,7 +88,7 @@ nb_java_home() {
   return 0
 }
 open_netbeans() {
-  (cd "$HOME" && setsid "${LAUNCH[@]}" >/dev/null 2>&1 </dev/null &)
+  (cd "$HOME" && setsid "${LAUNCH[@]}" "$@" >/dev/null 2>&1 </dev/null &)
   ok "$(t cli.opening_netbeans)"
 }
 
@@ -128,6 +128,18 @@ close_netbeans() {
     info "$(t cli.could_not_ask)"
     spin_until "$(t cli.close_to_continue)" nb_closed
   fi
+}
+# a NetBeans with no window: its close option, or SIGTERM when it has none (NetBeans saves its state and lets go of
+# the lock; never -9); no window to answer anything in, so nothing is asked
+close_nowindow() {
+  local opt p
+  opt="$(close_option)"
+  if [ -e "$UD/lock" ] && [ -n "$opt" ] && find_launcher; then
+    (cd "$HOME" && timeout 90 "${LAUNCH[@]}" --userdir "$UD" "$opt" </dev/null >/dev/null 2>&1) || true
+  else
+    for p in $(nb_pids); do kill -TERM "$p" 2>/dev/null; done
+  fi
+  spin_until "$(t cli.waiting_close)" nb_closed "" no
 }
 # makes sure NetBeans is closed before touching files
 ensure_closed() {

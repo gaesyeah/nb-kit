@@ -702,7 +702,7 @@ if command -v java >/dev/null 2>&1 || ls /usr/lib/jvm/*/bin/java >/dev/null 2>&1
 #!/bin/bash
 UD="$HOME/.netbeans/31"
 case " $* " in *" --nbkit-close "*) echo close >> "$COL_EVENTS"; pkill -f "nbkit-fake-""collector"; rm -f "$UD/lock"; exit 0 ;; esac
-echo open >> "$COL_EVENTS"
+case " $* " in *" --nogui "*) echo open-nowindow ;; *) echo open ;; esac >> "$COL_EVENTS"
 : > "$UD/lock"; sleep 1; echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
 nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then p="$(cat "$r")"; rm "$r"; echo "collect ${p##*/}" >> "$COL_EVENTS"; sleep 1; printf "1\t2\t3\tsrc/main/webapp/p.xhtml\n" > "$HOME/.cache/nbkit/collect-progress"; sleep 0.6; rm -f "$HOME/.cache/nbkit/collect-progress"; mkdir -p "$HOME/.cache/nbkit/collect"; printf "# nbkit NetBeans marks 1\n" > "$HOME/.cache/nbkit/collect/x.tsv"; echo "$HOME/.cache/nbkit/collect/x.tsv" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.2; done' "nbkit-fake-""collector" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
 X
@@ -715,19 +715,27 @@ X
   : > "$EV"
   out="$(HOME="$FH" NB_HOME="$WORK/colnb" COL_EVENTS="$EV" NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false bash "$NBKIT_DIR/nbkit.sh" --lang en analyze jsf "$M2" --netbeans </dev/null 2>&1)"
   check "--netbeans on a project of 2 modules: opens NetBeans once, collects each module in turn, closes it once" \
-    test "$(paste -sd' ' "$EV")" = "open collect a collect b close"
+    test "$(paste -sd' ' "$EV")" = "open-nowindow collect a collect b close"
   contains "loading NetBeans modules shows elapsed time" "$out" "00:00"
   lacks "while the collector has not created progress yet, there is no missing-file error" "$out" "$FH/.cache/nbkit/collect-progress"
   contains "while NetBeans collects, the wait shows how far it got" "$out" "Collecting 1/2 pages, 3 marks (a): src/main/webapp/p.xhtml"
   : > "$EV"
-  # yes to collecting; the yes to closing only after the collections (a key typed while it waits cancels the wait)
-  KEYS_OUT="$({ printf 'y\r'; sleep 6; printf 'y\r'; } | timeout 60 script -qec "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2'" /dev/null 2>&1 \
+  # yes to collecting: NetBeans closed, so with no window, closed at the end without asking
+  KEYS_OUT="$({ printf 'y\r'; sleep 8; } | timeout 60 script -qec "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2'" /dev/null 2>&1 \
     | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
   check "it ends by itself, not at the time limit" test "$?" != 124
   check "in the interface or the menu it asks once for all the modules" test "$(grep -c 'Collect what NetBeans marks on these 2 modules' <<<"$KEYS_OUT")" = 1
   contains "listing each module and why" "$KEYS_OUT" "a: no collection"
   contains "the other one too" "$KEYS_OUT" "b: no collection"
-  check "and then opens once, collects both and closes once (asked at the end)" test "$(paste -sd' ' "$EV")" = "open collect a collect b close"
+  check "and then opens once with no window, collects both and closes once" test "$(paste -sd' ' "$EV")" = "open-nowindow collect a collect b close"
+  lacks "with no window, closing is not asked" "$KEYS_OUT" "Close NetBeans?"
+  : > "$EV"
+  # --netbeans=window in the interface or the menu: the visible NetBeans, and the yes to closing asked at the end
+  KEYS_OUT="$({ sleep 6; printf 'y\r'; } | timeout 60 script -qec "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2' --netbeans=window" /dev/null 2>&1 \
+    | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
+  check "it ends by itself, not at the time limit" test "$?" != 124
+  contains "with its window, closing is asked at the end" "$KEYS_OUT" "Close NetBeans?"
+  check "and opens once with its window, collects both and closes once" test "$(paste -sd' ' "$EV")" = "open collect a collect b close"
   pkill -f "nbkit-fake-""collector" 2>/dev/null
 else
   echo "  skipped: no Java here"
