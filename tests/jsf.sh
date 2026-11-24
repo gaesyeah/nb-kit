@@ -258,6 +258,12 @@ out="$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")"
 contains "with an old one it warns, and compares with it anyway" "$out" "The collection of what NetBeans marks ($CD) may be out of date; comparing with it anyway."
 contains "saying what changed, with how many" "$out" "changed pages (1): src/main/webapp/pages/compare.xhtml"
 contains "and still compares" "$out" "Comparison with NetBeans (collection of"
+# pages not saved in NetBeans when it collected: their marks came from the editor, the comparison from the disk
+cp "$W/marks.tsv" "$W/unsaved.tsv"
+printf 'info\tunsaved\tsrc/main/webapp/pages/compare.xhtml\ninfo\tunsaved\tsrc/main/webapp/pages/orders.xhtml\n' >> "$W/unsaved.tsv"
+out="$(NBKIT_COLLECTION="$W/unsaved.tsv" analyze "$W/proj")"
+contains "a page unsaved in NetBeans makes the comparison partial, naming each" "$out" "Partial comparison: not saved in NetBeans when it collected: src/main/webapp/pages/compare.xhtml, src/main/webapp/pages/orders.xhtml."
+lacks "a collection with every page saved says nothing" "$(NBKIT_COLLECTION="$W/marks.tsv" analyze "$W/proj")" "Partial comparison"
 # a folder moved since the collection (same content, another path): one line with the folder, not each page twice
 WA="$W/proj/src/main/webapp"
 nres="$(find "$WA/resources" -name '*.xhtml' | wc -l)"
@@ -292,6 +298,11 @@ out="$(printf 'n\n\n' | PATH="$W/fakebin:$PATH" HOME="$QH" NBKIT_TTY=1 NBKIT_UI_
 contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) may be out of date. Collect it again? It opens NetBeans."
 check "the dialog gets what changed, from the same list" grep -q 'changed pages (1): src/main/webapp/pages/compare.xhtml' "$W/collect-ev"
 contains "no: it compares with the old one, warning" "$out" "may be out of date; comparing with it anyway."
+# NetBeans open with that userdir: the question says the running one is used, and that unsaved files go as on disk
+bash -c 'sleep 60; :' nbkit-fake-open org.netbeans.Main --userdir "$QH/.netbeans/31" & fakeopen=$!
+out="$(printf 'n\n\n' | PATH="$W/fakebin:$PATH" HOME="$QH" NBKIT_TTY=1 NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" /dev/null 2>&1 | tr -d '\r')"
+pkill -P $fakeopen 2>/dev/null; kill $fakeopen 2>/dev/null; wait $fakeopen 2>/dev/null
+contains "NetBeans open: the question says files open and unsaved go as they are on disk" "$out" "Uses the NetBeans that is already open; files open and not saved go as they are on disk."
 contains "the interface or the menu asks whether to open the report, Enter opens" "$out" "Report saved: $W/cache/nbkit/analyze/proj-"
 for _ in $(seq 50); do [ -f "$W/opened" ] && break; sleep 0.1; done
 check "Enter opens it" grep -q "$W/cache/nbkit/analyze/proj-.*\.txt" "$W/opened"
@@ -406,6 +417,20 @@ contains "then each page in turn, telling how far it got (pages done, of how man
 contains "at the end the first one goes away and the last one says how many marks" "$steps" \
   "collect step: clear nbkit: collecting what NetBeans marks on collectproj to compare with analyze. You can keep working.|collect step: notice nbkit | Collection ready: 2 marks."
 contains "after the collection and its done marker are written" "$steps" "Collection ready: 2 marks.|collect step: collection: 2 marks, done marker: true, progress left: false"
+html="$(grep '^html step: ' <<<"$out")"
+contains "HTML checking already on: nothing is changed" "$steps" "collect step: notice nbkit | nbkit: collecting"
+lacks "and the start notice says nothing about HTML" "$steps" "HTML warnings"
+contains "HTML checking off: turned on for the collection, with a restore-pending file" "$html" "html step: html set text/xml;text/facelets, done marker false, pending true"
+contains "the pages are read with it on" "$html" "html step: page src/main/webapp/a.xhtml: html text/xml;text/facelets, pending true"
+contains "the start notice says the editors may show HTML warnings" "$html" "until the collection ends."
+contains "restored before the done marker (the pending file goes right after, still before it)" "$html" "html step: html set text/xml, done marker false, pending true"
+contains "after: as before, nothing left" "$html" "html step: after: html text/xml, pending false, done marker true"
+contains "the collection records it on, and the unsaved page" "$html" "html step: recorded: on text/facelets, unsaved src/main/webapp/b.xhtml"
+contains "a page that breaks the collection: restored all the same" "$html" "html step: failed: broken, html text/xml, pending false"
+contains "NetBeans died mid-collection: restored at its next start" "$html" "html step: restored at start: text/xml"
+contains "and the file deleted" "$html" "html step: pending after start: false"
+contains "with no setting before, the key is removed (null)" "$html" "html step: restored at start (no setting before): null"
+lacks "no file: nothing restored" "$html" "restored with no file"
 # in NetBeans the Workspace lives on: a .js or a .properties that changes must not leave old classes or keys
 compile -cp "$W/nbkit" -d "$W/caches" "$J/test/RunWorkspaceCaches.java"
 out="$("$JAVA" -cp "$W/nbkit:$W/caches" RunWorkspaceCaches "$W/cacheproj" 2>&1 | grep -v '^Picked up JAVA_TOOL_OPTIONS')"

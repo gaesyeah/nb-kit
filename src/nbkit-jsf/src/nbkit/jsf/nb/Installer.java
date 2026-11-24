@@ -21,6 +21,12 @@ public final class Installer extends ModuleInstall {
             // never breaks NetBeans
         }
         try {
+            // NetBeans stopped in the middle of a collection: HTML error checking back to what it was
+            nbkit.jsf.NetBeansMarks.restorePending(nbkit.jsf.NetBeansMarks.cache(), Collector::setHtmlChecking);
+        } catch (java.io.IOException | RuntimeException ex) {
+            // never breaks NetBeans
+        }
+        try {
             Collector.start();
         } catch (RuntimeException ex) {
             // never breaks NetBeans

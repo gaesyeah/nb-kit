@@ -44,6 +44,8 @@ public final class NetBeansMarks {
     public static final String INFO_WEB_MODULE = "web-module";
     /** the content mime of a JSF page in NetBeans (web.jsfapi JsfUtils.JSF_XHTML_FILE_MIMETYPE) */
     public static final String FACELETS = "text/facelets";
+    /** the pages that were modified and not saved in NetBeans when it collected (tab between them) */
+    public static final String INFO_UNSAVED = "unsaved";
 
     private NetBeansMarks() {
     }
@@ -64,6 +66,26 @@ public final class NetBeansMarks {
 
     public static File requestFile(File cache) {
         return new File(cache, "collect-request");
+    }
+
+    /** what HTML error checking was before nbkit turned it on for a collection ("=value", empty: no value) */
+    public static File htmlRestoreFile(File cache) {
+        return new File(cache, "collect-html-restore");
+    }
+
+    /** the setting with JSF pages added (";" between mimes) */
+    static String withFacelets(String setting) {
+        return setting == null || setting.isBlank() ? FACELETS : setting + ";" + FACELETS;
+    }
+
+    /** NetBeans stopped in the middle of a collection: puts HTML error checking back (null: remove the setting) */
+    public static void restorePending(File cache, java.util.function.Consumer<String> setter) throws IOException {
+        File f = htmlRestoreFile(cache);
+        if (f.isFile()) {
+            String v = Files.readString(f.toPath(), StandardCharsets.UTF_8);
+            setter.accept(v.startsWith("=") ? v.substring(1) : null);
+            Files.delete(f.toPath());
+        }
     }
 
     public static File doneFile(File cache) {
@@ -286,6 +308,15 @@ public final class NetBeansMarks {
         Object notice(String title, String text);
 
         void clear(Object notice);
+
+        /** mimetypesWithEnabledHtmlErrorChecking of text/html; null: not set */
+        String htmlSetting();
+
+        /** sets it (null: removes it, back to NetBeans' default) */
+        void htmlSetting(String value);
+
+        /** the page is open and modified, not saved: NetBeans marks the editor's text, not the disk's */
+        boolean unsaved(File page);
     }
 
     /**
@@ -294,12 +325,25 @@ public final class NetBeansMarks {
      * Returns that number.
      */
     public static int collect(File dir, File cache, CollectSteps steps) throws Exception {
-        Object started = steps.notice(Msg.t("collect.title"), Msg.t("collect.started", dir.getName()));
+        // HTML error checking for JSF pages on while collecting, or Missing CSS Class is not collected; put back
+        // after, before the done marker (analyze may close NetBeans as soon as it sees it); the file restores it at
+        // the next start if NetBeans stops in between
+        String htmlBefore = steps.htmlSetting();
+        boolean htmlOn = !htmlErrorChecking(htmlBefore, FACELETS);
+        File pending = htmlRestoreFile(cache);
+        if (htmlOn) {
+            cache.mkdirs();
+            Files.writeString(pending.toPath(), htmlBefore == null ? "" : "=" + htmlBefore, StandardCharsets.UTF_8);
+            steps.htmlSetting(withFacelets(htmlBefore));
+        }
+        Object started = steps.notice(Msg.t("collect.title"), Msg.t("collect.started", dir.getName())
+                + (htmlOn ? " " + Msg.t("collect.html") : ""));
         Map<String, String> info = new LinkedHashMap<>();
         info.put("date", java.time.Instant.now().toString());
         info.put(INFO_CLASSES, "" + classesTime(dir));
         Map<String, String> hashes = new LinkedHashMap<>();
         List<Mark> marks = new ArrayList<>();
+        List<String> unsaved = new ArrayList<>();
         File progress = progressFile(cache);
         try {
             if (steps.open()) {
@@ -310,13 +354,25 @@ public final class NetBeansMarks {
                             StandardCharsets.UTF_8);
                     hashes.put(rel, sha256(Files.readAllBytes(page.toPath())));
                     marks.addAll(steps.marks(page, rel));
+                    if (steps.unsaved(page)) {
+                        unsaved.add(rel);
+                    }
                 }
                 info.putAll(steps.info());
+                // what NetBeans does not run at all here: no mark there is not agreement (notRun)
+                info.put(INFO_HTML_ERRORS, (htmlErrorChecking(steps.htmlSetting(), FACELETS) ? "on " : "off ") + FACELETS);
+                if (!unsaved.isEmpty()) {
+                    info.put(INFO_UNSAVED, String.join("\t", unsaved));
+                }
             } else {
                 info.put("error", "not a NetBeans project: " + dir);
             }
         } finally {
             Files.deleteIfExists(progress.toPath());
+            if (htmlOn) {
+                steps.htmlSetting(htmlBefore);
+                Files.deleteIfExists(pending.toPath());
+            }
         }
         File out = outputFile(cache, dir);
         write(out, info, hashes, marks);
@@ -358,7 +414,7 @@ public final class NetBeansMarks {
                 f[i] = unescape(f[i]);
             }
             switch (f[0]) {
-                case "info" -> info.put(f[1], f[2]);
+                case "info" -> info.merge(f[1], String.join("\t", List.of(f).subList(2, f.length)), (a, b) -> a + "\t" + b);
                 case "file" -> hashes.put(f[1], f[2]);
                 case "mark" -> marks.add(new Mark(f[1], Integer.parseInt(f[2]), Integer.parseInt(f[3]), Integer.parseInt(f[4]),
                         Integer.parseInt(f[5]), f[6], f[7], f[8].equals("on"), f[9]));

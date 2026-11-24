@@ -47,7 +47,9 @@ final class Notices {
         }
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.setOpaque(false);
-        panel.add(new JLabel(text), BorderLayout.NORTH);
+        // a fixed width wraps the text: on one line the balloon grows past the window and is cut
+        panel.add(new JLabel("<html><body style='width: 360px'>" + text.replace("&", "&amp;").replace("<", "&lt;") + "</body></html>"),
+                BorderLayout.NORTH);
         panel.add(row, BorderLayout.SOUTH);
         return panel;
     }

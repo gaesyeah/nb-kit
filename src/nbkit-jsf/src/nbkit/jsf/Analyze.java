@@ -239,6 +239,10 @@ public final class Analyze {
         System.out.println("  " + Msg.t("cmp.counts", by.get(NetBeansComparison.Category.AGREE).size(),
                 by.get(NetBeansComparison.Category.NETBEANS_FALSE_POSITIVE).size(), by.get(NetBeansComparison.Category.NETBEANS_CATCHES_SKIPPED).size(),
                 by.get(NetBeansComparison.Category.NBKIT_ONLY).size()));
+        String unsaved = c.info().get(NetBeansMarks.INFO_UNSAVED);
+        if (unsaved != null && !unsaved.isBlank()) {
+            System.out.println("  " + Msg.t("cmp.unsaved", String.join(", ", unsaved.split("\t"))));
+        }
         for (Map.Entry<String, String> e : NetBeansMarks.notRun(c).entrySet()) {
             System.out.println("  " + Msg.t("cmp.notrun", e.getKey().endsWith("_") ? Msg.t("cmp.rules.html") : e.getKey().substring(e.getKey().lastIndexOf('_') + 1), e.getValue()));
         }

@@ -42,6 +42,8 @@ import org.netbeans.modules.parsing.api.indexing.IndexingManager;
 import org.netbeans.spi.options.OptionsPanelController;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
+import org.openide.loaders.DataObject;
+import org.openide.loaders.DataObjectNotFoundException;
 import org.openide.modules.ModuleInfo;
 import org.openide.modules.Modules;
 import org.openide.util.RequestProcessor;
@@ -130,11 +132,6 @@ final class Collector {
                 info.put("netbeans", System.getProperty("netbeans.productversion", "") + " " + System.getProperty("netbeans.buildnumber", ""));
                 ModuleInfo self = Modules.getDefault().ownerOf(Collector.class);
                 info.put("nbkit-jsf", self == null ? "" : self.getSpecificationVersion() + " " + self.getAttribute("NbKit-Source-Hash"));
-                // what NetBeans does not run at all here: no mark there is not agreement (NetBeansMarks.notRun)
-                Preferences html = MimeLookup.getLookup("text/html").lookup(Preferences.class);
-                String setting = html == null ? "" : html.get("mimetypesWithEnabledHtmlErrorChecking", "");
-                info.put(NetBeansMarks.INFO_HTML_ERRORS, (NetBeansMarks.htmlErrorChecking(setting, NetBeansMarks.FACELETS) ? "on " : "off ")
-                        + NetBeansMarks.FACELETS);
                 info.put(NetBeansMarks.INFO_WEB_MODULE, NetBeansMarks.webModule(el[0], el[1]));
                 Watcher.debug("collect: " + info);
                 return info;
@@ -149,8 +146,49 @@ final class Collector {
             public void clear(Object notice) {
                 ((org.openide.awt.Notification) notice).clear();
             }
+
+            @Override
+            public String htmlSetting() {
+                Preferences html = htmlPreferences();
+                return html == null ? null : html.get(HTML_CHECKING, null);
+            }
+
+            @Override
+            public void htmlSetting(String value) {
+                setHtmlChecking(value);
+            }
+
+            @Override
+            public boolean unsaved(File page) {
+                FileObject fo = FileUtil.toFileObject(FileUtil.normalizeFile(page));
+                try {
+                    return fo != null && DataObject.find(fo).isModified();
+                } catch (DataObjectNotFoundException ex) {
+                    return false;
+                }
+            }
         });
         Watcher.debug("collect: done, " + n + " mark(s)");
+    }
+
+    /** html.editor's HtmlPreferences reads it, and a listener there takes a change at once */
+    private static final String HTML_CHECKING = "mimetypesWithEnabledHtmlErrorChecking";
+
+    private static Preferences htmlPreferences() {
+        return MimeLookup.getLookup("text/html").lookup(Preferences.class);
+    }
+
+    /** sets HTML error checking (null: removes the setting, back to NetBeans' default) */
+    static void setHtmlChecking(String value) {
+        Preferences html = htmlPreferences();
+        if (html == null) {
+            return;
+        }
+        if (value == null) {
+            html.remove(HTML_CHECKING);
+        } else {
+            html.put(HTML_CHECKING, value);
+        }
     }
 
     /** opens the project in NetBeans when it is not open yet (its classpath and index come with it) */

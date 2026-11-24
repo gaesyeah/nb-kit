@@ -115,6 +115,9 @@ public class RunNetBeansMarks {
             public Map<String, String> info() { return Map.of("netbeans", "Apache NetBeans IDE 31 x"); }
             public Object notice(String title, String text) { events.add("notice " + title + " | " + text); return text; }
             public void clear(Object notice) { events.add("clear " + notice); }
+            public String htmlSetting() { return "text/facelets"; }
+            public void htmlSetting(String v) { events.add("html set " + v); }
+            public boolean unsaved(File page) { return false; }
         });
         events.add("collection: " + NetBeansMarks.read(NetBeansMarks.outputFile(cache, proj)).marks().size() + " marks, done marker: "
                 + NetBeansMarks.doneFile(cache).exists() + ", progress left: " + NetBeansMarks.progressFile(cache).exists());
@@ -122,5 +125,52 @@ public class RunNetBeansMarks {
             System.out.println("collect step: " + e);
         }
         System.out.println("collected: " + n);
+
+        // HTML error checking for facelets off in NetBeans: on while the pages are read, back to what it was (and the
+        // restore-pending file gone) before the done marker, since analyze may close NetBeans as soon as it sees it
+        String[] html = {"text/xml"};
+        File pending = NetBeansMarks.htmlRestoreFile(cache);
+        List<String> h = new java.util.ArrayList<>();
+        NetBeansMarks.CollectSteps offSteps = new NetBeansMarks.CollectSteps() {
+            public boolean open() { return true; }
+            public List<NetBeansMarks.Mark> marks(File page, String rel) {
+                h.add("page " + rel + ": html " + html[0] + ", pending " + pending.exists());
+                if (rel.endsWith("b.xhtml") && System.getProperty("fail") != null) throw new IllegalStateException("broken");
+                return List.of();
+            }
+            public Map<String, String> info() { return Map.of(); }
+            public Object notice(String title, String text) { h.add("notice " + text); return text; }
+            public void clear(Object notice) { }
+            public String htmlSetting() { return html[0]; }
+            public void htmlSetting(String v) {
+                html[0] = v;
+                h.add("html set " + v + ", done marker " + NetBeansMarks.doneFile(cache).exists() + ", pending " + pending.exists());
+            }
+            public boolean unsaved(File page) { return page.getName().equals("b.xhtml"); }
+        };
+        NetBeansMarks.doneFile(cache).delete(); // as taking the request does
+        NetBeansMarks.collect(proj, cache, offSteps);
+        h.add("after: html " + html[0] + ", pending " + pending.exists() + ", done marker " + NetBeansMarks.doneFile(cache).exists());
+        NetBeansMarks.Collected got = NetBeansMarks.read(NetBeansMarks.outputFile(cache, proj));
+        h.add("recorded: " + got.info().get(NetBeansMarks.INFO_HTML_ERRORS) + ", unsaved " + got.info().get(NetBeansMarks.INFO_UNSAVED));
+        // a page that breaks the collection: the setting comes back all the same
+        System.setProperty("fail", "1");
+        html[0] = "text/xml";
+        try {
+            NetBeansMarks.collect(proj, cache, offSteps);
+        } catch (Exception e) {
+            h.add("failed: " + e.getMessage() + ", html " + html[0] + ", pending " + pending.exists());
+        }
+        System.clearProperty("fail");
+        // NetBeans died mid-collection: at its next start the module restores what the file says, then deletes it
+        Files.writeString(pending.toPath(), "=text/xml");
+        NetBeansMarks.restorePending(cache, v -> h.add("restored at start: " + v));
+        h.add("pending after start: " + pending.exists());
+        Files.writeString(pending.toPath(), "");
+        NetBeansMarks.restorePending(cache, v -> h.add("restored at start (no setting before): " + v));
+        NetBeansMarks.restorePending(cache, v -> h.add("restored with no file: " + v));
+        for (String e : h) {
+            System.out.println("html step: " + e);
+        }
     }
 }
