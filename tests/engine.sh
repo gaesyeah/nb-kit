@@ -660,6 +660,15 @@ contains "status --json lists the JSF projects (pages in them or in modules): th
   "$(nbkit status --json)" "\"jsf_projects\":[{\"path\":\"$P/web app\",\"name\":\"Web App\"},{\"path\":\"$P/mono\",\"name\":\"mono\"},{\"path\":\"$P/closed one\",\"name\":\"closed one\"},{\"path\":\"$P/modules parent\",\"name\":\"modules parent\"}]"
 lacks "a folder with a repo and a project deep inside is not a JSF project" "$(nbkit status --json)" "$P/not a project"
 
+# the spinner in a narrow terminal: the text is cut and, with no room, the cancel hint left out; the line never wraps
+spin() { timeout 20 script -qec "stty cols $1; NBKIT_DIR='$NBKIT_DIR' NBKIT_LANG=en bash -c 'source \"\$NBKIT_DIR/lib/terminal.sh\"; n=0; later() { n=\$((n + 1)); [ \$n -gt 2 ]; }; spin_until \"waiting for something that takes a long time\" later \"\" yes yes'" /dev/null </dev/null 2>&1; }
+widest() { python3 -c 'import re, sys; print(max(len(s) for s in re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", sys.argv[1]).replace("\n", "\r").split("\r")))' "$1"; }
+for c in 29 22 16; do
+  out="$(spin $c)"
+  check "the spinner line fits a terminal of $c columns" test "$(widest "$out")" -le $c
+done
+contains "with room, the spinner says a key cancels" "$(spin 80)" "$(NBKIT_DIR="$NBKIT_DIR" NBKIT_LANG=en bash -c 'source "$NBKIT_DIR/lib/terminal.sh"; t cli.enter_cancels')"
+
 # the list in the menu of the terminal: each project on one line, even in a narrow terminal
 L="$P/a folder with a very long name/that goes on and on/web"
 mkdir -p "$L/src/main/webapp" && : > "$L/src/main/webapp/i.xhtml"

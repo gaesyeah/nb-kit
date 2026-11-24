@@ -1,18 +1,19 @@
 # nbkit NetBeans marks 1
-info	date	2026-11-17T03:20:27.542268802Z
-info	classes	1794885018720
+info	date	2026-11-24T02:07:17.578882189Z
+info	classes	1795131419485
 info	netbeans	Apache NetBeans IDE 31 31-f8ac37e0f2434a7f000fbe3360f1a92aa3ea67bc
-info	nbkit-jsf	1.1 7aa2b5255c010bd0a439131b61e6ec58
+info	nbkit-jsf	1.1 5f94475c5aa052101a3e5fa2ac0ce685
 info	html-error-checking	on text/facelets
 info	web-module	yes
-file	src/main/webapp/index.xhtml	6f31be02afcaaa3d6cbe66de613c33d72569533bef4fd2e06a07e178864bba21
-mark	src/main/webapp/index.xhtml	15	17	975	984	text_html_MissingClassRule	WARNING	off	Class real-clas not found
-mark	src/main/webapp/index.xhtml	21	17	1564	1571	text_html_MissingClassRule	WARNING	off	Class zz-hook not found
-mark	src/main/webapp/index.xhtml	3	1	100	109	text_html_NotValidatedContent	INFO	on	Content is being hidden from the validator based on namespace filtering.\nFrom line 3, column 1; to line 3, column 9\n(Rule Category: Not validated content)
-mark	src/main/webapp/index.xhtml	4	5	113	121	text_html_Other	WARNING	on	Filtering out selected namespaces causes descendants in other namespaces to be dropped as well.\nFrom line 4, column 5; to line 4, column 12\n(Rule Category: All Other)
-mark	src/main/webapp/index.xhtml	28	1	2153	2161	text_html_Other	WARNING	on	XHTML element "html" is missing a required instance of one or more of the following child elements: "body", "head".\nFrom line 28, column 1; to line 28, column 8\n(Rule Category: All Other)
-mark	src/main/webapp/index.xhtml	9	36	359	363	text_x-el_Identifiers	WARNING	on	Unknown property "nmae"
-mark	src/main/webapp/index.xhtml	11	46	574	585	text_x-el_Identifiers	WARNING	on	Unknown method "concat"
-mark	src/main/webapp/index.xhtml	13	49	773	777	text_x-el_Identifiers	WARNING	on	Unknown property "name"
-mark	src/main/webapp/index.xhtml	23	36	1809	1824	text_x-el_Identifiers	WARNING	on	Unknown method "count"
-mark	src/main/webapp/index.xhtml	25	40	2080	2084	text_x-el_Identifiers	WARNING	on	Unknown property "bark"
+file	src/main/webapp/index.xhtml	d14b57ece77f07d1d5ccc3e9bf3eabe29469ea02138430e4451457a736fc3b49
+mark	src/main/webapp/index.xhtml	15	17	1015	1024	text_html_MissingClassRule	WARNING	off	Class real-clas not found
+mark	src/main/webapp/index.xhtml	21	17	1604	1611	text_html_MissingClassRule	WARNING	off	Class zz-hook not found
+mark	src/main/webapp/index.xhtml	35	17	3225	3232	text_html_MissingClassRule	WARNING	off	Class js-hook not found
+mark	src/main/webapp/index.xhtml	3	1	140	149	text_html_NotValidatedContent	INFO	on	Content is being hidden from the validator based on namespace filtering.\nFrom line 3, column 1; to line 3, column 9\n(Rule Category: Not validated content)
+mark	src/main/webapp/index.xhtml	4	5	153	161	text_html_Other	WARNING	on	Filtering out selected namespaces causes descendants in other namespaces to be dropped as well.\nFrom line 4, column 5; to line 4, column 12\n(Rule Category: All Other)
+mark	src/main/webapp/index.xhtml	43	1	3695	3703	text_html_Other	WARNING	on	XHTML element "html" is missing a required instance of one or more of the following child elements: "body", "head".\nFrom line 43, column 1; to line 43, column 8\n(Rule Category: All Other)
+mark	src/main/webapp/index.xhtml	9	36	399	403	text_x-el_Identifiers	WARNING	on	Unknown property "nmae"
+mark	src/main/webapp/index.xhtml	11	46	614	625	text_x-el_Identifiers	WARNING	on	Unknown method "concat"
+mark	src/main/webapp/index.xhtml	13	49	813	817	text_x-el_Identifiers	WARNING	on	Unknown property "name"
+mark	src/main/webapp/index.xhtml	23	36	1849	1864	text_x-el_Identifiers	WARNING	on	Unknown method "count"
+mark	src/main/webapp/index.xhtml	25	40	2120	2124	text_x-el_Identifiers	WARNING	on	Unknown property "bark"

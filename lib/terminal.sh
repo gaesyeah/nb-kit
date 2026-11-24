@@ -159,7 +159,7 @@ menu() {
 # spinner until the condition is true; any key cancels (returns 1) unless disabled
 # optional: progress function, cancelable (yes), elapsed time (no)
 spin_until() {
-  local sp='|/-\' i=0 k cancel='' line label timer cols=0 keys=0 elapsed=0 started=$SECONDS
+  local sp='|/-\' i=0 k cancel='' hint line label timer n cols=0 keys=0 elapsed=0 started=$SECONDS
   [ "${4:-yes}" = yes ] && cancel="$(t cli.enter_cancels)"
   { [ -t 1 ] || [ -t 2 ]; } && cols="$(tput cols 2>/dev/null || echo 80)"
   [ "${4:-yes}" = yes ] && { [ -t 0 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && keys=1
@@ -174,15 +174,20 @@ spin_until() {
       timer="$(printf '%02d:%02d' "$((elapsed / 60))" "$((elapsed % 60))")"
       line+=" $timer"
     fi
-    if [ "$cols" -gt 0 ] && [ ${#line} -gt $((cols - ${#cancel} - 8)) ]; then
+    # the cancel hint only with room for 10 characters of text beside it (the key still cancels); the cut never goes
+    # below 0 (${v:0:-n} would keep almost all of it)
+    hint="$cancel"
+    if [ "$cols" -gt 0 ] && [ $((cols - ${#hint} - ${#timer} - 10)) -lt 10 ]; then hint=""; fi
+    if [ "$cols" -gt 0 ] && [ ${#line} -gt $((cols - ${#hint} - 8)) ]; then
       if [ -n "$timer" ]; then
-        label="${line% $timer}"
-        line="${label:0:$((cols - ${#cancel} - ${#timer} - 10))}… $timer"
+        label="${line% $timer}"; n=$((cols - ${#hint} - ${#timer} - 10))
+        line="${label:0:$((n > 0 ? n : 0))}… $timer"
       else
-        line="${line:0:$((cols - ${#cancel} - 9))}…"
+        n=$((cols - ${#hint} - 9))
+        line="${line:0:$((n > 0 ? n : 0))}…"
       fi
     fi
-    printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$line" "$D" "$cancel" "$N"; i=$((i + 1))
+    printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$line" "$D" "$hint" "$N"; i=$((i + 1))
     if [ $keys = 0 ]; then sleep 0.25; continue; fi
     if IFS= read -rsn1 -t 0.25 k </dev/tty; then
       IFS= read -rsn5 -t 0.05 k </dev/tty || true

@@ -458,6 +458,12 @@ if [ -f "$WAR/netbeans-marks.tsv" ]; then
   contains "case 6 (class in no CSS nor JS): both mark it" "$out" "  21:17  agree"
   contains "case 7 (wrong number of arguments): both mark it" "$out" "  23:36  agree"
   contains "case 8 (only in an implementation): a NetBeans false positive" "$out" "  25:40  NetBeans false positives"
+  lacks "case 9 (ternary in class, a class that exists or ''): nothing to compare" \
+    "$(grep -E '^  [0-9]+:[0-9]+  (agree|NetBeans false positives|NetBeans catches what nbkit skipped|Only nbkit \(to review\)|not collected)  ' <<<"$out")" "  29:"
+  contains "case 9b (typo in a ternary in class): only nbkit, NetBeans does not check EL in class" "$out" "  31:53  Only nbkit (to review)"
+  contains "case 9c (typo in a ternary in styleClass): only nbkit" "$out" "  33:67  Only nbkit (to review)"
+  contains "case 10 (class only the page's script uses): a NetBeans false positive" "$out" "  35:17  NetBeans false positives"
+  contains "case 11b (a key in no file of the bundle): only nbkit, NetBeans does not mark it" "$out" "  41:32  Only nbkit (to review)"
 else
   echo "  skipped: jsf-war has no saved NetBeans collection yet (tests/jsf-war/netbeans-marks.tsv, see How to run)"
 fi

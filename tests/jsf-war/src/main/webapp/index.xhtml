@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="http://xmlns.jcp.org/jsf/html">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:h="http://xmlns.jcp.org/jsf/html" xmlns:f="http://xmlns.jcp.org/jsf/core">
 <h:head>
     <title>nbkit collector test</title>
     <link rel="stylesheet" href="resources/css/app.css"/>
@@ -24,5 +24,20 @@
     <!-- case 8: a property only the implementation has, getPet() is declared Pet and returns a Dog (skipped by nbkit, el.impl: EL finds it at runtime; NetBeans Identifiers marks it: NetBeans false positive) -->
     <h:outputText value="#{greeter.pet.bark}"/>
     <div class="real-class">a class that exists</div>
+    <!-- the cases below were added on 2026-11-24 (step 2b); what NetBeans marks on them comes from the collection of that day -->
+    <!-- case 9: a ternary in class whose branches are a class that exists and '' (nbkit: nothing, the class exists and '' is never checked; NetBeans: see the collection) -->
+    <div class="real-class #{greeter.name == 'x' ? 'real-class' : ''}">case 9</div>
+    <!-- case 9b: the same with a typo in the branch (nbkit: blue note Did you mean real-class; NetBeans: see the collection) -->
+    <div class="real-class #{greeter.name == 'x' ? 'real-clas' : ''}">case 9b</div>
+    <!-- case 9c: the typo in a ternary of a JSF component's styleClass (only nbkit marks it: NetBeans looks only at class) -->
+    <h:panelGroup styleClass="real-class #{greeter.name == 'x' ? 'real-clas' : ''}">case 9c</h:panelGroup>
+    <!-- case 10: a class with no CSS rule that the page's script uses (nbkit: blue note "used by the JavaScript" with Go to; NetBeans Missing CSS Class marks it: its false positive) -->
+    <div class="js-hook">case 10</div>
+    <script>document.querySelector('.js-hook').textContent = 'case 10';</script>
+    <!-- case 11: a key of a bundle (nbkit: blue note with Go to the key) -->
+    <f:loadBundle basename="example.messages" var="msg"/>
+    <h:outputText value="#{msg.greeting}"/>
+    <!-- case 11b: a key in no file of the bundle (nbkit: error bundle.key, Did you mean greeting; NetBeans: see the collection) -->
+    <h:outputText value="#{msg.greetin}"/>
 </h:body>
 </html>
