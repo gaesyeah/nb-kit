@@ -1,0 +1,32 @@
+<ui:composition template="/WEB-INF/templates/main.xhtml" xmlns="http://www.w3.org/1999/xhtml" xmlns:h="jakarta.faces.html" xmlns:ui="jakarta.faces.facelets" xmlns:c="jakarta.tags.core">
+  <!-- a ui:param keeps its expression and Facelets evaluates it where the param is used: a loop variable in it is
+       not out of scope here (nothing to say: the uses are in this same file) -->
+  <ui:param name="archivable" value="#{customerVM.canArchive(row)}"/>
+  <ui:param name="owner" value="#{customerVM.ownerOf(row)}"/>
+  <ui:define name="content">
+    <h:dataTable value="#{customerVM.items}" var="row">
+      <h:column>
+        <h:outputText value="#{row.name}" rendered="#{archivable}"/><ui:include src="/pages/deferred-part.xhtml"/>
+        <!-- typed where it is used: the method's return, with row from the loop -->
+        <h:outputText value="#{owner.namee}"/><!--E:el.member-->
+      </h:column>
+    </h:dataTable>
+    <!-- used where row does not exist: the error is here, going to the ui:param -->
+    <h:outputText value="x" rendered="#{archivable}"/><!--E:el.scope-->
+    <!-- c:set evaluates at once: there row does not exist -->
+    <c:set var="early" value="#{row.name}"/><!--E:el.scope-->
+    <h:outputText value="#{early}"/>
+    <!-- c:forEach and c:set give their var while the view is built: EL looks it up when the ui:param's expression is
+         made, so one made where it does not exist never sees it -->
+    <ui:param name="fromEach" value="#{each.name}"/><!--E:el.scope-->
+    <c:forEach items="#{customerVM.items}" var="each"><h:outputText value="#{fromEach}"/></c:forEach>
+    <ui:param name="late" value="#{setLater}"/><!--E:el.scope-->
+    <c:set var="setLater" value="x"/>
+    <h:outputText value="#{late}"/>
+    <!-- a comparison is a boolean; another loop with the same var also gives it -->
+    <ui:param name="named" value="#{row.name == 'x'}"/>
+    <h:dataTable value="#{customerVM.items}" var="row"><h:column><h:outputText value="x" rendered="#{named}"/></h:column></h:dataTable>
+    <ui:param name="counted" value="#{customerVM.items.size() + 1}"/>
+    <h:outputText value="#{counted}"/>
+  </ui:define>
+</ui:composition>

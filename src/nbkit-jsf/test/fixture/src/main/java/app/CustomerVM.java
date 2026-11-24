@@ -28,6 +28,8 @@ public class CustomerVM {
   }
   public String nextPage() { return getTitle(); }
   public void listen(jakarta.faces.event.ActionEvent e) { }
+  public boolean canArchive(Customer c) { return true; }
+  public Customer ownerOf(Customer c) { return c; }
   public String pick(String a) { return a; }
   public String pick(String a, String b, String c) { return a; }
 }

@@ -446,6 +446,45 @@ public final class El {
         return new int[]{close + 1, count};
     }
 
+    private static final Set<String> BOOLEAN_OPS = Set.of("==", "!=", "<", ">", "<=", ">=", "&&", "||",
+            "eq", "ne", "lt", "gt", "le", "ge", "and", "or");
+    private static final Set<String> UNSURE_OPS = Set.of("?", "=", "+=", ";", "->");
+    private static final Set<String> ARITHMETIC = Set.of("+", "-", "*", "/", "%", "div", "mod");
+
+    /**
+     * Whether the whole expression gives a boolean, by its tokens outside parentheses and brackets: a comparison or
+     * a logical operator (they bind looser than arithmetic, so they give the result), or a leading not / ! / empty with
+     * no arithmetic after it. A ternary, an assignment, a lambda or ';' give whatever their parts give: false (unsure).
+     */
+    public static boolean isBoolean(Expr e) {
+        int depth = 0;
+        boolean op = false, arithmetic = false;
+        Tok prev = null;
+        for (Tok t : e.toks) {
+            boolean member = prev != null && prev.t == T.OP && (prev.s.equals(".") || prev.s.equals("?.")); // bean.lt is a name
+            prev = t;
+            if (member) {
+                continue;
+            }
+            if (t.t == T.OP && (t.s.equals("(") || t.s.equals("["))) {
+                depth++;
+            } else if (t.t == T.OP && (t.s.equals(")") || t.s.equals("]"))) {
+                depth--;
+            } else if (depth == 0 && (t.t == T.OP || t.t == T.ID)) {
+                if (t.t == T.OP && UNSURE_OPS.contains(t.s)) {
+                    return false;
+                }
+                op |= BOOLEAN_OPS.contains(t.s);
+                arithmetic |= ARITHMETIC.contains(t.s);
+            }
+        }
+        if (e.toks.isEmpty()) {
+            return false;
+        }
+        Tok first = e.toks.get(0);
+        return op || !arithmetic && (first.t == T.OP && first.s.equals("!") || first.t == T.ID && (first.s.equals("not") || first.s.equals("empty")));
+    }
+
     /** Comparisons "chain == 'text'" (or the other way around), for the enum rule. */
     public static final class Compare {
         public Ref ref;

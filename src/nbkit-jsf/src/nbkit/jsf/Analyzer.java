@@ -760,6 +760,9 @@ public final class Analyzer {
                 }
                 if (found != null) {
                     found.used = true;
+                    if (found.kind.equals("ui:param")) {
+                        paramUses.computeIfAbsent(found, k -> new ArrayList<>()).add(new Use(s.el, attrName, pos, s.x.off(r.b)));
+                    }
                     jstlIteration(s, r, found);
                     types(s, r);
                     continue;
@@ -779,6 +782,16 @@ public final class Analyzer {
                         elsewhere = d;
                         break;
                     }
+                }
+                // Facelets keeps the expression of a ui:param and evaluates it where the param is used, so a var a
+                // component gives while rendering (a table's row) is checked there; c:forEach and c:set give theirs to
+                // the expression when it is made (EL's VariableMapper), so one made outside never sees it
+                Decl param = elsewhere == null ? null : valueOfParam(s);
+                Decl rendered = param == null ? null : renderedVar(r.name);
+                if (rendered != null) {
+                    rendered.used = true;
+                    deferred.computeIfAbsent(param, k -> new ArrayList<>()).add(new Deferred(rendered, r.name, pos, s.x.off(r.b)));
+                    continue;
                 }
                 if (elsewhere != null) {
                     String where = elsewhere.scope == AFTER
@@ -820,6 +833,74 @@ public final class Analyzer {
             }
             enumCompare(s);
             readonly(s);
+        }
+        deferredParams();
+    }
+
+    /** a use of a ui:param; a name in a ui:param's value that exists only somewhere else in the file */
+    record Use(Xml.Element el, String attrName, int a, int b) {
+    }
+
+    record Deferred(Decl decl, String name, int a, int b) {
+    }
+
+    /** a var a component gives while rendering (a table's, ui:repeat's), not c:forEach's or c:set's */
+    static boolean renders(Decl d) {
+        return d.scope == SUBTREE && d.renderIter && !d.passed;
+    }
+
+    Decl renderedVar(String name) {
+        for (Decl d : decls) {
+            if (d.name.equals(name) && renders(d)) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    final Map<Decl, List<Use>> paramUses = new HashMap<>();
+    final Map<Decl, List<Deferred>> deferred = new LinkedHashMap<>();
+
+    /** the ui:param of this file whose value s is (one given to an include is evaluated in it, not here): null if none */
+    Decl valueOfParam(Site s) {
+        if (s.attr == null || !s.attr.name.equals("value")) {
+            return null;
+        }
+        for (Decl d : decls) {
+            if (d.el == s.el && d.kind.equals("ui:param") && !d.passed) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * each name of a ui:param's value that only exists elsewhere: el.scope at each use of the param where that name
+     * does not exist, going to the ui:param (nothing at the ui:param: it is right, and the uses are in this same file)
+     */
+    void deferredParams() {
+        for (Map.Entry<Decl, List<Deferred>> e : deferred.entrySet()) {
+            Decl param = e.getKey();
+            List<Use> uses = paramUses.getOrDefault(param, List.of());
+            for (Deferred x : e.getValue()) {
+                String where = x.decl().scope == AFTER
+                        ? Msg.t("el.scope.after", tag(x.decl().el), doc.line(x.decl().el.start))
+                        : Msg.t("el.scope.inside", tag(x.decl().el), doc.line(x.decl().el.start));
+                for (Use u : uses) {
+                    Decl seen = null;
+                    for (Decl d : decls) {
+                        if (d.name.equals(x.name()) && renders(d) && visible(d, u.el(), u.attrName(), u.a())) {
+                            seen = d;
+                        }
+                    }
+                    if (seen != null) {
+                        seen.used = true;
+                    } else {
+                        report("el.scope", Severity.ERROR, u.a(), u.b(), Msg.t("el.scope.param", x.name(), param.name, doc.line(param.el.start), where),
+                                targets(origin(file, param.el, "ui:param")));
+                    }
+                }
+            }
         }
     }
 
@@ -1324,7 +1405,8 @@ public final class Analyzer {
             return b.append(Msg.t("explain.resource")).toString();
         }
         String prev = rootType(s, r, new HashSet<>());
-        b.append(prev == null ? Msg.t("explain.untyped") : ClassModel.display(prev));
+        String primRoot = prev == null ? primitiveOfParam(s, r) : null;
+        b.append(prev != null ? ClassModel.display(prev) : primRoot != null ? primRoot : Msg.t("explain.untyped"));
         for (int k = chainStart(r); k < r.chain.size() && prev != null; k++) {
             El.Member m = r.chain.get(k);
             b.append(" → ").append(m.name == null ? "[...]" : m.name + (m.call ? "()" : "")).append(": ");
@@ -1342,12 +1424,65 @@ public final class Analyzer {
             String impl = t != null || ws.classes.members(owner).getters.containsKey(m.name) || ws.classes.members(owner).methods.containsKey(m.name) ? null
                     : ws.implementations(owner).stream().filter(i -> ws.classes.members(i).getters.containsKey(m.name)
                     || ws.classes.members(i).methods.containsKey(m.name)).findFirst().orElse(null);
+            String prim = t == null ? primitiveOf(owner, m) : null;
             b.append(t != null ? ClassModel.display(t)
+                    : prim != null ? prim
                     : impl != null ? Msg.t("explain.impl", ClassModel.display(impl))
                     : Msg.t(out.stream().anyMatch(p -> p.start == at) ? "explain.missing" : "explain.untyped"));
             prev = t;
         }
         return b.toString();
+    }
+
+    static final Map<String, String> PRIMITIVES = Map.of("Z", "boolean", "I", "int", "J", "long", "D", "double", "F", "float",
+            "B", "byte", "S", "short", "C", "char");
+
+    /** "boolean", "int"...: what a member gives when it is a primitive (the chain follows only classes); else null */
+    String primitiveOf(String owner, El.Member m) {
+        ClassModel.Members mm = ws.classes.members(owner);
+        String d = null;
+        if (m.call) {
+            for (ClassModel.MethodInfo mi : mm.methods.getOrDefault(m.name, List.of())) {
+                if (mi.params() == m.argCount) {
+                    d = mi.returnType();
+                }
+            }
+        } else {
+            d = mm.getters.get(m.name);
+        }
+        return d == null ? null : PRIMITIVES.get(d);
+    }
+
+    /** the primitive a ui:param or c:set holds: its value is one reference ending in a primitive, or a boolean operation */
+    String primitiveOfParam(Site s, El.Ref r) {
+        if (r.literal) {
+            return null;
+        }
+        String attrName = s.attr == null ? null : s.attr.name;
+        Decl found = null;
+        for (Decl d : decls) {
+            if (d.name.equals(r.name) && visible(d, s.el, attrName, s.x.off(r.a)) && (found == null || d.el.start >= found.el.start)) {
+                found = d;
+            }
+        }
+        if (found == null || !(found.kind.equals("ui:param") || found.kind.equals("c:set"))) {
+            return null;
+        }
+        for (Site v : sites) {
+            if (v.el == found.el && v.attr != null && v.attr.name.equals("value") && v.x.whole) {
+                if (El.isBoolean(v.x)) {
+                    return "boolean";
+                }
+                El.Ref src = v.x.refs.isEmpty() ? null : v.x.refs.get(0);
+                if (src == null || src.tokIndex != 0 || src.tokEnd != v.x.toks.size() - 1 || src.chain.isEmpty()) {
+                    return null;
+                }
+                El.Member last = src.chain.get(src.chain.size() - 1);
+                String owner = src.chain.size() == 1 ? rootType(v, src, new HashSet<>()) : walk(v, src, src.chain.size() - 1, false);
+                return owner == null || last.name == null ? null : primitiveOf(owner, last);
+            }
+        }
+        return null;
     }
 
     /**
