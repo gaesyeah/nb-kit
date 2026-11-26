@@ -452,6 +452,23 @@ check "no close option: the no-window NetBeans is ended all the same (SIGTERM)" 
 check "and nothing is left pending after SIGTERM" test ! -e "$FH/.cache/nbkit/collect-projectui.properties" -a ! -e "$FH/.cache/nbkit/collect-projectui.none"
 printf 'nbkit/core/CloseOption' > "$FU/modules/nbkit-core.jar"
 pkill -f "nbkit-fake-""netbeans" 2>/dev/null; rm -f "$FU/lock"
+# a filesystem that does not support preserving permissions (e.g. network/FUSE home): cp -p would fail
+mkdir -p "$W/nopermbin"
+cat > "$W/nopermbin/cp" <<'X'
+#!/bin/bash
+for a in "$@"; do
+  case "$a" in -p|-a|--preserve*) echo "cp: preserving permissions: Operation not supported" >&2; exit 1 ;; esac
+done
+exec /bin/cp "$@"
+X
+chmod +x "$W/nopermbin/cp"
+mkdir -p "${PUI%/*}"
+printf 'openProjectsURLs.0=file:/home/mine/\n' > "$PUI"; cp "$PUI" "$W/pui-noperm"
+out="$(PATH="$W/nopermbin:$PATH" collect --netbeans)"; rc=$?
+check "no-window collection succeeds when preserving permissions is not supported" test "$rc" = 0
+check "the project list is still put back byte for byte" cmp -s "$PUI" "$W/pui-noperm"
+check "and nothing is left pending" test ! -e "$FH/.cache/nbkit/collect-projectui.properties"
+lacks "no permission-preserving error from cp" "$out" "Operation not supported"
 out="$(collect --netbeans=maybe)"; rc=$?
 check "--netbeans=<anything else> fails" test "$rc" != 0
 contains "and shows how to use it" "$out" "[--netbeans[=window|nowindow]]"

@@ -416,7 +416,7 @@ theme_install() {
 
   step "$(t theme.step_colors)"
   # UI: copy to merge your keys later
-  if [ -e "$UD/$LAFT" ]; then mkdir -p "$OLD/$(dirname "$LAFT")"; cp -a "$UD/$LAFT" "$OLD/$LAFT"; fi
+  if [ -e "$UD/$LAFT" ]; then mkdir -p "$OLD/$(dirname "$LAFT")"; cp "$UD/$LAFT" "$OLD/$LAFT"; fi
   rm -f "$UD/$LAFT"
   # the profile is rebuilt on each install; your tweaks (outside Defaults) stay
   find "$C/Editors" -depth -type d -path "*/FontsColors/$THEME_PROFILE/Defaults" -exec rm -rf {} + 2>/dev/null || true

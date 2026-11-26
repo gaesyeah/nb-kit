@@ -273,7 +273,7 @@ projects_keep() {
   local c="$HOME/.cache/nbkit"
   mkdir -p "$c"
   rm -f "$c/collect-projectui.pid"
-  if [ -f "$UD/$PROJECTUI" ]; then cp -p "$UD/$PROJECTUI" "$c/collect-projectui.properties"; else : > "$c/collect-projectui.none"; fi
+  if [ -f "$UD/$PROJECTUI" ]; then cp "$UD/$PROJECTUI" "$c/collect-projectui.properties"; else : > "$c/collect-projectui.none"; fi
 }
 # the pids of the no-window NetBeans, with the copy: a next analyze tells whether it still runs
 projects_pid() { nb_pids > "$HOME/.cache/nbkit/collect-projectui.pid"; }
@@ -306,7 +306,7 @@ projects_restore() {
   for ((i = 0; i < 60; i++)); do projects_free && break; sleep 0.5; done
   projects_free || return 0
   if [ -e "$c/collect-projectui.properties" ]; then
-    mkdir -p "$(dirname "$UD/$PROJECTUI")" && cp -p "$c/collect-projectui.properties" "$UD/$PROJECTUI" && projects_forget
+    mkdir -p "$(dirname "$UD/$PROJECTUI")" && cp "$c/collect-projectui.properties" "$UD/$PROJECTUI" && projects_forget
   else
     rm -f "$UD/$PROJECTUI"; projects_forget
   fi
