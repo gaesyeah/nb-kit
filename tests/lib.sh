@@ -3,6 +3,8 @@
 TESTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NBKIT_DIR="$(dirname "$TESTS")"
 export LC_ALL=C.UTF-8 NBKIT_LANG=en NBKIT_OFFLINE=1
+# script -qec uses $SHELL, and test commands passed to script are bash; avoids fish/zsh startup or warnings in tests
+export SHELL=/bin/bash
 # no fonts of the machine (tests/bin/fc-list): with the theme font installed the theme files would differ
 export PATH="$TESTS/bin:$PATH"
 # the XDG folders of the machine (fonts, menu entries, caches) stay out: everything goes to the fake home
@@ -43,10 +45,20 @@ new_home() {
 X
   cp "$u/config/Editors/FontsColors/FlatLafDark/"*.xml "$u/config/Editors/text/x-java/FontsColors/FlatLafDark/"
 }
+# wait_prompt <typescript file> <text>: waits up to 20s for <text> to appear in the output (skips script's header line)
+wait_prompt() {
+  local i
+  for ((i = 0; i < 400; i++)); do
+    tail -n +2 "$1" 2>/dev/null | grep -qF -- "$2" && return 0
+    sleep 0.05
+  done
+  return 1
+}
+
 # NetBeans opened after the install: the log lists the enabled modules ($2...)
 nb_opened() {
   local u="$1/.netbeans/31" m
-  sleep 1
+  [ -e "$u/modules/nbkit-core.jar" ] && touch -d '-2 seconds' "$u/modules/nbkit-core.jar"
   { head -3 "$u/var/log/messages.log"; echo 'INFO: Turning on modules:'; for m in "${@:2}"; do printf '\t%s [1.0]\n' "$m"; done; } > "$u/var/log/messages.log.new"
   mv "$u/var/log/messages.log.new" "$u/var/log/messages.log"
 }

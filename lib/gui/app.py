@@ -236,8 +236,8 @@ class Window(Gtk.ApplicationWindow):
         self.set_child(paned)
         self.connect('close-request', self.on_close)
         self.refresh()
-        watch_id = GLib.timeout_add_seconds(self.WATCH_SECONDS, self.watch)
-        self.connect('destroy', lambda *_a: GLib.source_remove(watch_id))
+        self.watch_id = GLib.timeout_add_seconds(self.WATCH_SECONDS, self.watch)
+        self.connect('destroy', lambda *_a: GLib.source_remove(self.watch_id))
 
     # ---------- copying from the terminal: Ctrl+Shift+C, Ctrl+Shift+A and the right-click menu ----------
     def add_terminal_copy(self):

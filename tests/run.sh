@@ -82,7 +82,7 @@ python_tests() {
 }
 jsf_tests() {
   has_jdk || { t test.skipped_tool "JDK 17+"; echo; return 3; }
-  bash tests/jsf.sh
+  bash "${NBKIT_TEST_JSF:-tests/jsf.sh}"
 }
 
 if [ -n "$FILE" ]; then

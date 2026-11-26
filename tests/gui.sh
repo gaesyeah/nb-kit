@@ -52,7 +52,18 @@ if command -v dbus-run-session >/dev/null 2>&1; then
     > "$WORK/bus.conf"
   PATH="$WORK/bin:$PATH" HOME="$WORK/home" GSETTINGS_BACKEND=memory GDK_BACKEND=x11 NO_AT_BRIDGE=1 \
     dbus-run-session --config-file="$WORK/bus.conf" -- xvfb-run -a -s "-screen 0 1920x1080x24" bash -c '
-      "$0" "$1" & first=$!; sleep 5
+      "$0" "$1" & first=$!
+      "$0" -c "
+import time
+from gi.repository import Gio, GLib
+bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+for _ in range(150):
+    if bus.call_sync(\"org.freedesktop.DBus\", \"/org/freedesktop/DBus\", \"org.freedesktop.DBus\",
+                     \"NameHasOwner\", GLib.Variant(\"(s)\", (\"io.github.gaesyeah.nbkit\",)),
+                     None, Gio.DBusCallFlags.NONE, 1000, None).unpack()[0]:
+        break
+    time.sleep(0.1)
+"
       timeout 20 "$0" "$1"; echo "second=$?"
       kill "$first" && echo "first=alive"; wait "$first"' "$GUI_PY" "$NBKIT_DIR/lib/gui/app.py" > "$WORK/one-window.log" 2>&1 </dev/null
   out="$(cat "$WORK/one-window.log")"

@@ -159,40 +159,40 @@ menu() {
 # spinner until the condition is true; any key cancels (returns 1) unless disabled
 # optional: progress function, cancelable (yes), elapsed time (no)
 spin_until() {
-  local sp='|/-\' i=0 k cancel='' hint line last='' next='' label timer n cols=0 keys=0 elapsed=0 started=$SECONDS
-  [ "${4:-yes}" = yes ] && cancel="$(t cli.enter_cancels)"
-  { [ -t 1 ] || [ -t 2 ]; } && cols="$(tput cols 2>/dev/null || echo 80)"
-  [ "${4:-yes}" = yes ] && { [ -t 0 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && keys=1
+  local _sp_chars='|/-\' _sp_i=0 _sp_k _sp_cancel='' _sp_hint _sp_line _sp_last='' _sp_next='' _sp_label _sp_timer _sp_cut _sp_cols=0 _sp_keys=0 _sp_elapsed=0 _sp_started=$SECONDS
+  [ "${4:-yes}" = yes ] && _sp_cancel="$(t cli.enter_cancels)"
+  { [ -t 1 ] || [ -t 2 ]; } && _sp_cols="$(tput cols 2>/dev/null || echo 80)"
+  [ "${4:-yes}" = yes ] && { [ -t 0 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && _sp_keys=1
   printf '\e[?25l'; trap 'printf "\r\e[K\e[?25h"; exit 130' INT
   while ! "$2"; do
     # $3: a function telling how far it got, shown instead of the text once it says something; cut to the width of a
     # terminal (a wrapped line cannot be redrawn in place)
-    next=""; [ -n "${3:-}" ] && next="$("$3")"
-    [ -n "$next" ] && last="$next"
-    line="${last:-$1}"
-    timer=""
+    _sp_next=""; [ -n "${3:-}" ] && _sp_next="$("$3")"
+    [ -n "$_sp_next" ] && _sp_last="$_sp_next"
+    _sp_line="${_sp_last:-$1}"
+    _sp_timer=""
     if [ "${5:-no}" = yes ]; then
-      elapsed=$((SECONDS - started))
-      timer="$(printf '%02d:%02d' "$((elapsed / 60))" "$((elapsed % 60))")"
-      line+=" $timer"
+      _sp_elapsed=$((SECONDS - _sp_started))
+      _sp_timer="$(printf '%02d:%02d' "$((_sp_elapsed / 60))" "$((_sp_elapsed % 60))")"
+      _sp_line+=" $_sp_timer"
     fi
     # the cancel hint only with room for 10 characters of text beside it (the key still cancels); the cut never goes
     # below 0 (${v:0:-n} would keep almost all of it)
-    hint="$cancel"
-    if [ "$cols" -gt 0 ] && [ $((cols - ${#hint} - ${#timer} - 10)) -lt 10 ]; then hint=""; fi
-    if [ "$cols" -gt 0 ] && [ ${#line} -gt $((cols - ${#hint} - 8)) ]; then
-      if [ -n "$timer" ]; then
-        label="${line% $timer}"; n=$((cols - ${#hint} - ${#timer} - 10))
-        line="${label:0:$((n > 0 ? n : 0))}… $timer"
+    _sp_hint="$_sp_cancel"
+    if [ "$_sp_cols" -gt 0 ] && [ $((_sp_cols - ${#_sp_hint} - ${#_sp_timer} - 10)) -lt 10 ]; then _sp_hint=""; fi
+    if [ "$_sp_cols" -gt 0 ] && [ ${#_sp_line} -gt $((_sp_cols - ${#_sp_hint} - 8)) ]; then
+      if [ -n "$_sp_timer" ]; then
+        _sp_label="${_sp_line% $_sp_timer}"; _sp_cut=$((_sp_cols - ${#_sp_hint} - ${#_sp_timer} - 10))
+        _sp_line="${_sp_label:0:$((_sp_cut > 0 ? _sp_cut : 0))}… $_sp_timer"
       else
-        n=$((cols - ${#hint} - 9))
-        line="${line:0:$((n > 0 ? n : 0))}…"
+        _sp_cut=$((_sp_cols - ${#_sp_hint} - 9))
+        _sp_line="${_sp_line:0:$((_sp_cut > 0 ? _sp_cut : 0))}…"
       fi
     fi
-    printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${sp:i%4:1}" "$N" "$line" "$D" "$hint" "$N"; i=$((i + 1))
-    if [ $keys = 0 ]; then sleep 0.25; continue; fi
-    if IFS= read -rsn1 -t 0.25 k </dev/tty; then
-      IFS= read -rsn5 -t 0.05 k </dev/tty || true
+    printf '\r\e[K  %s%s%s %s  %s%s%s' "$Y" "${_sp_chars:_sp_i%4:1}" "$N" "$_sp_line" "$D" "$_sp_hint" "$N"; _sp_i=$((_sp_i + 1))
+    if [ $_sp_keys = 0 ]; then sleep 0.25; continue; fi
+    if IFS= read -rsn1 -t 0.25 _sp_k </dev/tty; then
+      IFS= read -rsn5 -t 0.05 _sp_k </dev/tty || true
       printf '\r\e[K\e[?25h'; trap 'exit 130' INT; return 1
     fi
   done

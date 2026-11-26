@@ -4,6 +4,9 @@
 set -uo pipefail
 # shellcheck disable=SC1091
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+W="$(mktemp -d)"
+trap 'rm -rf "$W"' EXIT
+printf '#!/usr/bin/env bash\necho "  ok    jsf stub"\n' > "$W/jsf-stub.sh"
 run() { (cd "$TESTS" && bash run.sh "$@" </dev/null 2>&1); }
 
 echo "Running the tests of one file"
@@ -15,12 +18,13 @@ lacks "and no other part (lint, engine)" "$out" "== shellcheck"
 lacks "nor the engine" "$out" "Engine (fake NetBeans)"
 contains "and says the result" "$out" "all tests passed"
 
-out="$(run "$NBKIT_DIR/src/nbkit-jsf/test/RunNetBeansMarks.java")"; rc=$?
+out="$(NBKIT_TEST_JSF="$W/jsf-stub.sh" run "$NBKIT_DIR/src/nbkit-jsf/test/RunNetBeansMarks.java")"; rc=$?
 if [ "$rc" = 0 ] && grep -q "skipped: JDK" <<<"$out"; then
   pass "a Run*.java of the JSF: skipped, no JDK here"
 else
-  check "a Run*.java of the JSF runs the JSF tests, which compile and check it: exits with 0" test "$rc" = 0
+  check "a Run*.java of the JSF runs the JSF tests: exits with 0" test "$rc" = 0
   contains "only the JSF tests" "$out" "== tests/jsf.sh"
+  contains "dispatches to the JSF test script" "$out" "jsf stub"
   lacks "nothing else" "$out" "== shellcheck"
 fi
 

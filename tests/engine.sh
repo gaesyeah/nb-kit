@@ -661,13 +661,21 @@ contains "status --json lists the JSF projects (pages in them or in modules): th
 lacks "a folder with a repo and a project deep inside is not a JSF project" "$(nbkit status --json)" "$P/not a project"
 
 # the spinner in a narrow terminal: the text is cut and, with no room, the cancel hint left out; the line never wraps
-spin() { timeout 20 script -qec "stty cols $1; NBKIT_DIR='$NBKIT_DIR' NBKIT_LANG=en bash -c 'source \"\$NBKIT_DIR/lib/terminal.sh\"; n=0; later() { n=\$((n + 1)); [ \$n -gt 2 ]; }; spin_until \"waiting for something that takes a long time\" later \"\" yes yes'" /dev/null </dev/null 2>&1; }
+spin() {
+  SPIN_OUT="$(timeout 20 script -qec "stty cols $1; NBKIT_DIR='$NBKIT_DIR' NBKIT_LANG=en bash -c 'source \"\$NBKIT_DIR/lib/terminal.sh\"; n=0; later() { n=\$((n + 1)); [ \$n -gt 2 ]; }; spin_until \"waiting for something that takes a long time\" later \"\" yes yes'" /dev/null </dev/null 2>&1)"
+  SPIN_RC=$?
+}
 widest() { python3 -c 'import re, sys; print(max(len(s) for s in re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", sys.argv[1]).replace("\n", "\r").split("\r")))' "$1"; }
 for c in 29 22 16; do
-  out="$(spin $c)"
-  check "the spinner line fits a terminal of $c columns" test "$(widest "$out")" -le $c
+  spin $c
+  check "the spinner at $c columns does not time out" test "$SPIN_RC" != 124
+  check "the spinner line fits a terminal of $c columns" test "$(widest "$SPIN_OUT")" -le $c
 done
-contains "with room, the spinner says a key cancels" "$(spin 80)" "$(NBKIT_DIR="$NBKIT_DIR" NBKIT_LANG=en bash -c 'source "$NBKIT_DIR/lib/terminal.sh"; t cli.enter_cancels')"
+spin 80
+check "the spinner at 80 columns does not time out" test "$SPIN_RC" != 124
+contains "with room, the spinner says a key cancels" "$SPIN_OUT" "$(NBKIT_DIR="$NBKIT_DIR" NBKIT_LANG=en bash -c 'source "$NBKIT_DIR/lib/terminal.sh"; t cli.enter_cancels')"
+timeout 5 script -qec "stty cols 16; NBKIT_DIR='$NBKIT_DIR' NBKIT_LANG=en bash -c 'source \"\$NBKIT_DIR/lib/terminal.sh\"; n=0; later() { n=\$((n + 1)); [ \$n -gt 2 ]; }; spin_until \"waiting for something that takes a long time\" later \"\" no yes'" /dev/null </dev/null >/dev/null 2>&1; rc=$?
+check "spinner at 16 columns does not clobber the caller's n variable" test "$rc" = 0
 
 # spinner progress: once progress has appeared, an empty progress tick keeps the last text instead of flashing back to waiting
 out="$(timeout 20 script -qec "stty cols 80; NBKIT_DIR='$NBKIT_DIR' NBKIT_LANG=en bash -c 'source \"\$NBKIT_DIR/lib/terminal.sh\"; n=0; cond() { n=\$((n + 1)); [ \$n -gt 4 ]; }; prog() { case \$n in 2) echo \"step 1\";; 4) echo \"step 2\";; esac; }; spin_until \"waiting\" cond prog no no'" /dev/null </dev/null 2>&1)"
@@ -704,7 +712,10 @@ check "no line of the list is wider than the terminal" python3 -c 'import sys; s
 # Enter for each question: the project, the explanation of a file, collecting what NetBeans marks (no); then, after the
 # analysis (keys typed ahead are lost when the menu ends), the end of input for opening the report (Enter: the fake
 # xdg-open of tests/bin)
-asked="$({ printf '\033[B\033[B\r\r\r\r'; sleep 3; printf '\r'; sleep 8; } | HOME="$H" timeout 30 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en" /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
+outf="$WORK/menu-analyze.out"; : > "$outf"
+asked="$({ printf '\033[B\033[B\r\r\r\r'; wait_prompt "$outf" "Collect what NetBeans marks"; printf '\r'; wait_prompt "$outf" "Open it?"; printf '\r'; } \
+  | HOME="$H" timeout 30 script -qefc "bash '$NBKIT_DIR/nbkit.sh' --lang en" "$outf" 2>&1 \
+  | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
 check "it ends by itself, not at the time limit" test "$?" != 124
 contains "at the end it says where the report is and offers to open it" "$asked" "Report saved: ~/.cache/nbkit/analyze/web-"
 contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain one .xhtml file in detail? [y/N]"
@@ -718,6 +729,7 @@ echo "Analyze: collecting what NetBeans marks for a project of modules"
 if command -v java >/dev/null 2>&1 || ls /usr/lib/jvm/*/bin/java >/dev/null 2>&1; then
   FH="$WORK/colhome"; FU="$FH/.netbeans/31"; new_home "$FH"
   mkdir -p "$FU/modules" "$WORK/colnb/bin"; : > "$FU/modules/nbkit-jsf.jar"; printf 'nbkit/core/CloseOption' > "$FU/modules/nbkit-core.jar"
+  touch -d '-2 seconds' "$FU/modules/nbkit-core.jar"
   EV="$WORK/col-events"
   # a NetBeans that only answers the collection requests of nbkit, writing down what happens to it
   cat > "$WORK/colnb/bin/netbeans" <<'X'
@@ -725,8 +737,8 @@ if command -v java >/dev/null 2>&1 || ls /usr/lib/jvm/*/bin/java >/dev/null 2>&1
 UD="$HOME/.netbeans/31"
 case " $* " in *" --nbkit-close "*) echo close >> "$COL_EVENTS"; pkill -f "nbkit-fake-""collector"; rm -f "$UD/lock"; exit 0 ;; esac
 case " $* " in *" --nogui "*) echo open-nowindow ;; *) echo open ;; esac >> "$COL_EVENTS"
-: > "$UD/lock"; sleep 1; echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
-nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then p="$(cat "$r")"; rm "$r"; echo "collect ${p##*/}" >> "$COL_EVENTS"; sleep 1; printf "1\t2\t3\tsrc/main/webapp/p.xhtml\n" > "$HOME/.cache/nbkit/collect-progress"; sleep 0.6; rm -f "$HOME/.cache/nbkit/collect-progress"; mkdir -p "$HOME/.cache/nbkit/collect"; printf "# nbkit NetBeans marks 1\n" > "$HOME/.cache/nbkit/collect/x.tsv"; echo "$HOME/.cache/nbkit/collect/x.tsv" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.2; done' "nbkit-fake-""collector" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
+: > "$UD/lock"; sleep 0.4; echo "INFO: Turning on modules:" >> "$UD/var/log/messages.log"
+nohup bash -c 'while :; do r="$HOME/.cache/nbkit/collect-request"; if [ -f "$r" ]; then p="$(cat "$r")"; rm "$r"; echo "collect ${p##*/}" >> "$COL_EVENTS"; sleep 0.35; printf "1\t2\t3\tsrc/main/webapp/p.xhtml\n" > "$HOME/.cache/nbkit/collect-progress"; sleep 0.45; rm -f "$HOME/.cache/nbkit/collect-progress"; mkdir -p "$HOME/.cache/nbkit/collect"; printf "# nbkit NetBeans marks 1\n" > "$HOME/.cache/nbkit/collect/x.tsv"; echo "$HOME/.cache/nbkit/collect/x.tsv" > "$HOME/.cache/nbkit/collect-done"; fi; sleep 0.05; done' "nbkit-fake-""collector" org.netbeans.Main --userdir "$UD" >/dev/null 2>&1 &
 X
   chmod +x "$WORK/colnb/bin/netbeans"
   M2="$WORK/mono2"
@@ -743,7 +755,9 @@ X
   contains "while NetBeans collects, the wait shows how far it got" "$out" "Collecting 1/2 pages, 3 marks (a): src/main/webapp/p.xhtml"
   : > "$EV"
   # yes to collecting: NetBeans closed, so with no window, closed at the end without asking
-  KEYS_OUT="$({ printf 'y\r'; sleep 8; } | timeout 60 script -qec "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2'" /dev/null 2>&1 \
+  outf="$WORK/col-ask.out"; : > "$outf"
+  KEYS_OUT="$({ wait_prompt "$outf" "[y/N]"; printf 'y\r'; wait_prompt "$outf" "Open it?"; printf 'n\r'; } \
+    | timeout 60 script -qefc "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2'" "$outf" 2>&1 \
     | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
   check "it ends by itself, not at the time limit" test "$?" != 124
   check "in the interface or the menu it asks once for all the modules" test "$(grep -c 'Collect what NetBeans marks on these 2 modules' <<<"$KEYS_OUT")" = 1
@@ -753,7 +767,9 @@ X
   lacks "with no window, closing is not asked" "$KEYS_OUT" "Close NetBeans?"
   : > "$EV"
   # --netbeans=window in the interface or the menu: the visible NetBeans, and the yes to closing asked at the end
-  KEYS_OUT="$({ sleep 6; printf 'y\r'; } | timeout 60 script -qec "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2' --netbeans=window" /dev/null 2>&1 \
+  outf="$WORK/col-win.out"; : > "$outf"
+  KEYS_OUT="$({ wait_prompt "$outf" "Close NetBeans?"; printf 'y\r'; wait_prompt "$outf" "Open it?"; printf 'n\r'; } \
+    | timeout 60 script -qefc "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2' --netbeans=window" "$outf" 2>&1 \
     | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
   check "it ends by itself, not at the time limit" test "$?" != 124
   contains "with its window, closing is asked at the end" "$KEYS_OUT" "Close NetBeans?"
@@ -776,7 +792,11 @@ sleep 1.3
 : > "$out"
 X
   chmod +x "$MVN"
-  out="$({ sleep 0.3; printf x; } | HOME="$AH" NBKIT_TTY=1 NBKIT_MVN="$MVN" NBKIT_JSF_JAR="$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar" timeout 20 script -qec "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$MP'" /dev/null 2>&1 | tr -d '\r')"
+  outf="$WORK/mvn.out"; : > "$outf"
+  out="$({ wait_prompt "$outf" "Reading the libraries"; printf 'x'; wait_prompt "$outf" "Open it?"; printf 'n\r'; } \
+    | HOME="$AH" NBKIT_TTY=1 NBKIT_MVN="$MVN" NBKIT_JSF_JAR="$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar" timeout 20 script -qefc "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$MP'" "$outf" 2>&1 \
+    | tr -d '\r'; exit "${PIPESTATUS[1]}")"
+  check "Maven classpath loading ends by itself, not at the time limit" test "$?" != 124
   contains "Maven classpath loading shows elapsed mm:ss" "$out" "00:01"
   contains "a key does not cancel Maven classpath loading" "$out" "xhtml files,"
 else

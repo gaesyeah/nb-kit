@@ -95,6 +95,7 @@ TIME_LIMIT = 180
 def main():
     scenario = sys.argv[1]
     faulthandler.dump_traceback_later(TIME_LIMIT, exit=True)
+    app.Window.CLOSE_AFTER_REMOVED = 1
     if scenario == 'dark':
         # the desktop asks for dark mode (GNOME setting; tests/gui.sh keeps settings in memory)
         schema = Gio.SettingsSchemaSource.get_default().lookup('org.gnome.desktop.interface', True)
@@ -343,6 +344,8 @@ def actions(w):
     check('uninstall all removes both', wait(lambda: not w.busy, 20) and [status(w, m) for m in w.rows] == ['not installed'] * 2)
 
     print('Changes made outside the window')
+    GLib.source_remove(w.watch_id)
+    w.watch_id = GLib.timeout_add_seconds(1, w.watch)
     subprocess.run(['bash', app.model.NBKIT, 'install', 'jsf'], stdin=subprocess.DEVNULL, capture_output=True)
     check('a module installed from the terminal shows up by itself', wait(lambda: status(w, 'jsf') == 'installed (v2)', 10),
           status(w, 'jsf'))
