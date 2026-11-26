@@ -101,11 +101,15 @@ public class RunNetBeansMarks {
         Files.writeString(new File(proj, "src/main/webapp/a.xhtml").toPath(), "<html/>");
         Files.writeString(new File(proj, "src/main/webapp/b.xhtml").toPath(), "<html/>");
         List<String> events = new java.util.ArrayList<>();
+        List<Object> progressKeys = new java.util.ArrayList<>();
+        boolean[] tmpSeen = {false};
         int n = NetBeansMarks.collect(proj, cache, new NetBeansMarks.CollectSteps() {
             public boolean open() { events.add("open the project, wait for the scan"); return true; }
             public List<NetBeansMarks.Mark> marks(File page, String rel) {
                 File pr = NetBeansMarks.progressFile(cache);
+                if (new File(pr.getPath() + ".tmp").exists()) tmpSeen[0] = true;
                 try {
+                    progressKeys.add(Files.readAttributes(pr.toPath(), java.nio.file.attribute.BasicFileAttributes.class).fileKey());
                     events.add("marks of " + rel + ", progress " + Files.readString(pr.toPath()).replace('\t', ' ').strip());
                 } catch (java.io.IOException e) {
                     events.add("marks of " + rel + ", no progress");
@@ -119,8 +123,11 @@ public class RunNetBeansMarks {
             public void htmlSetting(String v) { events.add("html set " + v); }
             public boolean unsaved(File page) { return false; }
         });
+        boolean tmpLeft = tmpSeen[0] || new File(NetBeansMarks.progressFile(cache).getPath() + ".tmp").exists();
+        boolean atomicProgress = progressKeys.size() == 2 && progressKeys.get(0) != null && !progressKeys.get(0).equals(progressKeys.get(1));
         events.add("collection: " + NetBeansMarks.read(NetBeansMarks.outputFile(cache, proj)).marks().size() + " marks, done marker: "
                 + NetBeansMarks.doneFile(cache).exists() + ", progress left: " + NetBeansMarks.progressFile(cache).exists());
+        events.add("progress atomic: " + atomicProgress + ", tmp left: " + tmpLeft);
         for (String e : events) {
             System.out.println("collect step: " + e);
         }

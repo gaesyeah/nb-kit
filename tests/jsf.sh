@@ -526,6 +526,7 @@ contains "then each page in turn, telling how far it got (pages done, of how man
 contains "at the end the first one goes away and the last one says how many marks" "$steps" \
   "collect step: clear nbkit: collecting what NetBeans marks on collectproj to compare with analyze. You can keep working.|collect step: notice nbkit | Collection ready: 2 marks."
 contains "after the collection and its done marker are written" "$steps" "Collection ready: 2 marks.|collect step: collection: 2 marks, done marker: true, progress left: false"
+contains "progress is replaced atomically with no temp file left" "$steps" "collect step: progress atomic: true, tmp left: false"
 html="$(grep '^html step: ' <<<"$out")"
 contains "HTML checking already on: nothing is changed" "$steps" "collect step: notice nbkit | nbkit: collecting"
 lacks "and the start notice says nothing about HTML" "$steps" "HTML warnings"

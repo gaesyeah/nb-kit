@@ -159,7 +159,7 @@ menu() {
 # spinner until the condition is true; any key cancels (returns 1) unless disabled
 # optional: progress function, cancelable (yes), elapsed time (no)
 spin_until() {
-  local sp='|/-\' i=0 k cancel='' hint line label timer n cols=0 keys=0 elapsed=0 started=$SECONDS
+  local sp='|/-\' i=0 k cancel='' hint line last='' next='' label timer n cols=0 keys=0 elapsed=0 started=$SECONDS
   [ "${4:-yes}" = yes ] && cancel="$(t cli.enter_cancels)"
   { [ -t 1 ] || [ -t 2 ]; } && cols="$(tput cols 2>/dev/null || echo 80)"
   [ "${4:-yes}" = yes ] && { [ -t 0 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && keys=1
@@ -167,7 +167,9 @@ spin_until() {
   while ! "$2"; do
     # $3: a function telling how far it got, shown instead of the text once it says something; cut to the width of a
     # terminal (a wrapped line cannot be redrawn in place)
-    line=""; [ -n "${3:-}" ] && line="$("$3")"; line="${line:-$1}"
+    next=""; [ -n "${3:-}" ] && next="$("$3")"
+    [ -n "$next" ] && last="$next"
+    line="${last:-$1}"
     timer=""
     if [ "${5:-no}" = yes ]; then
       elapsed=$((SECONDS - started))

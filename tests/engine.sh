@@ -669,6 +669,28 @@ for c in 29 22 16; do
 done
 contains "with room, the spinner says a key cancels" "$(spin 80)" "$(NBKIT_DIR="$NBKIT_DIR" NBKIT_LANG=en bash -c 'source "$NBKIT_DIR/lib/terminal.sh"; t cli.enter_cancels')"
 
+# spinner progress: once progress has appeared, an empty progress tick keeps the last text instead of flashing back to waiting
+out="$(timeout 20 script -qec "stty cols 80; NBKIT_DIR='$NBKIT_DIR' NBKIT_LANG=en bash -c 'source \"\$NBKIT_DIR/lib/terminal.sh\"; n=0; cond() { n=\$((n + 1)); [ \$n -gt 4 ]; }; prog() { case \$n in 2) echo \"step 1\";; 4) echo \"step 2\";; esac; }; spin_until \"waiting\" cond prog no no'" /dev/null </dev/null 2>&1)"
+check "spinner keeps the last progress line across empty ticks" python3 -c '
+import re, sys
+raw = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", sys.argv[1])
+frames = [s.strip() for s in re.split(r"[\r\n]+", raw) if s.strip()]
+first_step1 = next((i for i, f in enumerate(frames) if "step 1" in f), -1)
+assert first_step1 > 0, f"expected waiting before step 1 in {frames}"
+assert any("waiting" in f for f in frames[:first_step1]), frames
+assert sum("step 1" in f for f in frames) >= 2, frames
+assert not any("waiting" in f for f in frames[first_step1:]), f"flashed back to waiting: {frames}"
+assert any("step 2" in f for f in frames), frames
+' "$out"
+
+# collect_progress returns 0 even if total is missing under set -euo pipefail
+mkdir -p "$H/.cache/nbkit"
+printf '1\n' > "$H/.cache/nbkit/collect-progress"
+out="$(HOME="$H" NBKIT_DIR="$NBKIT_DIR" bash -euo pipefail -c 'source "$NBKIT_DIR/lib/terminal.sh"; source "$NBKIT_DIR/lib/analyze.sh"; COLLECTING=proj; collect_progress' 2>&1)"
+check "collect_progress exits 0 when total is missing" test "$?" = 0
+check "collect_progress prints nothing when total is missing" test -z "$out"
+rm -f "$H/.cache/nbkit/collect-progress"
+
 # the list in the menu of the terminal: each project on one line, even in a narrow terminal
 L="$P/a folder with a very long name/that goes on and on/web"
 mkdir -p "$L/src/main/webapp" && : > "$L/src/main/webapp/i.xhtml"

@@ -354,13 +354,16 @@ public final class NetBeansMarks {
         List<Mark> marks = new ArrayList<>();
         List<String> unsaved = new ArrayList<>();
         File progress = progressFile(cache);
+        File progressTmp = new File(progress.getPath() + ".tmp");
         try {
             if (steps.open()) {
                 List<File> pages = Workspace.pages(dir);
                 for (File page : pages) {
                     String rel = dir.toPath().relativize(page.toPath()).toString().replace('\\', '/');
-                    Files.writeString(progress.toPath(), hashes.size() + "\t" + pages.size() + "\t" + marks.size() + "\t" + rel + "\n",
+                    // written to a temporary file and renamed so a reader never sees it truncated
+                    Files.writeString(progressTmp.toPath(), hashes.size() + "\t" + pages.size() + "\t" + marks.size() + "\t" + rel + "\n",
                             StandardCharsets.UTF_8);
+                    Files.move(progressTmp.toPath(), progress.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                     hashes.put(rel, sha256(Files.readAllBytes(page.toPath())));
                     marks.addAll(steps.marks(page, rel));
                     if (steps.unsaved(page)) {
@@ -377,6 +380,7 @@ public final class NetBeansMarks {
                 info.put("error", "not a NetBeans project: " + dir);
             }
         } finally {
+            Files.deleteIfExists(progressTmp.toPath());
             Files.deleteIfExists(progress.toPath());
             if (htmlOn) {
                 steps.htmlSetting(htmlBefore);

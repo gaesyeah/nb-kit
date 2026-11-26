@@ -262,7 +262,7 @@ collect_progress() {
   local progress="$HOME/.cache/nbkit/collect-progress" pages_done total marks page
   [ -r "$progress" ] || return 0
   IFS=$'\t' read -r pages_done total marks page 2>/dev/null < "$progress" || return 0
-  [ -n "$total" ] && t cli.collect_progress "$pages_done" "$total" "$marks" "${COLLECTING##*/}" "$page"
+  if [ -n "$total" ]; then t cli.collect_progress "$pages_done" "$total" "$marks" "${COLLECTING##*/}" "$page"; fi
 }
 collect_ended() { [ -f "$HOME/.cache/nbkit/collect-done" ] || [ "$(date +%s)" -ge "$COLLECT_UNTIL" ]; }
 # NetBeans' open and recent projects (the no-window NetBeans would add the project it opens to them): kept before it
