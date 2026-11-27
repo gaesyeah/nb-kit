@@ -36,18 +36,22 @@ backup_detail() {
 }
 # confirm_restore <id> <file> and confirm_delete_backup <id> <file>: explain and ask (menu, arguments and interface)
 confirm_restore() {
-  t cli.restore_back_to "$(bk_date "$2")" "$(mod_call "$1" backup_desc "$2")"; echo
-  if mod_installed "$1"; then t cli.restore_uninstalls_first "$(mod_label "$1")"; echo
-  else t cli.restore_makes_backup; echo; fi
-  echo
-  ask_yn "$(t cli.ask_restore "$(bk_date "$2")")" N
+  local l1 l2
+  l1="$(t cli.restore_back_to "$(bk_date "$2")" "$(mod_call "$1" backup_desc "$2")")"
+  if mod_installed "$1"; then l2="$(t cli.restore_uninstalls_first "$(mod_label "$1")")"
+  else l2="$(t cli.restore_makes_backup)"; fi
+  printf '%s\n%s\n\n' "$l1" "$l2"
+  ask_yn "$(t cli.ask_restore "$(bk_date "$2")")" N "$(printf '%s\n%s' "${l1#  }" "${l2#  }")"
 }
 confirm_delete_backup() {
+  local det warn_line=""
+  det="$(t cli.ask_delete_backup_detail)"
   if [ "$(mod_call "$1" backups | wc -l)" = 1 ] && mod_installed "$1"; then
-    t cli.only_backup "$(mod_label "$1")"; echo
-    echo
+    warn_line="$(t cli.only_backup "$(mod_label "$1")")"
+    printf '%s\n\n' "$warn_line"
+    det="$(printf '%s\n%s' "${warn_line#  }" "$det")"
   fi
-  ask_yn "$(t cli.ask_delete_backup "$(bk_date "$2")")" N "$(t cli.ask_delete_backup_detail)"
+  ask_yn "$(t cli.ask_delete_backup "$(bk_date "$2")")" N "$det"
 }
 # browses the backups: Enter restores, Del deletes, Esc goes back. A confirmed restore goes to RESTORE_ID/RESTORE_BK
 browse_backups() {

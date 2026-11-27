@@ -237,6 +237,15 @@ contains "restore says what it needs" "$out" "restore needs the backup file"
 out="$(nbkit delete-backup "$NBKIT_DIR/LICENSE")"; rc=$?
 check "a file that is not a backup is refused" test "$rc" = 1
 contains "a file that is not a backup is named" "$out" "is not a backup of any module of this userdir"
+rm -f "$E"
+NBKIT_TTY=1 NBKIT_UI_EVENTS="$E" keys 'n\r' "bash '$NBKIT_DIR/nbkit.sh' --lang en restore '$B'"
+check "restore dialog gets what the backup changes as its detail" grep -q '"detail":"Goes back to how it was on' "$E"
+rm -f "$E"
+NBKIT_TTY=1 NBKIT_UI_EVENTS="$E" keys 'n\r' "bash '$NBKIT_DIR/nbkit.sh' --lang en delete-backup '$B'"
+check "delete of the only backup includes the only-backup warning in its detail" grep -q 'This is the only backup\.' "$E"
+rm -f "$E"
+NBKIT_TTY=1 NBKIT_UI_EVENTS="$E" keys 'n\r' "bash '$NBKIT_DIR/nbkit.sh' --lang en uninstall-self"
+check "uninstall-self dialog explains what goes and that modules stay" bash -c 'grep -q "Take nbkit out of the system?" "$1" && grep -q "The modules stay in NetBeans\." "$1"' _ "$E"
 out="$(nbkit restore "$B")"; rc=$?
 check "restore exits with 0" test "$rc" = 0
 json="$(nbkit status --json)"
@@ -713,13 +722,13 @@ check "no line of the list is wider than the terminal" python3 -c 'import sys; s
 # analysis (keys typed ahead are lost when the menu ends), the end of input for opening the report (Enter: the fake
 # xdg-open of tests/bin)
 outf="$WORK/menu-analyze.out"; : > "$outf"
-asked="$({ printf '\033[B\033[B\r\r\r\r'; wait_prompt "$outf" "Collect what NetBeans marks"; printf '\r'; wait_prompt "$outf" "Open it?"; printf '\r'; } \
+asked="$({ printf '\033[B\033[B\r\r\r\r'; wait_prompt "$outf" "Collect what NetBeans marks"; printf '\r'; wait_prompt "$outf" "Open the saved report?"; printf '\r'; } \
   | HOME="$H" timeout 30 script -qefc "bash '$NBKIT_DIR/nbkit.sh' --lang en" "$outf" 2>&1 \
   | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
 check "it ends by itself, not at the time limit" test "$?" != 124
 contains "at the end it says where the report is and offers to open it" "$asked" "Report saved: ~/.cache/nbkit/analyze/web-"
-contains "after the project, it asks: with or without the explanation of a file" "$asked" "Also explain one .xhtml file in detail? [y/N]"
-contains "and says what the explanation shows before asking" "$asked" "you pick one .xhtml file and nbkit shows"
+contains "after the project, it asks: with or without the explanation of a file" "$asked" "Explain one .xhtml file in detail? [y/N]"
+contains "and says what the explanation shows before asking" "$asked" "Instead of analyzing the whole project"
 
 out="$(nbkit --lang en debug jsf maybe)"; rc=$?
 check "an unknown debug option fails" test "$rc" = 1
@@ -756,7 +765,7 @@ X
   : > "$EV"
   # yes to collecting: NetBeans closed, so with no window, closed at the end without asking
   outf="$WORK/col-ask.out"; : > "$outf"
-  KEYS_OUT="$({ wait_prompt "$outf" "[y/N]"; printf 'y\r'; wait_prompt "$outf" "Open it?"; printf 'n\r'; } \
+  KEYS_OUT="$({ wait_prompt "$outf" "[y/N]"; printf 'y\r'; wait_prompt "$outf" "Open the saved report?"; printf 'n\r'; } \
     | timeout 60 script -qefc "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2'" "$outf" 2>&1 \
     | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
   check "it ends by itself, not at the time limit" test "$?" != 124
@@ -768,7 +777,7 @@ X
   : > "$EV"
   # --netbeans=window in the interface or the menu: the visible NetBeans, and the yes to closing asked at the end
   outf="$WORK/col-win.out"; : > "$outf"
-  KEYS_OUT="$({ wait_prompt "$outf" "Close NetBeans?"; printf 'y\r'; wait_prompt "$outf" "Open it?"; printf 'n\r'; } \
+  KEYS_OUT="$({ wait_prompt "$outf" "Close NetBeans?"; printf 'y\r'; wait_prompt "$outf" "Open the saved report?"; printf 'n\r'; } \
     | timeout 60 script -qefc "HOME='$FH' NB_HOME='$WORK/colnb' COL_EVENTS='$EV' NBKIT_COLLECT_TIMEOUT=20 NBKIT_MVN=false NBKIT_TTY=1 bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$M2' --netbeans=window" "$outf" 2>&1 \
     | tr -d '\r' | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'; exit "${PIPESTATUS[1]}")"
   check "it ends by itself, not at the time limit" test "$?" != 124
@@ -793,7 +802,7 @@ sleep 1.3
 X
   chmod +x "$MVN"
   outf="$WORK/mvn.out"; : > "$outf"
-  out="$({ wait_prompt "$outf" "Reading the libraries"; printf 'x'; wait_prompt "$outf" "Open it?"; printf 'n\r'; } \
+  out="$({ wait_prompt "$outf" "Reading the libraries"; printf 'x'; wait_prompt "$outf" "Open the saved report?"; printf 'n\r'; } \
     | HOME="$AH" NBKIT_TTY=1 NBKIT_MVN="$MVN" NBKIT_JSF_JAR="$NBKIT_DIR/modules/tools/jsf/nbkit-jsf.jar" timeout 20 script -qefc "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$MP'" "$outf" 2>&1 \
     | tr -d '\r'; exit "${PIPESTATUS[1]}")"
   check "Maven classpath loading ends by itself, not at the time limit" test "$?" != 124
@@ -845,7 +854,7 @@ contains "build.sh --force builds anyway" "$(grep -m1 'javac args' <<<"$out")" "
 out="$(HOME="$H" NB_HOME='' JAVA_HOME="$WORK/jdka" bash "$B/nbkit.sh" build --force 2>&1 </dev/null)"
 contains "nbkit build --force too" "$(grep -m1 'javac args' <<<"$out")" "-proc:none"
 keys 'n\r' "bash '$B/src/build.sh' --lang en"; asked="$KEYS_OUT"
-contains "in a terminal it asks whether to build anyway" "$asked" "Build anyway? [y/N]"
+contains "in a terminal it asks whether to build anyway" "$asked" "Build the modules anyway? [y/N]"
 contains "and, with no, builds nothing" "$asked" "Nothing was built."
 keys '\033' "bash '$B/nbkit.sh' --lang en"; menu_out="$KEYS_OUT"
 contains "the menu shows the build as up to date" "$menu_out" "Build the modules (up to date)"

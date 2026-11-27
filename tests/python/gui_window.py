@@ -293,7 +293,12 @@ def actions(w):
     print('A question answered in the dialog')
     w.rows['jsf']['buttons']['uninstall'].emit('clicked')
     check('the question opens a dialog', wait(lambda: w.question is not None, 15))
-    check('the dialog has the question of the terminal', w.run.question['text'] == 'Uninstall?', w.run.question)
+    check('the dialog has the question of the terminal', w.run.question['text'] == 'Uninstall JSF checks?'
+          and 'Goes:' in w.run.question['detail'], w.run.question)
+    qlabels = [x for x in children(w.question.get_child()) if isinstance(x, Gtk.Label)]
+    check('a multi-line detail uses monospace aligned left',
+          len(qlabels) == 2 and qlabels[1].has_css_class('monospace') and qlabels[1].get_justify() == Gtk.Justification.LEFT,
+          [x.get_css_classes() for x in qlabels])
     w.question_buttons['yes'].emit('clicked')
     check('the answer goes to nbkit', wait(lambda: not w.busy, 20) and status(w, 'jsf') == 'not installed', status(w, 'jsf'))
 
@@ -310,6 +315,11 @@ def actions(w):
     check('typing the answer in the terminal closes the dialog', wait(lambda: w.question is not first, 10))
     check('the next question opens another dialog', wait(lambda: w.question is not None and w.run.question is not None
                                                           and 'Also delete the backups' in w.run.question['text'], 30), w.run.question)
+    qlabels = [x for x in children(w.question.get_child()) if isinstance(x, Gtk.Label)]
+    check('a single-line detail uses dim-label centered',
+          len(qlabels) == 2 and qlabels[1].has_css_class('dim-label') and not qlabels[1].has_css_class('monospace')
+          and qlabels[1].get_justify() == Gtk.Justification.CENTER,
+          [x.get_css_classes() for x in qlabels])
     w.question_buttons['no'].emit('clicked')
     check('uninstall finishes keeping the backup', wait(lambda: not w.busy, 20) and status(w, 'one-dark-pro-mix') == 'not installed'
           and w.backups_button.get_label() == 'Backups (1)')
@@ -336,7 +346,9 @@ def actions(w):
           [status(w, m) for m in w.rows])
     check('then reinstall all and uninstall all are offered', [b.get_name() for b in children(w.bulk)] == ['reinstall-all', 'uninstall-all'])
     bulk_button(w, 'uninstall-all').emit('clicked')
-    check('uninstall all asks once', wait(lambda: w.question is not None, 15) and w.run.question['text'] == 'Uninstall?')
+    check('uninstall all asks once', wait(lambda: w.question is not None, 15)
+          and w.run.question['text'] == 'Uninstall Theme One Dark Pro Mix; JSF checks?'
+          and 'Theme One Dark Pro Mix' in w.run.question['detail'] and 'JSF checks' in w.run.question['detail'], w.run.question)
     w.question_buttons['yes'].emit('clicked')
     wait(lambda: w.question is not None or not w.busy, 30)
     if w.question is not None:                          # keep the backup of the theme

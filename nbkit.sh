@@ -150,7 +150,10 @@ if [ "$ACTION" = update-self ]; then header; update_self; exit 0; fi
 if [ "$ACTION" = uninstall-self ]; then
   header
   # with a terminal to answer (the menu, the interface): asks first
-  if [ $INTERACTIVE = 1 ]; then ask_yn "$(t cli.ask_uninstall_self)" N || { t cli.nothing_changed; echo; exit 0; }; fi
+  if [ $INTERACTIVE = 1 ]; then
+    printf '  %s\n' "$(t cli.ask_uninstall_self_detail)"
+    ask_yn "$(t cli.ask_uninstall_self)" N "$(t cli.ask_uninstall_self_detail)" || { t cli.nothing_changed; echo; exit 0; }
+  fi
   uninstall_self; exit 0
 fi
 
@@ -301,9 +304,10 @@ after_change() {
   fi
   echo
   # waits for NetBeans to check by itself, unless you said not to open it now
-  local wait=1
+  local wait=1 open_det
   if find_launcher; then
-    if ask_yn "$(t cli.ask_open)" Y "$(t cli.ask_open_detail)"; then open_netbeans; else wait=0; fi
+    if [ "$1" = install ]; then open_det="$(t cli.ask_open_install_detail)"; else open_det="$(t cli.ask_open_detail)"; fi
+    if ask_yn "$(t cli.ask_open)" Y "$open_det"; then open_netbeans; else wait=0; fi
   fi
   if [ "$1" = install ] && [ $wait = 0 ]; then t cli.check_later_menu "$(t cli.menu_check)"; echo; exit 0; fi
   if [ "$1" = install ]; then
@@ -350,7 +354,8 @@ do_check() {
   echo "${R}$(t cli.problems_above)${N}"
   if [ ${#fix[@]} -gt 0 ] && [ $INTERACTIVE = 1 ]; then
     echo
-    if ask_yn "$(t cli.ask_reinstall)" Y "$(t cli.ask_reinstall_detail)"; then echo; exec env NBKIT_TTY=1 NBKIT_CLOSE=1 bash "$SELF" install "${fix[@]}" "$UD"; fi
+    local fix_labels; fix_labels="$(labels_of "${fix[@]}")"
+    if ask_yn "$(t cli.ask_reinstall "$fix_labels")" Y "$(t cli.ask_reinstall_detail "$fix_labels")"; then echo; exec env NBKIT_TTY=1 NBKIT_CLOSE=1 bash "$SELF" install "${fix[@]}" "$UD"; fi
   else
     t cli.send_output; echo
   fi
@@ -359,13 +364,15 @@ do_check() {
 
 # ---------- menu ----------
 confirm_uninstall() {
-  local id
+  local id body summary=""
   for id in "$@"; do
+    body="$(mod_call "$id" uninstall_summary)"
     echo "  ${B}$(mod_label "$id")${N}"
-    mod_call "$id" uninstall_summary
+    printf '%s\n' "$body"
+    summary+="${summary:+$'\n\n'}$(mod_label "$id")"$'\n'"$body"
   done
   echo
-  ask_yn "$(t cli.ask_uninstall)" N
+  ask_yn "$(t cli.ask_uninstall "$(labels_of "$@")")" N "$summary"
 }
 # status --json: what the interface shows (userdirs, modules, backups), see lib/gui/model.py
 # module submenu: "All" + each one. Result in PICK (list of ids); empty = went back with Esc
@@ -507,7 +514,8 @@ if [ $MENU = 1 ]; then
       update-self) echo; echo; update_self; exit 0 ;;
       uninstall-self)
         echo; echo
-        if ask_yn "$(t cli.ask_uninstall_self)" N; then uninstall_self; else t cli.nothing_changed; echo; fi
+        printf '  %s\n' "$(t cli.ask_uninstall_self_detail)"
+        if ask_yn "$(t cli.ask_uninstall_self)" N "$(t cli.ask_uninstall_self_detail)"; then uninstall_self; else t cli.nothing_changed; echo; fi
         exit 0 ;;
       build) echo; echo; exec bash "$NBKIT_DIR/src/build.sh" ;;
       check) echo; echo; do_check ;;

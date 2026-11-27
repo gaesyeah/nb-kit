@@ -694,7 +694,7 @@ class Window(Gtk.ApplicationWindow):
     # ---------- questions: a dialog that answers by typing in the terminal ----------
     def ask(self, q):
         self.close_question()
-        d, no, yes = self.question_dialog(q['text'], q['detail'], q['default_yes'], listing=True)
+        d, no, yes = self.question_dialog(q['text'], q['detail'], q['default_yes'], listing=model.is_listing(q['detail']))
         no.connect('clicked', lambda _b: self.reply(False))
         yes.connect('clicked', lambda _b: self.reply(True))
         # closing the dialog leaves the question in the terminal, to answer there

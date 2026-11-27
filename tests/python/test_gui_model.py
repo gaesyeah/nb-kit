@@ -192,6 +192,11 @@ class Commands(unittest.TestCase):
     def test_answers_work_in_every_language(self):
         self.assertEqual((model.answer(True), model.answer(False)), (b'y\n', b'n\n'))
 
+    def test_listing_only_for_multiline_details(self):
+        self.assertFalse(model.is_listing(''))
+        self.assertFalse(model.is_listing('A single explanation sentence.'))
+        self.assertTrue(model.is_listing('First line\nSecond line'))
+
 
 class Events(unittest.TestCase):
     def setUp(self):

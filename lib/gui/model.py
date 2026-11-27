@@ -187,6 +187,11 @@ def answer(yes):
     return b'y\n' if yes else b'n\n'
 
 
+def is_listing(detail):
+    """multi-line details (lists of changes, summaries) stay left-aligned in monospace; single sentences wrap centered"""
+    return '\n' in (detail or '')
+
+
 class EventFile:
     """follows the events file of a running action: read() returns the events written since the last call"""
     def __init__(self, path):

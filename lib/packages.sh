@@ -54,7 +54,9 @@ pkg_run() {
   esac
   if [ "$(id -u)" != 0 ]; then command -v sudo >/dev/null 2>&1 || return 1; sudo=(sudo); fi
   { [ -t 0 ] && [ -t 1 ]; } || return 1
-  ask_yn "$(t cli.ask_install "$what" "${sudo[*]+${sudo[*]} }${cmd[*]}")" Y || return 1
+  local cmd_str="${sudo[*]+${sudo[*]} }${cmd[*]}"
+  printf '  %s\n' "$(t cli.ask_install_detail "$cmd_str")"
+  ask_yn "$(t cli.ask_install "$what")" Y "$(t cli.ask_install_detail "$cmd_str")" || return 1
   echo
   if [ "$m" = apt-get ]; then
     info "$(t cli.pkg_updating)"

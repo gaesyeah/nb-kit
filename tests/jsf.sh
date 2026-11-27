@@ -321,15 +321,16 @@ rm -f "$W/collect-ev"
 # a fake xdg-open, to see the report opened
 mkdir -p "$W/fakebin"; printf '#!/bin/bash\necho "$1" > "%s/opened"\n' "$W" > "$W/fakebin/xdg-open"; chmod +x "$W/fakebin/xdg-open"
 outf="$W/ask1.out"; : > "$outf"
-out="$({ wait_prompt "$outf" "Collect it again?"; printf 'n\r'; wait_prompt "$outf" "Open it?"; printf '\r'; } \
+out="$({ wait_prompt "$outf" "Collect it again?"; printf 'n\r'; wait_prompt "$outf" "Open the saved report?"; printf '\r'; } \
   | PATH="$W/fakebin:$PATH" HOME="$QH" NBKIT_TTY=1 NBKIT_UI_EVENTS="$W/collect-ev" NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qefc "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" "$outf" 2>&1 | tr -d '\r')"
-contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) may be out of date. Collect it again? It opens NetBeans with no window; it closes by itself when done."
-check "the dialog gets what changed, from the same list" grep -q 'changed pages (1): src/main/webapp/pages/compare.xhtml' "$W/collect-ev"
+contains "the interface or the menu asks whether to collect again, listing what changed" "$out" "The collection of what NetBeans marks ($CD) may be out of date. Collect it again?"
+contains "saying it opens NetBeans with no window" "$out" "It opens NetBeans with no window; it closes by itself when done."
+check "the dialog gets the mode note and what changed" bash -c 'grep -q "It opens NetBeans with no window" "$1" && grep -q "changed pages (1): src/main/webapp/pages/compare.xhtml" "$1"' _ "$W/collect-ev"
 contains "no: it compares with the old one, warning" "$out" "may be out of date; comparing with it anyway."
 # NetBeans open with that userdir: the question says the running one is used, and that unsaved files go as on disk
 bash -c 'sleep 60; :' nbkit-fake-open org.netbeans.Main --userdir "$QH/.netbeans/31" & fakeopen=$!
 outf="$W/ask2.out"; : > "$outf"
-out="$({ wait_prompt "$outf" "Collect it again?"; printf 'n\r'; wait_prompt "$outf" "Open it?"; printf '\r'; } \
+out="$({ wait_prompt "$outf" "Collect it again?"; printf 'n\r'; wait_prompt "$outf" "Open the saved report?"; printf '\r'; } \
   | PATH="$W/fakebin:$PATH" HOME="$QH" NBKIT_TTY=1 NBKIT_COLLECTION="$W/marks.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false timeout 60 script -qefc "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" "$outf" 2>&1 | tr -d '\r')"
 pkill -P $fakeopen 2>/dev/null; kill $fakeopen 2>/dev/null; wait $fakeopen 2>/dev/null
 contains "NetBeans open: the question says files open and unsaved go as they are on disk" "$out" "Uses the NetBeans that is already open; files open and not saved go as they are on disk."
@@ -417,7 +418,7 @@ check "and it stays pending for the menu or the interface" test -e "$P.propertie
 # in the menu or the interface it asks: yes puts it back, no forgets it
 askrun() {
   local outf="$W/askrun.out"; : > "$outf"
-  { wait_prompt "$outf" "[y/N]"; printf '%s\r' "$1"; wait_prompt "$outf" "Collect it again?"; printf 'n\r'; wait_prompt "$outf" "Open it?"; printf 'n\r'; } \
+  { wait_prompt "$outf" "[y/N]"; printf '%s\r' "$1"; wait_prompt "$outf" "Collect it again?"; printf 'n\r'; wait_prompt "$outf" "Open the saved report?"; printf 'n\r'; } \
     | HOME="$FH" NBKIT_TTY=1 NBKIT_COLLECTION="$W/collected.tsv" NBKIT_JSF_JAR="$W/nbkit-jsf.jar" NBKIT_MVN=false PATH="$W/fakebin:$PATH" timeout 60 script -qefc "bash '$NBKIT_DIR/nbkit.sh' --lang en analyze jsf '$W/proj'" "$outf" 2>&1 | tr -d '\r'
 }
 out="$(askrun y)"

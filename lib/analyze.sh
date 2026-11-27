@@ -241,9 +241,13 @@ netbeans_collections() {
       printf '%s' "$det"
       label="$(t cli.collect_ask_modules "${#need[@]}")"
     fi
-    if nb_running; then label="$label $(t cli.collect_nb_open)"
-    else label="$label $(t cli.collect_nb_closed)"; fi
-    ask_yn "  $label" N "${det%$'\n'}" && go=1
+    local mode_note
+    if nb_running; then mode_note="$(t cli.collect_nb_open)"
+    else mode_note="$(t cli.collect_nb_closed)"; fi
+    printf '  %s\n' "$mode_note"
+    det="${det%$'\n'}"
+    if [ -n "$det" ]; then det="$mode_note"$'\n'"$det"; else det="$mode_note"; fi
+    ask_yn "  $label" N "$det" && go=1
   fi
   COLLECTED=()
   if [ $go = 1 ]; then collect_all $ask "${need[@]}"; fi
@@ -427,9 +431,8 @@ report_end() {
   local shown="${REPORT/#$HOME/\~}"
   sed -i 's/\x1b\[[0-9;]*m//g' "$REPORT"
   echo
+  echo "  ${G}$(t cli.analyze_report "$shown")${N}"
   if { [ "${MENU:-0}" = 1 ] || [ "${NBKIT_TTY:-}" = 1 ]; } && command -v xdg-open >/dev/null 2>&1; then
-    if ask_yn "  ${G}$(t cli.analyze_report_open "$shown")${N}" Y; then setsid -f xdg-open "$REPORT" >/dev/null 2>&1; fi
-  else
-    echo "  ${G}$(t cli.analyze_report "$shown")${N}"
+    if ask_yn "  $(t cli.analyze_report_open)" Y "$(printf '%s\n%s' "$shown" "$(t cli.analyze_report_open_detail)")"; then setsid -f xdg-open "$REPORT" >/dev/null 2>&1; fi
   fi
 }

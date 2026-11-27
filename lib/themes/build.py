@@ -131,13 +131,15 @@ print(os.environ.get('NBKIT_G', '') + '\u2713' + os.environ.get('NBKIT_N', '') +
 # ---------- 4. Font ----------
 font = json.loads(FONTJSON) if FONTJSON else None      # font you used in the base profile
 
-def ask(question):
+def ask(question, detail=''):
     try:
         if os.environ.get('NBKIT_INTERACTIVE') != '1':
             raise OSError('not interactive')       # same answer as with no terminal
         with open('/dev/tty') as tty, open('/dev/tty', 'w') as out:
+            if detail:
+                out.write('      ' + detail + '\n')
             out.write('      ' + question + ' ' + T('cli.yn_no') + ' '); out.flush()
-            event(ev='ask', text=question, default='N')
+            event(ev='ask', text=question, **({'detail': detail} if detail else {}), default='N')
             answer = tty.readline()
             event(ev='answered')
             return answer.strip().lower() in ('s', 'sim', 'y', 'yes')
@@ -190,7 +192,7 @@ if not THEMEFONT:
         print(T('theme.font_carried', ' '.join(mine.values())))
 elif mine and mine.get('name') != THEMEFONT:
     desc = mine['name'] + (' ' + mine['size'] if mine.get('size') else '')
-    if ask(T('theme.ask_keep_font', desc, THEMEFONT)):
+    if ask(T('theme.ask_keep_font', desc, THEMEFONT), T('theme.ask_keep_font_detail', THEMEFONT, BASE_NAME)):
         if not cur:
             put_font(pfile, theme_default, mine)
         print(T('theme.font_kept', desc))

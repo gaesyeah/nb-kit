@@ -165,7 +165,7 @@ def merge_ui(old_path, cur_path, man, laf, notes):
     # theme keys whose value you changed (needs the value saved in the manifest)
     changed = [k for k, v in ov.items() if k in cv and prevv.get(k) is not None and v != prevv[k] and v != cv[k]]
     if changed:
-        msg = T('theme.merge_changed') + '\n' + ''.join('  ' + T('theme.merge_changed_line', k, ov[k], cv[k]) + '\n' for k in changed)
+        msg = T('theme.merge_changed') + '\n' + ''.join('  ' + T('theme.merge_changed_line', k, ov[k], cv[k]) + '\n' for k in changed) + T('theme.merge_ask_keep_hint') + '\n'
         if ask_keep(msg):
             keep += [f'{k}={ov[k]}' for k in changed]
             notes.append(T('theme.merge_values_kept', len(changed)))
